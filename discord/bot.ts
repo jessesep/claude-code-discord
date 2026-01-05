@@ -99,7 +99,11 @@ export async function createDiscordBot(
   };
   
   const client = new Client({
-    intents: [GatewayIntentBits.Guilds],
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+    ],
   });
   
   // Use commands from dependencies
@@ -160,32 +164,38 @@ export async function createDiscordBot(
   // Create interaction context wrapper
   function createInteractionContext(interaction: CommandInteraction | ButtonInteraction): InteractionContext {
     return {
+      // User information from the interaction
+      user: {
+        id: interaction.user.id,
+        username: interaction.user.username
+      },
+
       async deferReply(): Promise<void> {
         await interaction.deferReply();
       },
-      
+
       async editReply(content: MessageContent): Promise<void> {
         await interaction.editReply(convertMessageContent(content));
       },
-      
+
       async followUp(content: MessageContent & { ephemeral?: boolean }): Promise<void> {
         const payload = convertMessageContent(content);
         payload.ephemeral = content.ephemeral || false;
         await interaction.followUp(payload);
       },
-      
+
       async reply(content: MessageContent & { ephemeral?: boolean }): Promise<void> {
         const payload = convertMessageContent(content);
         payload.ephemeral = content.ephemeral || false;
         await interaction.reply(payload);
       },
-      
+
       async update(content: MessageContent): Promise<void> {
         if ('update' in interaction) {
           await (interaction as ButtonInteraction).update(convertMessageContent(content));
         }
       },
-      
+
       getString(name: string, required?: boolean): string | null {
         if (interaction.isCommand && interaction.isCommand()) {
           // deno-lint-ignore no-explicit-any
@@ -193,7 +203,7 @@ export async function createDiscordBot(
         }
         return null;
       },
-      
+
       getInteger(name: string, required?: boolean): number | null {
         if (interaction.isCommand && interaction.isCommand()) {
           // deno-lint-ignore no-explicit-any
@@ -201,7 +211,7 @@ export async function createDiscordBot(
         }
         return null;
       },
-      
+
       getBoolean(name: string, required?: boolean): boolean | null {
         if (interaction.isCommand && interaction.isCommand()) {
           // deno-lint-ignore no-explicit-any
@@ -329,7 +339,7 @@ export async function createDiscordBot(
             fields: [
               { name: 'Usage', value: 'Copy this ID to use with `/claude session_id:...`', inline: false }
             ],
-            timestamp: true
+            timestamp: new Date().toISOString()
           }]
         });
       } catch (error) {
@@ -361,7 +371,7 @@ export async function createDiscordBot(
             color: 0xffaa00,
             title: '📖 Content Not Available',
             description: 'The full content is no longer available for expansion.',
-            timestamp: true
+            timestamp: new Date().toISOString()
           }],
           components: []
         });
@@ -428,7 +438,7 @@ export async function createDiscordBot(
     
     try {
       myChannel = await ensureChannelExists(guild);
-      console.log(`Using channel "${myChannel.name}"`);
+      console.log(`Using channel "${myChannel.name}" (ID: ${myChannel.id})`);
       
       await myChannel.send(convertMessageContent({
         embeds: [{
@@ -441,7 +451,7 @@ export async function createDiscordBot(
             { name: 'Branch', value: branchName, inline: true },
             { name: 'Working Directory', value: `\`${workDir}\``, inline: false }
           ],
-          timestamp: true
+          timestamp: new Date().toISOString()
         }]
       }));
     } catch (error) {
@@ -449,6 +459,113 @@ export async function createDiscordBot(
     }
   });
   
+  // Handle @mentions for automated testing
+  client.on(Events.MessageCreate, async (message) => {
+    // Ignore own messages and non-mentions
+    if (message.author.bot) return;
+    if (!message.mentions.has(client.user!.id)) return;
+    if (!myChannel || message.channelId !== myChannel.id) return;
+
+    try {
+      // Extract prompt (remove the mention)
+      const prompt = message.content.replace(/<@!?\d+>/g, '').trim();
+      if (!prompt) return;
+
+      console.log(`[MessageHandler] Received @mention: "${prompt.substring(0, 50)}..."`);
+
+      // Find agent command handler
+      const agentHandler = handlers.get('agent');
+      if (!agentHandler) {
+        console.error('[MessageHandler] Agent command handler not found');
+        await message.reply({
+          embeds: [{
+            color: 0xFF0000,
+            title: '❌ Error',
+            description: 'Agent command not available',
+          }]
+        });
+        return;
+      }
+
+      // Create mock interaction with proper reply/edit chain
+      let replyMessage: any = null;
+      let isDeferred = false;
+
+      const mockInteraction: any = {
+        user: message.author,
+        channel: message.channel,
+        guild: message.guild,
+        channelId: message.channelId,
+        isCommand: () => true,
+        options: {
+          getString: (name: string, required?: boolean) => {
+            if (name === 'action') return 'chat';
+            if (name === 'agent_name') return 'general-assistant'; // Use general assistant by default
+            if (name === 'message') return prompt;
+            return null;
+          },
+          getBoolean: () => null
+        }
+      };
+
+      const mockCtx = {
+        user: message.author,
+        channel: message.channel,
+        guild: message.guild,
+        deferReply: async (opts?: any) => {
+          isDeferred = true;
+          replyMessage = await message.reply({
+            embeds: [{
+              color: 0x5865F2,
+              title: '🤖 Processing...',
+              description: 'Starting agent conversation...',
+              timestamp: new Date().toISOString(),
+            }]
+          });
+        },
+        reply: async (opts: any) => {
+          if (!replyMessage) {
+            replyMessage = await message.reply(opts);
+          } else {
+            await replyMessage.edit(opts);
+          }
+        },
+        editReply: async (opts: any) => {
+          if (replyMessage) {
+            await replyMessage.edit(opts);
+          } else {
+            replyMessage = await message.reply(opts);
+          }
+        },
+        followUp: async (opts: any) => {
+          await message.channel.send(opts);
+        },
+        update: async (opts: any) => {
+          if (replyMessage) {
+            await replyMessage.edit(opts);
+          }
+        },
+        getString: (name: string, required?: boolean) => mockInteraction.options.getString(name, required),
+        getBoolean: (name: string, required?: boolean) => mockInteraction.options.getBoolean(name, required),
+        getInteger: () => null
+      };
+
+      // Execute agent command with chat action
+      console.log('[MessageHandler] Executing agent command...');
+      await agentHandler.execute(mockCtx);
+
+    } catch (error) {
+      console.error('[MessageHandler] Error:', error);
+      await message.reply({
+        embeds: [{
+          color: 0xFF0000,
+          title: '❌ Error',
+          description: `Failed to process: ${error}`,
+        }]
+      }).catch(() => {});
+    }
+  });
+
   client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isCommand()) {
       await handleCommand(interaction as CommandInteraction);

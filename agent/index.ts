@@ -165,6 +165,7 @@ export const agentCommand = new SlashCommandBuilder()
       .setRequired(true)
       .addChoices(
         { name: 'List Agents', value: 'list' },
+        { name: 'Select Agent', value: 'select' },
         { name: 'Start Session', value: 'start' },
         { name: 'Chat with Agent', value: 'chat' },
         { name: 'Switch Agent', value: 'switch' },
@@ -225,7 +226,8 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
           case 'list':
             await listAgents(ctx);
             break;
-            
+
+          case 'select':
           case 'start':
             if (!agentName) {
               await ctx.editReply({

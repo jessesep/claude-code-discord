@@ -32,6 +32,8 @@ export interface InteractionContext {
   getString(name: string, required?: boolean): string | null;
   getInteger(name: string, required?: boolean): number | null;
   getBoolean(name: string, required?: boolean): boolean | null;
+  // User information from the interaction
+  user: { id: string; username: string };
 }
 
 export interface BotConfig {
