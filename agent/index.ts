@@ -11,6 +11,10 @@ export interface AgentConfig {
   maxTokens: number;
   capabilities: string[];
   riskLevel: 'low' | 'medium' | 'high';
+  client?: 'claude' | 'cursor'; // Which CLI client to use (default: claude)
+  workspace?: string; // For cursor: working directory
+  force?: boolean; // For cursor: auto-approve operations
+  sandbox?: 'enabled' | 'disabled'; // For cursor: sandbox mode
 }
 
 export interface AgentSession {
@@ -94,6 +98,60 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     maxTokens: 4096,
     capabilities: ['general-help', 'coding', 'explanation', 'guidance'],
     riskLevel: 'low'
+  },
+
+  // Cursor-powered agents (autonomous code editing)
+  'cursor-coder': {
+    name: 'Cursor Autonomous Coder',
+    description: 'Cursor AI agent that can autonomously write and edit code',
+    model: 'sonnet-4',
+    systemPrompt: 'You are an autonomous coding agent powered by Cursor. You can read, write, and modify code files. Be thorough, write clean code, and follow best practices.',
+    temperature: 0.3,
+    maxTokens: 8000,
+    capabilities: ['file-editing', 'code-generation', 'refactoring', 'autonomous'],
+    riskLevel: 'high',
+    client: 'cursor',
+    force: false, // Require approval for operations
+    sandbox: 'enabled'
+  },
+  'cursor-refactor': {
+    name: 'Cursor Refactoring Specialist',
+    description: 'Specialized in autonomous code refactoring using Cursor',
+    model: 'sonnet-4',
+    systemPrompt: 'You are a refactoring specialist. Improve code structure, readability, and maintainability while preserving functionality. Always write tests to verify behavior.',
+    temperature: 0.2,
+    maxTokens: 8000,
+    capabilities: ['refactoring', 'code-improvement', 'file-editing'],
+    riskLevel: 'high',
+    client: 'cursor',
+    force: false,
+    sandbox: 'enabled'
+  },
+  'cursor-debugger': {
+    name: 'Cursor Debug Agent',
+    description: 'Autonomous debugging agent using Cursor',
+    model: 'sonnet-4-thinking',
+    systemPrompt: 'You are a debugging expert with autonomous code editing capabilities. Investigate issues, add logging, write tests, and fix bugs. Think step-by-step.',
+    temperature: 0.1,
+    maxTokens: 8000,
+    capabilities: ['debugging', 'testing', 'file-editing', 'autonomous'],
+    riskLevel: 'high',
+    client: 'cursor',
+    force: false,
+    sandbox: 'enabled'
+  },
+  'cursor-fast': {
+    name: 'Cursor Fast Agent',
+    description: 'Quick code changes with auto-approval (use with caution)',
+    model: 'sonnet-4',
+    systemPrompt: 'You are a fast coding agent. Make quick, targeted changes. Be efficient and accurate.',
+    temperature: 0.3,
+    maxTokens: 4096,
+    capabilities: ['quick-edits', 'file-editing', 'autonomous'],
+    riskLevel: 'high',
+    client: 'cursor',
+    force: true, // Auto-approve for speed
+    sandbox: 'disabled'
   }
 };
 
@@ -226,7 +284,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
                 color: 0xff0000,
                 title: '❌ Invalid Action',
                 description: `Unknown agent action: ${action}`,
-                timestamp: true
+                timestamp: new Date().toISOString()
               }]
             });
         }
@@ -258,7 +316,7 @@ async function listAgents(ctx: any) {
       footer: {
         text: 'Use /agent action:start agent_name:[name] to begin a session'
       },
-      timestamp: true
+      timestamp: new Date().toISOString()
     }]
   });
 }
@@ -271,7 +329,7 @@ async function startAgentSession(ctx: any, agentName: string) {
         color: 0xff0000,
         title: '❌ Agent Not Found',
         description: `No agent found with name: ${agentName}`,
-        timestamp: true
+        timestamp: new Date().toISOString()
       }]
     });
     return;
@@ -306,7 +364,7 @@ async function startAgentSession(ctx: any, agentName: string) {
         { name: 'Capabilities', value: agent.capabilities.join(', '), inline: false },
         { name: 'Usage', value: 'Use `/agent action:chat message:[your message]` to chat with this agent', inline: false }
       ],
-      timestamp: true
+      timestamp: new Date().toISOString()
     }]
   });
 }
@@ -328,7 +386,7 @@ async function chatWithAgent(
         color: 0xff6600,
         title: '⚠️ No Active Agent',
         description: 'No agent session active. Use `/agent action:start agent_name:[name]` to start one.',
-        timestamp: true
+        timestamp: new Date().toISOString()
       }]
     });
     return;
@@ -341,7 +399,7 @@ async function chatWithAgent(
         color: 0xff0000,
         title: '❌ Agent Not Found',
         description: `Agent ${activeAgentName} is not available.`,
-        timestamp: true
+        timestamp: new Date().toISOString()
       }]
     });
     return;
@@ -371,27 +429,143 @@ async function chatWithAgent(
         { name: 'Temperature', value: agent.temperature.toString(), inline: true },
         { name: 'Message Preview', value: `\`${message.substring(0, 200)}${message.length > 200 ? '...' : ''}\``, inline: false }
       ],
-      timestamp: true
+      timestamp: new Date().toISOString()
     }]
   });
 
-  // Here would be the actual Claude API call with agent configuration
-  // For now, we'll simulate the response
-  setTimeout(async () => {
+  // Call actual Claude API with agent configuration
+  try {
+    // Create controller for this request
+    const controller = new AbortController();
+
+    let currentChunk = "";
+    let lastUpdate = Date.now();
+    const UPDATE_INTERVAL = 2000; // Update Discord every 2 seconds
+    let result;
+
+    // Determine which client to use based on agent configuration
+    const clientType = agent.client || 'claude'; // Default to Claude
+
+    if (clientType === 'cursor') {
+      // Import Cursor CLI client
+      const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
+
+      // Build Cursor prompt combining system and user message
+      const fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+
+      // Call Cursor CLI with streaming
+      result = await sendToCursorCLI(
+        fullPrompt,
+        controller,
+        {
+          model: agent.model,
+          workspace: agent.workspace,
+          force: agent.force,
+          sandbox: agent.sandbox,
+          streamJson: true, // Enable streaming for Discord updates
+        },
+        async (chunk) => {
+          currentChunk += chunk;
+
+          // Send updates to Discord periodically
+          const now = Date.now();
+          if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+            lastUpdate = now;
+
+            // Send the accumulated text as a message
+            const claudeMessages = [{
+              type: 'text' as const,
+              content: currentChunk,
+              timestamp: new Date().toISOString()
+            }];
+
+            await deps.sendClaudeMessages(claudeMessages).catch(() => {});
+            currentChunk = ""; // Reset after sending to avoid duplicates
+          }
+        }
+      );
+    } else {
+      // Import the Claude CLI client (uses Claude subscription, no API key needed!)
+      const { sendToClaudeCLI } = await import("../claude/cli-client.ts");
+
+      // Use simple model alias for CLI (sonnet/opus) instead of full model ID
+      const cliModel = agent.model.includes("sonnet") ? "sonnet" : agent.model.includes("opus") ? "opus" : "sonnet";
+      result = await sendToClaudeCLI(
+        agent.systemPrompt,
+        message,
+        controller,
+        cliModel,
+        8000,
+        async (chunk) => {
+          currentChunk += chunk;
+
+          // Send updates to Discord periodically
+          const now = Date.now();
+          if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+            lastUpdate = now;
+
+            // Send the accumulated text as a message
+            const claudeMessages = [{
+              type: 'text' as const,
+              content: currentChunk,
+              timestamp: new Date().toISOString()
+            }];
+
+            await deps.sendClaudeMessages(claudeMessages).catch(() => {});
+            currentChunk = ""; // Reset after sending to avoid duplicates
+          }
+        }
+      );
+    }
+
+    // Send final chunk if there's any remaining content
+    if (currentChunk && deps?.sendClaudeMessages) {
+      const claudeMessages = [{
+        type: 'text' as const,
+        content: currentChunk,
+        timestamp: new Date().toISOString()
+      }];
+      await deps.sendClaudeMessages(claudeMessages).catch(() => {});
+    }
+
+    // Send completion message
+    const completionFields = [
+      { name: 'Client', value: clientType === 'cursor' ? '🖱️ Cursor' : '🤖 Claude', inline: true },
+      { name: 'Model', value: result.modelUsed || agent.model, inline: true },
+      { name: 'Duration', value: result.duration ? `${(result.duration / 1000).toFixed(1)}s` : 'N/A', inline: true },
+    ];
+
+    // Add cost for Claude (not applicable to Cursor)
+    if (clientType === 'claude' && result.cost) {
+      completionFields.splice(2, 0, { name: 'Cost', value: `$${result.cost.toFixed(4)}`, inline: true });
+    }
+
+    // Add chatId for Cursor (for session resumption)
+    if (clientType === 'cursor' && result.chatId) {
+      completionFields.push({ name: 'Chat ID', value: result.chatId, inline: false });
+    }
+
     await ctx.editReply({
       embeds: [{
         color: 0x00ff00,
-        title: `🤖 ${agent.name} Response`,
-        description: `[Agent would respond here using ${agent.model} with specialized prompting for ${agent.capabilities.join(', ')}]`,
-        fields: [
-          { name: 'Status', value: 'Completed ✅', inline: true },
-          { name: 'Tokens Used', value: 'Est. 150 tokens', inline: true },
-          { name: 'Note', value: 'This is a placeholder response. Full integration would call Claude with agent-specific configuration.', inline: false }
-        ],
-        timestamp: true
+        title: `✅ ${agent.name} - Completed`,
+        fields: completionFields,
+        timestamp: new Date().toISOString()
       }]
     });
-  }, 2000);
+
+  } catch (error) {
+    const clientType = agent.client || 'claude';
+    console.error(`[Agent] Error calling ${clientType}:`, error);
+    await ctx.editReply({
+      embeds: [{
+        color: 0xff0000,
+        title: `❌ Agent Error (${clientType === 'cursor' ? 'Cursor' : 'Claude'})`,
+        description: `Failed to process: ${error}`,
+        timestamp: new Date().toISOString()
+      }]
+    });
+  }
 }
 
 async function showAgentStatus(ctx: any) {
@@ -420,7 +594,7 @@ async function showAgentStatus(ctx: any) {
           inline: true
         }
       ],
-      timestamp: true
+      timestamp: new Date().toISOString()
     }]
   });
 }
@@ -433,7 +607,7 @@ async function showAgentInfo(ctx: any, agentName: string) {
         color: 0xff0000,
         title: '❌ Agent Not Found',
         description: `No agent found with name: ${agentName}`,
-        timestamp: true
+        timestamp: new Date().toISOString()
       }]
     });
     return;
@@ -454,7 +628,7 @@ async function showAgentInfo(ctx: any, agentName: string) {
         { name: 'Capabilities', value: agent.capabilities.join(', '), inline: false },
         { name: 'System Prompt Preview', value: `\`${agent.systemPrompt.substring(0, 200)}...\``, inline: false }
       ],
-      timestamp: true
+      timestamp: new Date().toISOString()
     }]
   });
 }
@@ -467,7 +641,7 @@ async function switchAgent(ctx: any, agentName: string) {
         color: 0xff0000,
         title: '❌ Agent Not Found',
         description: `No agent found with name: ${agentName}`,
-        timestamp: true
+        timestamp: new Date().toISOString()
       }]
     });
     return;
@@ -486,7 +660,7 @@ async function switchAgent(ctx: any, agentName: string) {
         { name: 'New Agent', value: agent.name, inline: true },
         { name: 'Ready', value: 'Use `/agent action:chat` to start chatting', inline: false }
       ],
-      timestamp: true
+      timestamp: new Date().toISOString()
     }]
   });
 }
@@ -501,7 +675,7 @@ async function endAgentSession(ctx: any) {
         color: 0xffaa00,
         title: '⚠️ No Active Session',
         description: 'No active agent session to end.',
-        timestamp: true
+        timestamp: new Date().toISOString()
       }]
     });
     return;
@@ -521,7 +695,7 @@ async function endAgentSession(ctx: any) {
       color: 0x00ff00,
       title: '✅ Session Ended',
       description: `Agent session with ${PREDEFINED_AGENTS[activeAgent]?.name || activeAgent} has been ended.`,
-      timestamp: true
+      timestamp: new Date().toISOString()
     }]
   });
 }
