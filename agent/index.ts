@@ -104,7 +104,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'cursor-coder': {
     name: 'Cursor Autonomous Coder',
     description: 'Cursor AI agent that can autonomously write and edit code',
-    model: 'sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are an autonomous coding agent powered by Cursor. You can read, write, and modify code files. Be thorough, write clean code, and follow best practices.',
     temperature: 0.3,
     maxTokens: 8000,
@@ -117,7 +117,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'cursor-refactor': {
     name: 'Cursor Refactoring Specialist',
     description: 'Specialized in autonomous code refactoring using Cursor',
-    model: 'sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are a refactoring specialist. Improve code structure, readability, and maintainability while preserving functionality. Always write tests to verify behavior.',
     temperature: 0.2,
     maxTokens: 8000,
@@ -130,7 +130,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'cursor-debugger': {
     name: 'Cursor Debug Agent',
     description: 'Autonomous debugging agent using Cursor',
-    model: 'sonnet-4-thinking',
+    model: 'sonnet-4.5-thinking',
     systemPrompt: 'You are a debugging expert with autonomous code editing capabilities. Investigate issues, add logging, write tests, and fix bugs. Think step-by-step.',
     temperature: 0.1,
     maxTokens: 8000,
@@ -143,7 +143,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'cursor-fast': {
     name: 'Cursor Fast Agent',
     description: 'Quick code changes with auto-approval (use with caution)',
-    model: 'sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are a fast coding agent. Make quick, targeted changes. Be efficient and accurate.',
     temperature: 0.3,
     maxTokens: 4096,
