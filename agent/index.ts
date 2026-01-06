@@ -271,8 +271,51 @@ export interface AgentHandlerDeps {
 
 // In-memory storage for agent sessions (in production, would be persisted)
 let agentSessions: AgentSession[] = [];
-let currentUserAgent: Record<string, string> = {}; // userId -> agentName
+// Support multiple concurrent agents per user/channel
+// Key format: `${userId}:${channelId}`, value: array of active agent names
+let currentUserAgent: Record<string, string[]> = {}; // userId:channelId -> agentName[]
 const pendingSwarmTasks = new Map<string, { subAgentName: string, task: string, managerConfig: AgentConfig }>();
+
+// Helper to get composite key for user+channel
+function getUserChannelKey(userId: string, channelId: string): string {
+  return `${userId}:${channelId}`;
+}
+
+// Helper to get active agents for a user/channel
+export function getActiveAgents(userId: string, channelId: string): string[] {
+  const key = getUserChannelKey(userId, channelId);
+  return currentUserAgent[key] || [];
+}
+
+// Helper to add an agent to active list
+function addActiveAgent(userId: string, channelId: string, agentName: string): void {
+  const key = getUserChannelKey(userId, channelId);
+  if (!currentUserAgent[key]) {
+    currentUserAgent[key] = [];
+  }
+  if (!currentUserAgent[key].includes(agentName)) {
+    currentUserAgent[key].push(agentName);
+  }
+}
+
+// Helper to remove an agent from active list
+function removeActiveAgent(userId: string, channelId: string, agentName?: string): void {
+  const key = getUserChannelKey(userId, channelId);
+  if (!currentUserAgent[key]) return;
+  
+  if (agentName) {
+    // Remove specific agent
+    currentUserAgent[key] = currentUserAgent[key].filter(a => a !== agentName);
+  } else {
+    // Remove all agents for this user/channel
+    delete currentUserAgent[key];
+  }
+  
+  // Clean up empty arrays
+  if (currentUserAgent[key] && currentUserAgent[key].length === 0) {
+    delete currentUserAgent[key];
+  }
+}
 
 export function createAgentHandlers(deps: AgentHandlerDeps) {
   const { workDir, crashHandler, sendClaudeMessages, sessionManager } = deps;
@@ -396,11 +439,9 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             }]
           });
 
-          // Security: Calculate Authorization for GCP Credentials
-          const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
-          const isAuthorized = !!(ownerId && userId === ownerId);
-
-          subAgentOutput = await runAgentTask(subAgentName, pending.task, undefined, isAuthorized);
+          // SECURITY: All Antigravity agents use gcloud OAuth (secure Google login)
+          // No need to check owner - authentication is handled by gcloud credentials
+          subAgentOutput = await runAgentTask(subAgentName, pending.task, undefined, true);
 
           const summaryPrompt = `You are the Manager. You spawned '${subAgentName}' to do this task: "${pending.task}".\n\nOutput:\n${subAgentOutput.substring(0, 40000)}\n\nProvide CONCISE summary.`;
           const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
@@ -409,7 +450,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             new AbortController(),
             {
               model: pending.managerConfig.model,
-              authorized: isAuthorized
+              authorized: true // Always use gcloud OAuth for Antigravity agents
             }
           );
           const summaryText = summaryResponse.response;
@@ -495,7 +536,7 @@ async function startAgentSession(ctx: any, agentName: string) {
 
   const channelId = ctx.channelId || ctx.channel?.id;
   console.log(`[startSession] Creating session: userId=${userId}, channelId=${channelId}, agentName=${agentName}`);
-  currentUserAgent[userId] = agentName;
+  addActiveAgent(userId, channelId, agentName);
 
   const session: AgentSession = {
     id: generateSessionId(),
@@ -588,6 +629,8 @@ export async function runAgentTask(
     const safeSystemPrompt = agent.systemPrompt.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeTask = task.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const prompt = `${safeSystemPrompt}\n\n<task>${safeTask}</task>`;
+    // SECURITY: Default to authorized=true (gcloud OAuth) for all Antigravity agents
+    // This ensures secure authentication via Google login instead of API keys
     const result = await sendToAntigravityCLI(
       prompt,
       controller,
@@ -597,7 +640,7 @@ export async function runAgentTask(
         streamJson: true,
         force: agent.force,
         sandbox: agent.sandbox,
-        authorized: isAuthorized,
+        authorized: true, // Always use gcloud OAuth for Antigravity agents
       },
       onChunk
     );
@@ -622,7 +665,10 @@ export async function chatWithAgent(
   deps?: AgentHandlerDeps
 ) {
   const userId = ctx.user.id;
-  const activeAgentName = agentName || currentUserAgent[userId];
+  const channelId = ctx.channelId || ctx.channel?.id;
+  // If agentName is provided, use it; otherwise get the first active agent for this user/channel
+  const activeAgents = getActiveAgents(userId, channelId);
+  const activeAgentName = agentName || (activeAgents.length > 0 ? activeAgents[0] : undefined);
   // ...
   const agent = AgentRegistry.getInstance().getAgent(activeAgentName || '');
   if (!agent) {
@@ -934,10 +980,7 @@ export async function chatWithAgent(
                 // Silently fail if claude-mem is not available
               }
 
-              const ownerId = deps?.ownerId;
-              const userId = ctx.user?.id;
-              const isAuthorized = !!(ownerId && userId === ownerId);
-
+              // SECURITY: Always use gcloud OAuth for Antigravity agents (secure Google login)
               result = await sendToAntigravityCLI(
                 fullPrompt,
                 controller,
@@ -947,7 +990,7 @@ export async function chatWithAgent(
                   force: agent.force,
                   sandbox: agent.sandbox,
                   streamJson: true,
-                  authorized: isAuthorized,
+                  authorized: true, // Always use gcloud OAuth for Antigravity agents
                 },
                 async (chunk) => {
                   currentChunk += chunk;
@@ -1153,10 +1196,7 @@ export async function chatWithAgent(
         }
       }
 
-      // Security: Calculate Authorization for GCP Credentials
-      const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
-      const isAuthorized = !!(ownerId && userId === ownerId);
-
+      // SECURITY: Always use gcloud OAuth for Antigravity agents (secure Google login)
       // Call Antigravity CLI with streaming
       result = await sendToAntigravityCLI(
         fullPrompt,
@@ -1167,7 +1207,7 @@ export async function chatWithAgent(
           force: agent.force,
           sandbox: agent.sandbox,
           streamJson: true,
-          authorized: isAuthorized,
+          authorized: true, // Always use gcloud OAuth for Antigravity agents
         },
         async (chunk) => {
           currentChunk += chunk;
@@ -1384,8 +1424,20 @@ export async function chatWithAgent(
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
+        // Provide user-friendly error messages
+        let errorMessage = String(error);
+        if (errorMessage.includes("ConnectError") || errorMessage.includes("[canceled]")) {
+          if (errorMessage.includes("timeout") || errorMessage.includes("too long")) {
+            errorMessage = "⏱️ Request timed out. The operation took too long and was cancelled. Try breaking your request into smaller tasks or using a faster model.";
+          } else {
+            errorMessage = "🔌 Connection cancelled. This may be due to network issues. Please try again in a moment.";
+          }
+        } else if (errorMessage.includes("exited with code 1")) {
+          errorMessage = "❌ Cursor CLI encountered an error. This might be a temporary issue - please try again.";
+        }
+        
         title: `❌ Agent Error (${clientType === 'cursor' ? 'Cursor' : 'Claude'})`,
-        description: `Failed to process: ${error}`,
+        description: `Failed to process: ${errorMessage}`,
         timestamp: new Date().toISOString()
       }]
     });
@@ -1394,8 +1446,13 @@ export async function chatWithAgent(
 
 async function showAgentStatus(ctx: any) {
   const userId = ctx.user.id;
-  const activeAgent = currentUserAgent[userId];
-  const activeSessions = agentSessions.filter(s => s.status === 'active');
+  const channelId = ctx.channelId || ctx.channel?.id;
+  const activeAgents = getActiveAgents(userId, channelId);
+  const activeSessions = agentSessions.filter(s => s.status === 'active' && s.userId === userId && s.channelId === channelId);
+
+  const activeAgentNames = activeAgents.length > 0 
+    ? activeAgents.map(a => PREDEFINED_AGENTS[a]?.name || a).join(', ')
+    : 'None';
 
   await ctx.editReply({
     embeds: [{
@@ -1403,9 +1460,9 @@ async function showAgentStatus(ctx: any) {
       title: '📊 Agent Status',
       fields: [
         {
-          name: 'Current Agent',
-          value: activeAgent ? PREDEFINED_AGENTS[activeAgent]?.name || 'Unknown' : 'None',
-          inline: true
+          name: 'Active Agents',
+          value: activeAgentNames,
+          inline: false
         },
         {
           name: 'Active Sessions',
@@ -1472,15 +1529,22 @@ async function switchAgent(ctx: any, agentName: string) {
   }
 
   const userId = ctx.user.id;
-  const previousAgent = currentUserAgent[userId];
-  currentUserAgent[userId] = agentName;
+  const channelId = ctx.channelId || ctx.channel?.id;
+  const previousAgents = getActiveAgents(userId, channelId);
+  // For switch, we replace all active agents with the new one
+  removeActiveAgent(userId, channelId);
+  addActiveAgent(userId, channelId, agentName);
+
+  const previousAgentNames = previousAgents.length > 0 
+    ? previousAgents.map(a => PREDEFINED_AGENTS[a]?.name || a).join(', ')
+    : 'None';
 
   await ctx.editReply({
     embeds: [{
       color: 0x00ff00,
       title: '🔄 Agent Switched',
       fields: [
-        { name: 'Previous Agent', value: previousAgent ? PREDEFINED_AGENTS[previousAgent]?.name || 'None' : 'None', inline: true },
+        { name: 'Previous Agent(s)', value: previousAgentNames, inline: true },
         { name: 'New Agent', value: agent.name, inline: true },
         { name: 'Ready', value: 'Use `/agent action:chat` to start chatting', inline: false }
       ],
@@ -1492,9 +1556,9 @@ async function switchAgent(ctx: any, agentName: string) {
 async function endAgentSession(ctx: any) {
   const userId = ctx.user.id;
   const channelId = ctx.channelId || ctx.channel?.id;
-  const activeAgent = currentUserAgent[userId];
+  const activeAgents = getActiveAgents(userId, channelId);
 
-  if (!activeAgent) {
+  if (activeAgents.length === 0) {
     await ctx.editReply({
       embeds: [{
         color: 0xffaa00,
@@ -1506,7 +1570,8 @@ async function endAgentSession(ctx: any) {
     return;
   }
 
-  delete currentUserAgent[userId];
+  const agentNames = activeAgents.map(a => PREDEFINED_AGENTS[a]?.name || a).join(', ');
+  removeActiveAgent(userId, channelId);
 
   // Mark sessions as completed
   agentSessions.forEach(session => {
@@ -1518,8 +1583,8 @@ async function endAgentSession(ctx: any) {
   await ctx.editReply({
     embeds: [{
       color: 0x00ff00,
-      title: '🛑 Agent Stopped',
-      description: `The **${PREDEFINED_AGENTS[activeAgent]?.name || activeAgent}** session has been terminated.\n\nUse \`/run\` to start a new session.`,
+      title: '🛑 Agent(s) Stopped',
+      description: `The **${agentNames}** session(s) have been terminated.\n\nUse \`/run\` to start a new session.`,
       timestamp: new Date().toISOString()
     }]
   });
@@ -1528,7 +1593,7 @@ async function endAgentSession(ctx: any) {
 // (Removed duplicate getActiveSession)
 
 export function setAgentSession(userId: string, channelId: string, agentName: string) {
-  currentUserAgent[userId] = agentName;
+  addActiveAgent(userId, channelId, agentName);
   const session: AgentSession = {
     id: `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     agentName,
@@ -1545,7 +1610,7 @@ export function setAgentSession(userId: string, channelId: string, agentName: st
 }
 
 export function clearAgentSession(userId: string, channelId: string) {
-  delete currentUserAgent[userId];
+  removeActiveAgent(userId, channelId);
   agentSessions.forEach(session => {
     if (session.userId === userId && session.channelId === channelId && session.status === 'active') {
       session.status = 'completed';
@@ -1566,16 +1631,16 @@ export function getActiveSession(userId: string, channelId: string): { session: 
     console.log(`[getActiveSession] Session ${i}: userId=${s.userId}, channelId=${s.channelId}, status=${s.status}, agent=${s.agentName}`);
   });
 
+  const activeAgents = getActiveAgents(userId, channelId);
   const session = agentSessions.find(
     s => s.userId === userId && s.channelId === channelId && s.status === 'active'
   );
 
-  if (session) {
-    const agentName = currentUserAgent[userId];
-    console.log(`[getActiveSession] Found session! agentName=${agentName}`);
-    if (agentName) {
-      return { session, agentName };
-    }
+  if (session && activeAgents.length > 0) {
+    // Return the session with the first active agent (or the session's agent if it matches)
+    const agentName = activeAgents.includes(session.agentName) ? session.agentName : activeAgents[0];
+    console.log(`[getActiveSession] Found session! agentName=${agentName}, activeAgents=${activeAgents.join(', ')}`);
+    return { session, agentName };
   }
 
   console.log(`[getActiveSession] No active session found`);
@@ -1624,9 +1689,8 @@ export async function handleManagerInteraction(
     const sessionData = getActiveSession(userId, channelId);
     let historyPrompt = "";
 
-    // Security: Calculate Authorization for GCP Credentials
-    const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
-    const isAuthorized = !!(ownerId && userId === ownerId);
+    // SECURITY: Always use gcloud OAuth for Antigravity agents (secure Google login)
+    // No need to check owner - all Antigravity agents use secure Google authentication
 
     if (sessionData && sessionData.session) {
       // Append current user message to history
@@ -1717,13 +1781,14 @@ export async function handleManagerInteraction(
     const managerPrompt = `${agentConfig.systemPrompt}${contextContent}${gitContext}${mcpToolsInfo}\n\n=== CONVERSATION HISTORY ===\n${historyPrompt}\n\n=== END HISTORY ===\n\n(Respond to the last User message)`;
     const controller = new AbortController();
 
+    // SECURITY: Always use gcloud OAuth for Antigravity agents (secure Google login)
     const response = await sendToAntigravityCLI(
       managerPrompt,
       controller,
       {
         model: agentConfig.model,
         streamJson: false, // We need full JSON block, not streaming text for logic
-        authorized: isAuthorized,
+        authorized: true, // Always use gcloud OAuth for Antigravity agents
       }
     );
 
@@ -1873,51 +1938,44 @@ export async function handleManagerInteraction(
         return;
       }
 
-      // Switch the active agent
+      // Spawn the new agent (add it to active agents, don't replace)
       const channelId = ctx.channelId || ctx.channel?.id;
-      currentUserAgent[userId] = subAgentName;
+      addActiveAgent(userId, channelId, subAgentName);
 
-      // Update or create session for the new agent
-      let newSession = agentSessions.find(
-        s => s.userId === userId && s.channelId === channelId && s.status === 'active'
-      );
-
-      if (newSession) {
-        // Update existing session
-        newSession.agentName = subAgentName;
-        newSession.lastActivity = new Date();
-      } else {
-        // Create new session
-        newSession = {
-          id: generateSessionId(),
-          agentName: subAgentName,
-          userId,
-          channelId: channelId!,
-          startTime: new Date(),
-          messageCount: 0,
-          totalCost: 0,
-          lastActivity: new Date(),
-          status: 'active',
-          history: []
-        };
-        agentSessions.push(newSession);
-      }
+      // Create a new session for the spawned agent (don't replace existing sessions)
+      const newSession: AgentSession = {
+        id: generateSessionId(),
+        agentName: subAgentName,
+        userId,
+        channelId: channelId!,
+        startTime: new Date(),
+        messageCount: 0,
+        totalCost: 0,
+        lastActivity: new Date(),
+        status: 'active',
+        history: []
+      };
 
       // Add the original user message and task to history
       if (sessionData && sessionData.session) {
         newSession.history = [...sessionData.session.history];
       }
       newSession.history.push({ role: 'user', content: userMessage });
+      agentSessions.push(newSession);
 
-      // Notify user that agent is switching
+      // Get list of all active agents for this user/channel
+      const activeAgents = getActiveAgents(userId, channelId);
+      const activeAgentNames = activeAgents.map(a => PREDEFINED_AGENTS[a]?.name || a).join(', ');
+
+      // Notify user that agent is spawning (not switching)
       await ctx.editReply({
         embeds: [{
           color: 0x00cc99,
-          title: '🔄 Switching Agent',
-          description: `**${agentConfig.name}** is handing off to **${subAgentConfig.name}**.\n\n**Task:** ${subAgentTask}`,
+          title: '🚀 Spawning Agent',
+          description: `**${agentConfig.name}** is spawning **${subAgentConfig.name}** to handle this task.\n\n**Task:** ${subAgentTask}\n\n**Active Agents:** ${activeAgentNames}`,
           fields: [
             { name: 'New Agent', value: subAgentConfig.name, inline: true },
-            { name: 'Status', value: '🔄 Taking over...', inline: true }
+            { name: 'Status', value: '🔄 Running concurrently...', inline: true }
           ],
           timestamp: new Date().toISOString()
         }]

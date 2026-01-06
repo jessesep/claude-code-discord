@@ -184,8 +184,11 @@ deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User
 - `/disk-usage`, `/env-vars`, `/system-logs`, `/port-scan`
 - `/service-status`, `/uptime`
 
-### Utilities (4)
+### Utilities (7)
 - `/status`, `/pwd`, `/shutdown`, `/help`
+- `/agents-status` - View all active agents running concurrently
+- `/category-info` - Show category and repository information
+- `/repo-info` - Display repository details
 
 ### Agent System (3)
 - `/agent` with 7 specialized agents:
@@ -208,6 +211,20 @@ deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User
 #### Claude Code (Discord Bot Edition)
 
 A powerful Discord-based AI coding assistant that acts as a "Main Agent" (Manager) to orchestrate specialized subagents for complex coding tasks.
+
+### ✨ New Features
+
+**Multi-Agent Support:**
+- Multiple agents can now run simultaneously in the same channel
+- Each agent works on different tasks concurrently
+- Use `/agents-status` to see all active agents
+- Manager agent can spawn multiple subagents without stopping existing ones
+
+**Category Names with Repository Info:**
+- Category names now include repository information for easy identification
+- Format: `CategoryName (RepositoryName)` or just `RepositoryName` if no category specified
+- Makes it easy to see which repository each Discord category belongs to
+- Use `/category-info` to see category and repository details
 
 ## 🌟 New Architecture (Manager-Subagent)
 

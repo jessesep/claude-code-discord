@@ -762,6 +762,44 @@ export const COMMAND_HELP = {
       "Shows model capabilities and features",
       "Applies to all new conversations until changed again"
     ]
+  },
+  "agents-status": {
+    title: "🤖 Active Agents Status",
+    description: "View all currently active agents running in this channel",
+    usage: "/agents-status",
+    examples: ["/agents-status"],
+    parameters: [],
+    notes: [
+      "Shows all agents currently active for your user in this channel",
+      "Displays agent name, model, risk level, and capabilities",
+      "Multiple agents can run concurrently on different tasks",
+      "Useful for monitoring which agents are working on what"
+    ]
+  },
+  "category-info": {
+    title: "📁 Category Information",
+    description: "Display category and repository information",
+    usage: "/category-info",
+    examples: ["/category-info"],
+    parameters: [],
+    notes: [
+      "Shows the Discord category name and repository it belongs to",
+      "Category names now include repository: 'CategoryName (RepoName)'",
+      "Helps identify which repository each Discord category belongs to",
+      "Prevents confusion when managing multiple repositories"
+    ]
+  },
+  "repo-info": {
+    title: "📂 Repository Information",
+    description: "Display detailed repository information",
+    usage: "/repo-info",
+    examples: ["/repo-info"],
+    parameters: [],
+    notes: [
+      "Shows repository name, branch, category, and working directory",
+      "Displays how category names include repository information",
+      "Useful for confirming bot context and repository details"
+    ]
   }
 };
 
@@ -856,6 +894,11 @@ export function createHelpHandlers(deps: HelpHandlerDeps) {
               {
                 name: "🔧 Advanced Commands (Optional)",
                 value: "`/agent` - Direct agent control (for power users)\n`/settings` - Bot configuration\n`/help command:[name]` - Detailed help on specific commands",
+                inline: false
+              },
+              {
+                name: "✨ New Features",
+                value: "**Multi-Agent Support:** Multiple agents can now run simultaneously!\n**Category Names:** Category names include repository info (e.g., `MyProject (claude-code-discord)`)\n\n**New Commands:**\n`/agents-status` - View all active agents\n`/category-info` - See category and repo information\n`/repo-info` - View repository details",
                 inline: false
               }
             ],

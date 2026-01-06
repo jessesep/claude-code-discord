@@ -112,7 +112,8 @@ export async function createDiscordBot(
   crashHandler?: any
 ) {
   const { discordToken, applicationId, workDir, repoName, branchName, categoryName } = config;
-  const actualCategoryName = categoryName || repoName;
+  // Format: "categoryName (repoName)" if categoryName provided, otherwise just "repoName"
+  const actualCategoryName = categoryName ? `${categoryName} (${repoName})` : repoName;
   
   let myChannel: TextChannel | null = null;
   // deno-lint-ignore no-explicit-any no-unused-vars

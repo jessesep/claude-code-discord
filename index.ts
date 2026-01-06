@@ -57,8 +57,9 @@ export { sendToClaudeCode } from "./claude/index.ts";
 export async function createClaudeCodeBot(config: BotConfig) {
   const { discordToken, applicationId, workDir, repoName, branchName, categoryName, defaultMentionUserId } = config;
 
-  // Determine category name (use repository name if not specified)
-  const actualCategoryName = categoryName || repoName;
+  // Determine category name (include repo name for visibility)
+  // Format: "categoryName (repoName)" if categoryName provided, otherwise just "repoName"
+  const actualCategoryName = categoryName ? `${categoryName} (${repoName})` : repoName;
 
   // Initialize conversation sync system (for /sync command and conversation persistence)
   try {
@@ -956,6 +957,24 @@ export async function createClaudeCodeBot(config: BotConfig) {
             timestamp: true
           }]
         });
+      }
+    }],
+    ['agents-status', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await utilsHandlers.onAgentsStatus(ctx);
+      }
+    }],
+    ['category-info', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await utilsHandlers.onCategoryInfo(ctx);
+      }
+    }],
+    ['repo-info', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await utilsHandlers.onRepoInfo(ctx);
       }
     }],
     ['shutdown', {

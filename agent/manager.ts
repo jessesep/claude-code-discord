@@ -85,7 +85,7 @@ To switch to a specialized agent (which will take over the conversation), output
 }
 \`\`\`
 
-**Important**: When you output this JSON, the specified agent will immediately take over the conversation and handle the task. The user will continue chatting with that agent, not you. Only use this when the task clearly requires a specialized agent. For simple questions or clarifications, just reply directly.
+**Important**: When you output this JSON, the specified agent will be spawned and run concurrently with any other active agents. Multiple agents can work simultaneously on different tasks. The spawned agent will handle the specified task while you can continue coordinating. Only use this when the task clearly requires a specialized agent. For simple questions or clarifications, just reply directly.
 `;
 
 export interface ManagerAction {
