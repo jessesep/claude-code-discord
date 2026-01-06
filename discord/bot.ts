@@ -1,8 +1,8 @@
-import { 
-  Client, 
-  GatewayIntentBits, 
-  Events, 
-  ChannelType, 
+import {
+  Client,
+  GatewayIntentBits,
+  Events,
+  ChannelType,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -13,6 +13,7 @@ import {
   TextChannel,
   EmbedBuilder
 } from "npm:discord.js@14.14.1";
+import { getActiveSession } from "../agent/index.ts";
 
 import { sanitizeChannelName } from "./utils.ts";
 import { handlePaginationInteraction } from "./pagination.ts";
@@ -169,6 +170,11 @@ export async function createDiscordBot(
         id: interaction.user.id,
         username: interaction.user.username
       },
+
+      // Channel information
+      channelId: interaction.channelId,
+      channel: interaction.channel,
+      guild: interaction.guild,
 
       async deferReply(): Promise<void> {
         await interaction.deferReply();
@@ -459,19 +465,35 @@ export async function createDiscordBot(
     }
   });
   
-  // Handle @mentions for automated testing
+  // Handle messages (natural chat with active agents + @mentions)
   client.on(Events.MessageCreate, async (message) => {
-    // Ignore own messages and non-mentions
+    // Ignore own messages
     if (message.author.bot) return;
-    if (!message.mentions.has(client.user!.id)) return;
     if (!myChannel || message.channelId !== myChannel.id) return;
+
+    console.log(`[MessageCreate] Received message from ${message.author.username} (${message.author.id}) in channel ${message.channelId}`);
+    console.log(`[MessageCreate] Message content: "${message.content}"`);
+
+    // Check for active agent session (natural chat flow)
+    const activeSession = getActiveSession(message.author.id, message.channelId);
+    const isMention = message.mentions.has(client.user!.id);
+
+    console.log(`[MessageCreate] Active session:`, activeSession ? `${activeSession.agentName}` : 'none');
+    console.log(`[MessageCreate] Is mention:`, isMention);
+
+    // Skip if no active session and no @mention
+    if (!activeSession && !isMention) {
+      console.log(`[MessageCreate] Skipping - no active session and no @mention`);
+      return;
+    }
 
     try {
       // Extract prompt (remove the mention)
       const prompt = message.content.replace(/<@!?\d+>/g, '').trim();
       if (!prompt) return;
 
-      console.log(`[MessageHandler] Received @mention: "${prompt.substring(0, 50)}..."`);
+      const sessionInfo = activeSession ? ` (session: ${activeSession.agentName})` : ' (@mention)';
+      console.log(`[MessageHandler] Received message${sessionInfo}: "${prompt.substring(0, 50)}..."`);
 
       // Find agent command handler
       const agentHandler = handlers.get('agent');
@@ -487,6 +509,9 @@ export async function createDiscordBot(
         return;
       }
 
+      // Determine which agent to use: active session or default
+      const targetAgent = activeSession?.agentName || 'general-assistant';
+
       // Create mock interaction with proper reply/edit chain
       let replyMessage: any = null;
       let isDeferred = false;
@@ -500,7 +525,7 @@ export async function createDiscordBot(
         options: {
           getString: (name: string, required?: boolean) => {
             if (name === 'action') return 'chat';
-            if (name === 'agent_name') return 'general-assistant'; // Use general assistant by default
+            if (name === 'agent_name') return targetAgent;
             if (name === 'message') return prompt;
             return null;
           },
@@ -511,6 +536,7 @@ export async function createDiscordBot(
       const mockCtx = {
         user: message.author,
         channel: message.channel,
+        channelId: message.channelId,
         guild: message.guild,
         deferReply: async (opts?: any) => {
           isDeferred = true;

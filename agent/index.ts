@@ -20,6 +20,8 @@ export interface AgentConfig {
 export interface AgentSession {
   id: string;
   agentName: string;
+  userId: string;
+  channelId: string;
   startTime: Date;
   messageCount: number;
   totalCost: number;
@@ -338,11 +340,15 @@ async function startAgentSession(ctx: any, agentName: string) {
   }
 
   const userId = ctx.user.id;
+  const channelId = ctx.channelId || ctx.channel?.id;
+  console.log(`[startSession] Creating session: userId=${userId}, channelId=${channelId}, agentName=${agentName}`);
   currentUserAgent[userId] = agentName;
 
   const session: AgentSession = {
     id: generateSessionId(),
     agentName,
+    userId,
+    channelId,
     startTime: new Date(),
     messageCount: 0,
     totalCost: 0,
@@ -351,6 +357,7 @@ async function startAgentSession(ctx: any, agentName: string) {
   };
 
   agentSessions.push(session);
+  console.log(`[startSession] Session created and added. Total sessions: ${agentSessions.length}`);
 
   const riskColor = agent.riskLevel === 'high' ? 0xff6600 : agent.riskLevel === 'medium' ? 0xffaa00 : 0x00ff00;
 
@@ -705,4 +712,28 @@ async function endAgentSession(ctx: any) {
 // Utility functions
 function generateSessionId(): string {
   return `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Get active agent session for a user/channel (for natural chat flow)
+export function getActiveSession(userId: string, channelId: string): { session: AgentSession; agentName: string } | null {
+  console.log(`[getActiveSession] Looking for session: userId=${userId}, channelId=${channelId}`);
+  console.log(`[getActiveSession] Total sessions:`, agentSessions.length);
+  agentSessions.forEach((s, i) => {
+    console.log(`[getActiveSession] Session ${i}: userId=${s.userId}, channelId=${s.channelId}, status=${s.status}, agent=${s.agentName}`);
+  });
+
+  const session = agentSessions.find(
+    s => s.userId === userId && s.channelId === channelId && s.status === 'active'
+  );
+
+  if (session) {
+    const agentName = currentUserAgent[userId];
+    console.log(`[getActiveSession] Found session! agentName=${agentName}`);
+    if (agentName) {
+      return { session, agentName };
+    }
+  }
+
+  console.log(`[getActiveSession] No active session found`);
+  return null;
 }
