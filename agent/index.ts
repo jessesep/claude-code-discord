@@ -1894,7 +1894,7 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
         footer: { text: 'Select an option below to start' },
         timestamp: new Date().toISOString()
       }],
-      components: [row]
+      components: [row.toJSON()]
     });
     
     return;
