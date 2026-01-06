@@ -830,8 +830,26 @@ async function endAgentSession(ctx: any) {
   });
 }
 
+// Session management
+export function getActiveSession(userId: string, channelId: string): AgentSession | null {
+  const key = `${userId}-${channelId}`;
+  const agentName = currentUserAgent[key];
+  if (!agentName) return null;
+  return { agentName, startTime: 0, userId, channelId };
+}
+
+export function startAgentSession(userId: string, channelId: string, agentName: string) {
+  const key = `${userId}-${channelId}`;
+  currentUserAgent[key] = agentName;
+}
+
+export function endAgentSession(userId: string, channelId: string) {
+  const key = `${userId}-${channelId}`;
+  delete currentUserAgent[key];
+}
+
 // Utility functions
-function generateSessionId(): string {
+export function generateSessionId(): string {
   return `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 

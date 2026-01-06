@@ -33,4 +33,4 @@ echo ""
   --allow-write \
   --allow-env \
   --allow-run \
-  discord/bot.ts
+  discord/main.ts
