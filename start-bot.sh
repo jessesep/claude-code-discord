@@ -33,4 +33,5 @@ echo ""
   --allow-write \
   --allow-env \
   --allow-run \
-  discord/main.ts
+  --allow-sys \
+  index.ts

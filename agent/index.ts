@@ -1,5 +1,6 @@
 // Agent command implementation
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
+import { MANAGER_SYSTEM_PROMPT, parseManagerResponse, ManagerAction } from "./manager.ts";
 
 // Agent types and interfaces
 export interface AgentConfig {
@@ -15,6 +16,7 @@ export interface AgentConfig {
   workspace?: string; // For cursor: working directory
   force?: boolean; // For cursor: auto-approve operations
   sandbox?: 'enabled' | 'disabled'; // For cursor: sandbox mode
+  isManager?: boolean; // If true, this agent can spawn other agents
 }
 
 export interface AgentSession {
@@ -31,6 +33,18 @@ export interface AgentSession {
 
 // Predefined agent configurations
 export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
+  'ag-manager': {
+    name: 'Gemini Manager',
+    description: 'Main orchestrator agent that manages other agents and interacts with the user',
+    model: 'gemini-2.0-flash',
+    systemPrompt: MANAGER_SYSTEM_PROMPT,
+    temperature: 0.3,
+    maxTokens: 10000,
+    capabilities: ['orchestration', 'planning', 'subagent-management'],
+    riskLevel: 'low',
+    client: 'antigravity',
+    isManager: true
+  },
   'code-reviewer': {
     name: 'Code Reviewer',
     description: 'Specialized in code review and quality analysis',
@@ -486,6 +500,8 @@ export async function chatWithAgent(
     return;
   }
 
+
+
   const agent = PREDEFINED_AGENTS[activeAgentName];
   if (!agent) {
     await ctx.editReply({
@@ -498,6 +514,14 @@ export async function chatWithAgent(
     });
     return;
   }
+
+  // --- MANAGER AGENT LOGIC ---
+  if (agent.isManager) {
+    console.log('[Manager] Handling manager interaction');
+    await handleManagerInteraction(ctx, message, agent, deps);
+    return;
+  }
+  // ---------------------------
 
   // Build the enhanced prompt with agent's system prompt
   let enhancedPrompt = `${agent.systemPrompt}\n\nUser Query: ${message}`;
@@ -583,7 +607,67 @@ export async function chatWithAgent(
       const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
 
       // Build Prompt
-      const fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+      let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+
+      if (contextFiles) {
+        try {
+          const files = contextFiles.split(',').map(f => f.trim());
+          fullPrompt += `\n\n=== Context Files ===\n`;
+
+          for (const file of files) {
+            try {
+              // Resolve path relative to workDir if possible, otherwise CWD
+              const workDir = deps?.workDir || Deno.cwd();
+              // Simple resolution: if absolute use it, else join
+              let filePath = file;
+              if (!file.startsWith('/')) {
+                filePath = `${workDir}/${file}`;
+              }
+
+              // Check if exists
+              const stat = await Deno.stat(filePath);
+              if (stat.isFile) {
+                const content = await Deno.readTextFile(filePath);
+                fullPrompt += `\n--- File: ${file} ---\n${content}\n----------------\n`;
+              }
+            } catch (e) {
+              fullPrompt += `\n--- File: ${file} (Error reading: ${e.message}) ---\n`;
+            }
+          }
+          fullPrompt += `\n=====================\n`;
+        } catch (err) {
+          console.error("Error loading context files:", err);
+        }
+      }
+
+      // Git Context Injection
+      // We checking deps.includeGit which we passed from commands.ts
+      if ((deps as any)?.includeGit) {
+        try {
+          const workDir = deps?.workDir || Deno.cwd();
+          fullPrompt += `\n\n=== Git Context ===\n`;
+
+          // Git Status
+          const pStatus = new Deno.Command("git", { args: ["status"], cwd: workDir, stdout: "piped", stderr: "piped" });
+          const outStatus = await pStatus.output();
+          fullPrompt += `--- git status ---\n${new TextDecoder().decode(outStatus.stdout)}\n`;
+
+          // Git Diff
+          const pDiff = new Deno.Command("git", { args: ["diff"], cwd: workDir, stdout: "piped", stderr: "piped" });
+          const outDiff = await pDiff.output();
+          const diffText = new TextDecoder().decode(outDiff.stdout);
+          if (diffText.trim().length > 0) {
+            fullPrompt += `--- git diff ---\n${diffText.substring(0, 20000)}\n`; // Limit diff size
+          } else {
+            fullPrompt += `--- git diff ---\n(No changes)\n`;
+          }
+          fullPrompt += `===================\n`;
+
+        } catch (e) {
+          console.error("Error getting git context:", e);
+          fullPrompt += `\n(Error getting git context: ${e.message})\n`;
+        }
+      }
 
       // Call Antigravity CLI with streaming
       result = await sendToAntigravityCLI(
@@ -830,22 +914,31 @@ async function endAgentSession(ctx: any) {
   });
 }
 
-// Session management
-export function getActiveSession(userId: string, channelId: string): AgentSession | null {
-  const key = `${userId}-${channelId}`;
-  const agentName = currentUserAgent[key];
-  if (!agentName) return null;
-  return { agentName, startTime: 0, userId, channelId };
+// (Removed duplicate getActiveSession)
+
+export function setAgentSession(userId: string, channelId: string, agentName: string) {
+  currentUserAgent[userId] = agentName;
+  const session: AgentSession = {
+    id: `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    agentName,
+    userId,
+    channelId,
+    startTime: new Date(),
+    messageCount: 0,
+    totalCost: 0,
+    lastActivity: new Date(),
+    status: 'active'
+  };
+  agentSessions.push(session);
 }
 
-export function startAgentSession(userId: string, channelId: string, agentName: string) {
-  const key = `${userId}-${channelId}`;
-  currentUserAgent[key] = agentName;
-}
-
-export function endAgentSession(userId: string, channelId: string) {
-  const key = `${userId}-${channelId}`;
-  delete currentUserAgent[key];
+export function clearAgentSession(userId: string, channelId: string) {
+  delete currentUserAgent[userId];
+  agentSessions.forEach(session => {
+    if (session.userId === userId && session.channelId === channelId && session.status === 'active') {
+      session.status = 'completed';
+    }
+  });
 }
 
 // Utility functions
@@ -875,4 +968,149 @@ export function getActiveSession(userId: string, channelId: string): { session: 
 
   console.log(`[getActiveSession] No active session found`);
   return null;
+}
+
+// ==========================================
+// Manager Agent Implementation
+// ==========================================
+
+export async function handleManagerInteraction(
+  ctx: any,
+  userMessage: string,
+  agentConfig: AgentConfig,
+  deps?: AgentHandlerDeps
+) {
+  // 1. Initial acknowledgment (invisible update to change state)
+  await ctx.editReply({
+    embeds: [{
+      color: 0x9900ff, // Purple for Manager
+      title: '🧠 Manager Thinking...',
+      description: 'Analyzing request...',
+      timestamp: new Date().toISOString()
+    }]
+  });
+
+  try {
+    // 2. Call Manager (Gemini Flash)
+    // We reuse the Antigravity client directly here
+    const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+
+    // Construct Prompt
+    const managerPrompt = `${agentConfig.systemPrompt}\n\nUser Query: ${userMessage}`;
+    const controller = new AbortController();
+
+    const response = await sendToAntigravityCLI(
+      managerPrompt,
+      controller,
+      {
+        model: agentConfig.model,
+        streamJson: false, // We need full JSON block, not streaming text for logic
+      }
+    );
+
+    const fullResponse = response.response;
+    const action = parseManagerResponse(fullResponse);
+
+    if (!action) {
+      // Fallback
+      await ctx.editReply({ content: fullResponse });
+      return;
+    }
+
+    // 3. Handle Action
+    if (action.action === 'reply' && action.message) {
+      // Direct Reply
+      await ctx.editReply({
+        embeds: [{
+          color: 0x00cc99, // Teal for direct reply
+          title: '💬 Manager',
+          description: action.message,
+          timestamp: new Date().toISOString()
+        }]
+      });
+    } else if (action.action === 'spawn_agent' && action.agent_name && action.task) {
+      // Spawn Subagent
+      const subAgentName = action.agent_name;
+      const subAgentTask = action.task;
+      const subAgentConfig = PREDEFINED_AGENTS[subAgentName];
+
+      if (!subAgentConfig) {
+        await ctx.editReply({ content: `Manager tried to spawn unknown agent: ${subAgentName}` });
+        return;
+      }
+
+      // Update UI to show delegation
+      await ctx.editReply({
+        embeds: [{
+          color: 0xffaa00, // Orange for working
+          title: `🚧 Manager Delegating`,
+          description: `Spawning **${subAgentConfig.name}**...`,
+          fields: [
+            { name: 'Task', value: subAgentTask }
+          ],
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+      // Run Subagent Headlessly
+      // Trigger a "working" message if possible or just wait
+      let subAgentOutput = "";
+      try {
+        subAgentOutput = await runAgentTask(
+          subAgentName,
+          subAgentTask,
+          (chunk) => {
+            // Optional: We could stream this to a separate message or debug log
+            // For now, keep it silent to avoid "streaming block of text"
+          }
+        );
+      } catch (err) {
+        subAgentOutput = `Error running subagent: ${err}`;
+      }
+
+      // 4. Summarize Result
+      const summaryPrompt = `
+You are the Manager. You spawned '${subAgentName}' to do this task: "${subAgentTask}".
+
+Here is the Output from the subagent:
+--------------------------------------------------
+${subAgentOutput.substring(0, 50000)} ... (truncated if essential)
+--------------------------------------------------
+
+Based on this output, provide a CONCISE summary to the user.
+- Mention what files were edited or created.
+- Mention if it was successful.
+- Be brief and helpful.
+`;
+
+      // Call Manager again for summary
+      const summaryResponse = await sendToAntigravityCLI(
+        summaryPrompt,
+        new AbortController(),
+        { model: agentConfig.model }
+      );
+
+      const summaryText = summaryResponse.response;
+
+      // Final Success Embed
+      await ctx.editReply({
+        embeds: [{
+          color: 0x00ff00, // Green for success
+          title: '✅ Task Completed',
+          description: summaryText,
+          fields: [
+            { name: 'Agent', value: subAgentConfig.name, inline: true },
+            { name: 'Model', value: subAgentConfig.model, inline: true }
+          ],
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+    }
+  } catch (error) {
+    console.error("Manager Error:", error);
+    await ctx.editReply({
+      content: `Manager crashed: ${error}`
+    });
+  }
 }
