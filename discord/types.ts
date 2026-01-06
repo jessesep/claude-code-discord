@@ -34,6 +34,10 @@ export interface InteractionContext {
   getBoolean(name: string, required?: boolean): boolean | null;
   // User information from the interaction
   user: { id: string; username: string };
+  // Channel information
+  channelId?: string | null;
+  channel?: any; // Discord.js Channel object
+  guild?: any; // Discord.js Guild object
 }
 
 export interface BotConfig {

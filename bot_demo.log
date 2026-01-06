@@ -20,3 +20,286 @@ Checking category "claude-code-discord"...
 Using channel "main" (ID: 1458057566054645800)
 NotFound: No such file or directory (os error 2): open './dashboard/favicon.ico'
 Settings saved to ./data/settings.json
+❌ Error: DISCORD_TOKEN is not set
+Please set it in .env file or export DISCORD_TOKEN=your_token
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+[0m[32mDownload[0m https://deno.land/std/path/mod.ts
+[0m[33mWarning[0m Implicitly using latest version (0.224.0) for https://deno.land/std/path/mod.ts
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
+Registering slash commands...
+Slash commands registered
+Bot has started. Press Ctrl+C to stop.
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458057566054645800)
+Received SIGTERM, initiating graceful shutdown...
+
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
+Registering slash commands...
+Slash commands registered
+Bot has started. Press Ctrl+C to stop.
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458057566054645800)
+[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458057566054645800
+[MessageCreate] Message content: "/agen start agent_name:ag-manager"
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458057566054645800
+[getActiveSession] Total sessions: 0
+[getActiveSession] No active session found
+[MessageCreate] Active session: none
+[MessageCreate] Is mention: false
+[MessageCreate] Skipping - no active session and no @mention
+Received SIGTERM, initiating graceful shutdown...
+
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Failed to start Web Server: AddrInUse: Address already in use (os error 48)
+    at listen (ext:deno_net/01_net.js:605:35)
+    at serveInner (ext:deno_http/00_serve.ts:675:16)
+    at Object.serve (ext:deno_http/00_serve.ts:591:10)
+    at WebServer.start (file:///Users/jessesep/repos/claude-code-discord/server/index.ts:85:14)
+    at createClaudeCodeBot (file:///Users/jessesep/repos/claude-code-discord/index.ts:185:15)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async file:///Users/jessesep/repos/claude-code-discord/index.ts:1829:5 {
+  name: "AddrInUse",
+  code: "EADDRINUSE"
+}
+Registering slash commands...
+Slash commands registered
+Bot has started. Press Ctrl+C to stop.
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458057566054645800)
+[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458057566054645800
+[MessageCreate] Message content: "Hi"
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458057566054645800
+[getActiveSession] Total sessions: 0
+[getActiveSession] No active session found
+[MessageCreate] Active session: none
+[MessageCreate] Is mention: false
+[MessageCreate] Skipping - no active session and no @mention
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Clearing global commands...
+Bot has started. Press Ctrl+C to stop.
+Failed to register slash commands: ReferenceError: Cannot access 'guild' before initialization
+    at Client.<anonymous> (file:///Users/jessesep/repos/claude-code-discord/discord/bot.ts:428:59)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458057566054645800)
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Failed to start Web Server: AddrInUse: Address already in use (os error 48)
+    at listen (ext:deno_net/01_net.js:605:35)
+    at serveInner (ext:deno_http/00_serve.ts:675:16)
+    at Object.serve (ext:deno_http/00_serve.ts:591:10)
+    at WebServer.start (file:///Users/jessesep/repos/claude-code-discord/server/index.ts:85:14)
+    at createClaudeCodeBot (file:///Users/jessesep/repos/claude-code-discord/index.ts:185:15)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async file:///Users/jessesep/repos/claude-code-discord/index.ts:1829:5 {
+  name: "AddrInUse",
+  code: "EADDRINUSE"
+}
+Bot has started. Press Ctrl+C to stop.
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458057566054645800)
+Clearing global commands...
+Registering slash commands for guild 1457712106399862786...
+Guild slash commands registered
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+[0m[1m[31merror[0m: The module's source code could not be parsed: Unexpected token `...`. Expected identifier or string at file:///Users/jessesep/repos/claude-code-discord/index.ts:33:7
+
+        ...simpleCommands, createAgentHandlers, simpleCommands, handleSimpleComman...
+        ~~~
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Failed to start Web Server: AddrInUse: Address already in use (os error 48)
+    at listen (ext:deno_net/01_net.js:605:35)
+    at serveInner (ext:deno_http/00_serve.ts:675:16)
+    at Object.serve (ext:deno_http/00_serve.ts:591:10)
+    at WebServer.start (file:///Users/jessesep/repos/claude-code-discord/server/index.ts:85:14)
+    at createClaudeCodeBot (file:///Users/jessesep/repos/claude-code-discord/index.ts:185:15)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async file:///Users/jessesep/repos/claude-code-discord/index.ts:1829:5 {
+  name: "AddrInUse",
+  code: "EADDRINUSE"
+}
+Bot has started. Press Ctrl+C to stop.
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458057566054645800)
+Clearing global commands...
+Registering slash commands for guild 1457712106399862786...
+Guild slash commands registered
+[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458057566054645800
+[MessageCreate] Message content: "/run"
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458057566054645800
+[getActiveSession] Total sessions: 0
+[getActiveSession] No active session found
+[MessageCreate] Active session: none
+[MessageCreate] Is mention: false
+[MessageCreate] Skipping - no active session and no @mention
+[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458057566054645800
+[MessageCreate] Message content: "/run"
+[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458057566054645800
+[MessageCreate] Message content: "/run"
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458057566054645800
+[getActiveSession] Total sessions: 0
+[getActiveSession] No active session found
+[MessageCreate] Active session: none
+[MessageCreate] Is mention: false
+[MessageCreate] Skipping - no active session and no @mention
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458057566054645800
+[getActiveSession] Total sessions: 0
+[getActiveSession] No active session found
+[MessageCreate] Active session: none
+[MessageCreate] Is mention: false
+[MessageCreate] Skipping - no active session and no @mention
+[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458057566054645800
+[MessageCreate] Message content: "/run"
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458057566054645800
+[getActiveSession] Total sessions: 0
+[getActiveSession] No active session found
+[MessageCreate] Active session: none
+[MessageCreate] Is mention: false
+[MessageCreate] Skipping - no active session and no @mention
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Failed to start Web Server: AddrInUse: Address already in use (os error 48)
+    at listen (ext:deno_net/01_net.js:605:35)
+    at serveInner (ext:deno_http/00_serve.ts:675:16)
+    at Object.serve (ext:deno_http/00_serve.ts:591:10)
+    at WebServer.start (file:///Users/jessesep/repos/claude-code-discord/server/index.ts:85:14)
+    at createClaudeCodeBot (file:///Users/jessesep/repos/claude-code-discord/index.ts:185:15)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async file:///Users/jessesep/repos/claude-code-discord/index.ts:1829:5 {
+  name: "AddrInUse",
+  code: "EADDRINUSE"
+}
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458057566054645800)
+Clearing global commands...
+Bot has started. Press Ctrl+C to stop.
+Registering slash commands for guild 1457712106399862786...
+Guild slash commands registered
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+[0m[1m[31merror[0m: The module's source code could not be parsed: Unexpected token `...`. Expected identifier or string at file:///Users/jessesep/repos/claude-code-discord/index.ts:33:7
+
+        ...simpleCommands, createAgentHandlers, simpleCommands, handleSimpleComman...
+        ~~~
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Failed to start bot: ReferenceError: getGitInfo is not defined
+    at file:///Users/jessesep/repos/claude-code-discord/index.ts:1797:21
