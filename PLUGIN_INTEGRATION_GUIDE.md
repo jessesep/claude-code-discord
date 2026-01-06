@@ -45,6 +45,26 @@ This opens the plugin manager with tabs:
 npx claude-plugins install <plugin-name>
 ```
 
+#### Claude-Mem Marketplace (Long-term Memory)
+```bash
+/plugin marketplace add thedotmack/claude-mem
+```
+
+**What is claude-mem?**
+- Automatically captures everything Claude does during coding sessions
+- Compresses session data with AI (using Claude's agent-sdk)
+- Injects relevant context back into future sessions
+- Provides long-term memory across sessions
+- Perfect for maintaining project context and avoiding re-explaining architecture
+
+**Installation:**
+```bash
+# After adding marketplace
+/plugin install claude-mem@thedotmack-claude-mem
+```
+
+**Documentation:** https://docs.claude-mem.ai/
+
 ---
 
 ## Recommended Plugins for This Project
@@ -138,7 +158,30 @@ npx claude-plugins install <plugin-name>
 
 ---
 
-### 5. GitHub Integration Plugin
+### 5. Claude-Mem Plugin ✅ **HIGHLY RECOMMENDED**
+
+**Why:** Provides long-term memory across sessions. Perfect for maintaining context about this Discord bot project's architecture, decisions, and history.
+
+**Install:**
+```bash
+# First add the marketplace
+/plugin marketplace add thedotmack/claude-mem
+
+# Then install the plugin
+/plugin install claude-mem@thedotmack-claude-mem
+```
+
+**Features:**
+- Automatic session capture and compression
+- Long-term memory across sessions
+- Context injection for future sessions
+- Remembers architectural decisions
+- Tracks file changes and reasons
+- Maintains conversation history
+
+**Documentation:** https://docs.claude-mem.ai/
+
+### 6. GitHub Integration Plugin
 
 **Why:** This project uses GitHub. Integration can streamline workflows.
 
