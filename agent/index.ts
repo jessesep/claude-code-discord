@@ -1209,8 +1209,34 @@ export async function handleManagerInteraction(
       historyPrompt = `<conversation_history>\n  <entry role="user">${safeContent}</entry>\n</conversation_history>\n`;
     }
 
+    // Inject .agent-context.md files into prompt (since Gemini doesn't have tool access)
+    let contextContent = "";
+    try {
+      const workDir = deps?.workDir || Deno.cwd();
+      const rootContextPath = `${workDir}/.agent-context.md`;
+      const agentContextPath = `${workDir}/agent/.agent-context.md`;
+      
+      // Read root context
+      try {
+        const rootContext = await Deno.readTextFile(rootContextPath);
+        contextContent += `\n\n=== ROOT AGENT CONTEXT ===\n${rootContext}\n=== END ROOT CONTEXT ===\n`;
+      } catch (e) {
+        console.warn('[Manager] Could not read root .agent-context.md:', e);
+      }
+      
+      // Read agent context
+      try {
+        const agentContext = await Deno.readTextFile(agentContextPath);
+        contextContent += `\n\n=== AGENT COMPARTMENT CONTEXT ===\n${agentContext}\n=== END AGENT CONTEXT ===\n`;
+      } catch (e) {
+        console.warn('[Manager] Could not read agent/.agent-context.md:', e);
+      }
+    } catch (error) {
+      console.warn('[Manager] Error reading context files:', error);
+    }
+    
     // Construct Prompt
-    const managerPrompt = `${agentConfig.systemPrompt}\n\n=== CONVERSATION HISTORY ===\n${historyPrompt}\n\n=== END HISTORY ===\n\n(Respond to the last User message)`;
+    const managerPrompt = `${agentConfig.systemPrompt}${contextContent}\n\n=== CONVERSATION HISTORY ===\n${historyPrompt}\n\n=== END HISTORY ===\n\n(Respond to the last User message)`;
     const controller = new AbortController();
 
     const response = await sendToAntigravityCLI(
