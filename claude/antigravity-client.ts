@@ -24,7 +24,9 @@ export interface AntigravityOptions {
 }
 
 // Environment variable for API Key
-const API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
+function getApiKey(): string | undefined {
+  return Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
+}
 
 /**
  * Gcloud Token Manager
@@ -272,9 +274,10 @@ export async function sendToAntigravityCLI(
 
   // 2. Fallback to API Key Strategy (SDK) - only if OAuth unavailable or failed
   // SECURITY NOTE: API keys are less secure than OAuth but provided as fallback
-  if (API_KEY) {
+  const apiKey = getApiKey();
+  if (apiKey) {
     try {
-      const genAI = new GoogleGenerativeAI(API_KEY);
+      const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: modelName });
 
       let fullText = "";
@@ -305,7 +308,7 @@ export async function sendToAntigravityCLI(
   }
 
   // No authentication method available
-  if (!API_KEY) {
+  if (!apiKey) {
     const gcloudManager = GcloudTokenManager.getInstance();
     const hasGcloud = await gcloudManager.isAvailable();
     

@@ -120,8 +120,11 @@ export async function getAgentCommand(deps?: AgentHandlerDeps) {
                 // We need to access it. But typically commands rely on closure or argument.
                 // For now, we'll implement a basic callback here.
 
+                // Use channel context workDir if available, otherwise fall back to current directory
+                const effectiveWorkDir = ctx.channelContext?.projectPath || Deno.cwd();
+                
                 const deps: any = {
-                    workDir: Deno.cwd(),
+                    workDir: effectiveWorkDir,
                     sendClaudeMessages: async (msgs: any[]) => {
                         const content = msgs[0]?.content || '';
                         if (!content) return;

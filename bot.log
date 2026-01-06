@@ -53,13 +53,13 @@ Task: hi there
 
 > **CONTEXT AVAILABLE**: The root `.agent-context.m...
 [Cursor CLI] Spawning process...
-[Cursor CLI] stderr chunk: Cannot use this model: claude-sonnet-4. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+[Cursor CLI] stderr chunk: Cannot use this model: claude-sonnet-4. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-2.0-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
 
 [Cursor CLI] stdout stream ended. Total chunks: [33m0[39m
 [Cursor CLI] Process completed. Exit code: [33m1[39m Duration: [33m3429[39m ms
 [Cursor CLI] Full response length: [33m0[39m
 [Cursor CLI] Full response: 
-[Cursor CLI] Error output: Cannot use this model: claude-sonnet-4. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+[Cursor CLI] Error output: Cannot use this model: claude-sonnet-4. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-2.0-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
 
 ⚠️ Cursor also hit limits, trying Antigravity (Gemini) as final fallback...
 [Agent] Error calling claude: Error: All providers failed:
@@ -68,7 +68,7 @@ stderr:
 stdout: You're out of extra usage · resets Jan 9 at 4pm (Europe/Amsterdam)
 
 - Cursor: Cursor CLI exited with code 1
-stderr: Cannot use this model: claude-sonnet-4. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+stderr: Cannot use this model: claude-sonnet-4. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-2.0-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
 
 stdout: 
 - Antigravity: Expected '}', got '<eof>' at file:///Users/jessesep/repos/claude-code-discord/claude/antigravity-client.ts:333:2

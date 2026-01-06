@@ -39,6 +39,8 @@ export interface InteractionContext {
   channelId?: string | null;
   channel?: any; // Discord.js Channel object
   guild?: any; // Discord.js Guild object
+  // Channel project context (for multi-project routing)
+  channelContext?: import("../util/channel-context.ts").ChannelProjectContext;
 }
 
 export interface BotConfig {

@@ -14,6 +14,7 @@ import {
   EmbedBuilder
 } from "npm:discord.js@14.14.1";
 import { getActiveSession } from "../agent/index.ts";
+import { ChannelContextManager } from "../util/channel-context.ts";
 
 import { sanitizeChannelName, DISCORD_LIMITS, splitText } from "./utils.ts";
 import { handlePaginationInteraction } from "./pagination.ts";
@@ -123,6 +124,10 @@ export async function createDiscordBot(
     mentionEnabled: !!config.defaultMentionUserId,
     mentionUserId: config.defaultMentionUserId || null,
   };
+
+  // Initialize channel context manager for multi-project routing
+  const channelContextManager = new ChannelContextManager(workDir);
+  const enableChannelRouting = Deno.env.get("ENABLE_CHANNEL_ROUTING") === "true";
   
   const client = new Client({
     intents: [
@@ -188,7 +193,20 @@ export async function createDiscordBot(
   }
   
   // Create interaction context wrapper
-  function createInteractionContext(interaction: CommandInteraction | ButtonInteraction | any): InteractionContext {
+  async function createInteractionContext(interaction: CommandInteraction | ButtonInteraction | any): Promise<InteractionContext> {
+    // Get channel context for multi-project routing
+    let channelContext = undefined;
+    if (enableChannelRouting && interaction.channel) {
+      try {
+        channelContext = await channelContextManager.getChannelContext(interaction.channel);
+        if (channelContext) {
+          console.log(`[ChannelContext] Using project: ${channelContext.projectPath} (source: ${channelContext.source})`);
+        }
+      } catch (error) {
+        console.warn(`[ChannelContext] Error getting context: ${error}`);
+      }
+    }
+
     return {
       // User information from the interaction
       user: {
@@ -200,6 +218,7 @@ export async function createDiscordBot(
       channelId: interaction.channelId,
       channel: interaction.channel,
       guild: interaction.guild,
+      channelContext,
 
       async deferReply(): Promise<void> {
         if ('deferReply' in interaction) {
@@ -272,11 +291,14 @@ export async function createDiscordBot(
   
   // Command handler - completely generic
   async function handleCommand(interaction: CommandInteraction) {
-    if (!myChannel || interaction.channelId !== myChannel.id) {
-      return;
+    // Channel restriction: if routing is disabled, only respond to own channel
+    if (!enableChannelRouting) {
+      if (!myChannel || interaction.channelId !== myChannel.id) {
+        return;
+      }
     }
     
-    const ctx = createInteractionContext(interaction);
+    const ctx = await createInteractionContext(interaction);
     const handler = handlers.get(interaction.commandName);
     
     if (!handler) {
@@ -311,11 +333,14 @@ export async function createDiscordBot(
   
   // Select menu handler
   async function handleSelectMenu(interaction: any) {
-    if (!myChannel || interaction.channelId !== myChannel.id) {
-      return;
+    // Channel restriction: if routing is disabled, only respond to own channel
+    if (!enableChannelRouting) {
+      if (!myChannel || interaction.channelId !== myChannel.id) {
+        return;
+      }
     }
     
-    const ctx = createInteractionContext(interaction);
+    const ctx = await createInteractionContext(interaction);
     const customId = interaction.customId;
     const values = interaction.values;
     
@@ -1006,11 +1031,14 @@ export async function createDiscordBot(
 
   // Button handler - completely generic
   async function handleButton(interaction: ButtonInteraction) {
-    if (!myChannel || interaction.channelId !== myChannel.id) {
-      return;
+    // Channel restriction: if routing is disabled, only respond to own channel
+    if (!enableChannelRouting) {
+      if (!myChannel || interaction.channelId !== myChannel.id) {
+        return;
+      }
     }
     
-    const ctx = createInteractionContext(interaction);
+    const ctx = await createInteractionContext(interaction);
     const buttonId = interaction.customId;
     
     // Handle run-adv auto-select button
@@ -1481,7 +1509,31 @@ export async function createDiscordBot(
   client.on(Events.MessageCreate, async (message) => {
     // Ignore own messages
     if (message.author.bot) return;
-    if (!myChannel || message.channelId !== myChannel.id) return;
+    
+    // Get channel context for multi-project routing
+    let channelContext = undefined;
+    if (enableChannelRouting && message.channel) {
+      try {
+        channelContext = await channelContextManager.getChannelContext(message.channel);
+        if (channelContext) {
+          console.log(`[MessageCreate] Channel context: ${channelContext.projectPath} (source: ${channelContext.source})`);
+        }
+      } catch (error) {
+        console.warn(`[MessageCreate] Error getting channel context: ${error}`);
+      }
+    }
+    
+    // Channel restriction: if routing is disabled, only respond to own channel
+    // If routing is enabled, respond to any channel with valid context (or own channel as fallback)
+    if (!enableChannelRouting) {
+      if (!myChannel || message.channelId !== myChannel.id) return;
+    } else {
+      // With routing enabled, allow messages in any channel, but prefer channels with context
+      if (!channelContext && (!myChannel || message.channelId !== myChannel.id)) {
+        // No context and not our channel - skip (could optionally log)
+        return;
+      }
+    }
 
     console.log(`[MessageCreate] Received message from ${message.author.username} (${message.author.id}) in channel ${message.channelId}`);
     console.log(`[MessageCreate] Message content: "${message.content}"`);
@@ -1550,6 +1602,7 @@ export async function createDiscordBot(
         channel: message.channel,
         channelId: message.channelId,
         guild: message.guild,
+        channelContext, // Include channel context for multi-project routing
         deferReply: async (opts?: any) => {
           isDeferred = true;
           replyMessage = await message.reply({
