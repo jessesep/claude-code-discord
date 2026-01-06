@@ -489,7 +489,25 @@ export async function createDiscordBot(
       console.error('Failed to register slash commands:', error);
     }
       
-      // Test models on startup
+      // Send startup message first
+      await myChannel.send(convertMessageContent({
+        embeds: [{
+          color: 0x00ff00,
+          title: '🚀 Startup Complete',
+          description: `Claude Code bot for branch ${branchName} has started`,
+          fields: [
+            { name: 'Category', value: actualCategoryName, inline: true },
+            { name: 'Repository', value: repoName, inline: true },
+            { name: 'Branch', value: branchName, inline: true },
+            { name: 'Working Directory', value: `\`${workDir}\``, inline: false }
+          ],
+          timestamp: new Date().toISOString()
+        }]
+      })).catch(err => {
+        console.error('[Startup] Failed to send startup message:', err);
+      });
+      
+      // Test models on startup (async, don't block startup message)
       try {
         const { testAllModels, formatModelTestResults } = await import("../util/model-tester.ts");
         const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
@@ -521,21 +539,6 @@ export async function createDiscordBot(
           }]
         })).catch(() => {});
       }
-      
-      await myChannel.send(convertMessageContent({
-        embeds: [{
-          color: 0x00ff00,
-          title: '🚀 Startup Complete',
-          description: `Claude Code bot for branch ${branchName} has started`,
-          fields: [
-            { name: 'Category', value: actualCategoryName, inline: true },
-            { name: 'Repository', value: repoName, inline: true },
-            { name: 'Branch', value: branchName, inline: true },
-            { name: 'Working Directory', value: `\`${workDir}\``, inline: false }
-          ],
-          timestamp: new Date().toISOString()
-        }]
-      }));
     } catch (error) {
       console.error('Channel creation/retrieval error:', error);
     }
