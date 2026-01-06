@@ -1280,6 +1280,36 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await agentHandlers.onAgent(ctx, action, agentName || undefined, message || undefined, contextFiles || undefined, includeSystemInfo || undefined);
       }
     }],
+    ['run', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await handleSimpleCommand(ctx, 'run', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
+    ['kill', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await handleSimpleCommand(ctx, 'kill', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
     ['output-settings', {
       execute: async (ctx: InteractionContext) => {
         const action = ctx.getString('action', true)!;
@@ -1298,6 +1328,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Create dependencies object
   const dependencies: BotDependencies = {
     commands: [
+      ...simpleCommands, // Add /run and /kill commands
       ...claudeCommands,
       ...enhancedClaudeCommands, // claude-templates already removed from source
       ...additionalClaudeCommands,

@@ -836,36 +836,26 @@ export function createHelpHandlers(deps: HelpHandlerDeps) {
           embeds: [{
             color: 0x00ff00,
             title: "🤖 Antigravity AI Bot - Help",
-            description: `Bot for **${deps.repoName}** (${deps.branchName} branch)\n\nUse \`/help command:[name]\` for detailed help on specific commands.`,
+            description: `Bot for **${deps.repoName}** (${deps.branchName} branch)\n\n**Simple & Easy to Use!**`,
             fields: [
               {
-                name: "🧠 Specialized AI Agents",
-                value: "`/agent start` - Launch a specialized agent session\n`/agent chat` - Interact with your active agent\n`/agent list` - View all available agent profiles\n`/agent status` - Check current agent and session state\n`/agent end` - Terminate the current agent session",
+                name: "🚀 Getting Started",
+                value: "`/run` - Start a helper agent\n`/kill` - Stop the current agent session",
                 inline: false
               },
               {
-                name: "🌌 Agent Profiles",
-                value: "**Gemini Manager** (\`ag-manager\`) - Main orchestrator & planner\n**Code Reviewer** (\`code-reviewer\`) - Expert quality analysis\n**Debugger** (\`debugger\`) - Root cause & fix specialist",
+                name: "📝 How It Works",
+                value: "1. Use `/run` to start a helper agent\n2. The helper will ask: **\"What do you want to do?\"**\n3. Just type your request in the channel (include your task and repo path)\n4. The helper will analyze your request and launch the right agent\n5. Continue chatting naturally - no more slash commands needed!\n6. Use `/kill` when you're done",
                 inline: false
               },
               {
-                name: "🤖 Claude & Other LLMs",
-                value: "`/claude` - Direct Claude Code integration\n`/claude-enhanced` - Advanced prompts with templates\n`/continue` - Resume your last conversation\n`/claude-models` - List available AI models",
+                name: "💡 Example",
+                value: "```\n/run\n[Helper]: Hey! What do you want to do?\n[You]: Fix the bug in the login function, repo: /path/to/myproject\n[Helper]: I'll analyze this and get a debugger agent to help...\n[Debugger Agent takes over and fixes the bug]\n```",
                 inline: false
               },
               {
-                name: "⚙️ Settings & Configuration",
-                value: "`/settings` - Global bot configuration\n`/status` - Check system health & bot state",
-                inline: false
-              },
-              {
-                name: "📂 DevOps & System Tools", 
-                value: "`/git` - Git operations\n`/shell` - Terminal access\n`/system-info` - Hardware & OS metrics\n`/processes` - Monitor running tasks",
-                inline: false
-              },
-              {
-                name: "💡 Pro Tips",
-                value: "• Use \`/agent start\` with \`ag-manager\` for project-level task delegation\n• Each channel has its own persistent agent memory\n• Use buttons on responses for quick actions",
+                name: "🔧 Advanced Commands (Optional)",
+                value: "`/agent` - Direct agent control (for power users)\n`/settings` - Bot configuration\n`/help command:[name]` - Detailed help on specific commands",
                 inline: false
               }
             ],

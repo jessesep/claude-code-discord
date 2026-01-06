@@ -496,21 +496,38 @@ async function startAgentSession(ctx: any, agentName: string) {
 
   const riskColor = agent.riskLevel === 'high' ? 0xff6600 : agent.riskLevel === 'medium' ? 0xffaa00 : 0x00ff00;
 
-  await ctx.editReply({
-    embeds: [{
-      color: riskColor,
-      title: '🚀 Agent Session Started',
-      fields: [
-        { name: 'Agent', value: agent.name, inline: true },
-        { name: 'Risk Level', value: agent.riskLevel.toUpperCase(), inline: true },
-        { name: 'Session ID', value: `\`${session.id.substring(0, 12)}\``, inline: true },
-        { name: 'Description', value: agent.description, inline: false },
-        { name: 'Capabilities', value: agent.capabilities.join(', '), inline: false },
-        { name: 'Usage', value: 'Use `/agent action:chat message:[your message]` to chat with this agent', inline: false }
-      ],
-      timestamp: new Date().toISOString()
-    }]
-  });
+  // For manager agent, automatically send a greeting asking what the user wants to do
+  if (agent.isManager) {
+    await ctx.editReply({
+      embeds: [{
+        color: riskColor,
+        title: '🚀 Helper Agent Ready',
+        description: `**${agent.name}** is ready to help!\n\n👋 **Hey! What do you want to do?**\n\nJust type your request in this channel. Include:\n• What you want to accomplish\n• The repository path (if different from current)\n\nI'll analyze your request and launch the right agent to help you.`,
+        fields: [
+          { name: 'Session ID', value: `\`${session.id.substring(0, 12)}\``, inline: true },
+          { name: 'Status', value: '✅ Active - Ready for input', inline: true }
+        ],
+        footer: { text: 'Tip: Type your request directly in the channel, no slash commands needed!' },
+        timestamp: new Date().toISOString()
+      }]
+    });
+  } else {
+    await ctx.editReply({
+      embeds: [{
+        color: riskColor,
+        title: '🚀 Agent Session Started',
+        fields: [
+          { name: 'Agent', value: agent.name, inline: true },
+          { name: 'Risk Level', value: agent.riskLevel.toUpperCase(), inline: true },
+          { name: 'Session ID', value: `\`${session.id.substring(0, 12)}\``, inline: true },
+          { name: 'Description', value: agent.description, inline: false },
+          { name: 'Capabilities', value: agent.capabilities.join(', '), inline: false },
+          { name: 'Usage', value: 'Just type your message in this channel to continue the conversation', inline: false }
+        ],
+        timestamp: new Date().toISOString()
+      }]
+    });
+  }
 }
 
 /**
@@ -1028,6 +1045,7 @@ async function switchAgent(ctx: any, agentName: string) {
 
 async function endAgentSession(ctx: any) {
   const userId = ctx.user.id;
+  const channelId = ctx.channelId || ctx.channel?.id;
   const activeAgent = currentUserAgent[userId];
 
   if (!activeAgent) {
@@ -1046,7 +1064,7 @@ async function endAgentSession(ctx: any) {
 
   // Mark sessions as completed
   agentSessions.forEach(session => {
-    if (session.agentName === activeAgent && session.status === 'active') {
+    if (session.userId === userId && session.channelId === channelId && session.status === 'active') {
       session.status = 'completed';
     }
   });
@@ -1054,8 +1072,8 @@ async function endAgentSession(ctx: any) {
   await ctx.editReply({
     embeds: [{
       color: 0x00ff00,
-      title: '✅ Session Ended',
-      description: `Agent session with ${PREDEFINED_AGENTS[activeAgent]?.name || activeAgent} has been ended.`,
+      title: '🛑 Agent Stopped',
+      description: `The **${PREDEFINED_AGENTS[activeAgent]?.name || activeAgent}** session has been terminated.\n\nUse \`/run\` to start a new session.`,
       timestamp: new Date().toISOString()
     }]
   });
@@ -1210,7 +1228,7 @@ export async function handleManagerInteraction(
         }]
       });
     } else if (action.action === 'spawn_agent' && action.agent_name && action.task) {
-      // Spawn Subagent
+      // Switch to the new agent and have it take over
       const subAgentName = action.agent_name;
       const subAgentTask = action.task;
       const subAgentConfig = PREDEFINED_AGENTS[subAgentName];
@@ -1220,36 +1238,77 @@ export async function handleManagerInteraction(
         return;
       }
 
-      // --- HUMAN-IN-THE-LOOP (HITL) IMPLEMENTATION ---
-      const approveBtn = new ButtonBuilder()
-        .setCustomId(`agent_spawn_approve:${subAgentName}`)
-        .setLabel(`Approve ${subAgentConfig.name}`)
-        .setStyle(ButtonStyle.Success);
+      // Security: RBAC for High-Risk Agents
+      const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
+      if (subAgentConfig.riskLevel === 'high' && ownerId && userId !== ownerId) {
+        await ctx.editReply({
+          embeds: [{
+            color: 0xff0000,
+            title: '⛔ Access Denied',
+            description: `Agent **${subAgentConfig.name}** is a high-risk agent and can only be used by the bot owner.`,
+            footer: { text: "Security policy: Restricted access enabled" },
+            timestamp: new Date().toISOString()
+          }]
+        });
+        return;
+      }
 
-      const declineBtn = new ButtonBuilder()
-        .setCustomId(`agent_spawn_decline:${subAgentName}`)
-        .setLabel('Decline')
-        .setStyle(ButtonStyle.Danger);
+      // Switch the active agent
+      const channelId = ctx.channelId || ctx.channel?.id;
+      currentUserAgent[userId] = subAgentName;
 
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(approveBtn, declineBtn);
+      // Update or create session for the new agent
+      let newSession = agentSessions.find(
+        s => s.userId === userId && s.channelId === channelId && s.status === 'active'
+      );
 
-      pendingSwarmTasks.set(userId, {
-        subAgentName,
-        task: subAgentTask,
-        managerConfig: agentConfig
-      });
+      if (newSession) {
+        // Update existing session
+        newSession.agentName = subAgentName;
+        newSession.lastActivity = new Date();
+      } else {
+        // Create new session
+        newSession = {
+          id: generateSessionId(),
+          agentName: subAgentName,
+          userId,
+          channelId: channelId!,
+          startTime: new Date(),
+          messageCount: 0,
+          totalCost: 0,
+          lastActivity: new Date(),
+          status: 'active',
+          history: []
+        };
+        agentSessions.push(newSession);
+      }
 
+      // Add the original user message and task to history
+      if (sessionData && sessionData.session) {
+        newSession.history = [...sessionData.session.history];
+      }
+      newSession.history.push({ role: 'user', content: userMessage });
+
+      // Notify user that agent is switching
       await ctx.editReply({
         embeds: [{
-          color: 0xffaa00,
-          title: `🛡️ Approval Required: Subagent Delegation`,
-          description: `The Manager wants to delegate a task to **${subAgentConfig.name}**.`,
-          fields: [{ name: 'Task', value: `\`\`\`${subAgentTask}\`\`\`` }],
-          footer: { text: "Review the task above before approving." },
+          color: 0x00cc99,
+          title: '🔄 Switching Agent',
+          description: `**${agentConfig.name}** is handing off to **${subAgentConfig.name}**.\n\n**Task:** ${subAgentTask}`,
+          fields: [
+            { name: 'New Agent', value: subAgentConfig.name, inline: true },
+            { name: 'Status', value: '🔄 Taking over...', inline: true }
+          ],
           timestamp: new Date().toISOString()
-        }],
-        components: [row]
+        }]
       });
+
+      // Now have the new agent process the task
+      // We'll use the task as the message, but include the original user message for context
+      const agentMessage = `${subAgentTask}\n\nOriginal request: ${userMessage}`;
+      
+      // Call chatWithAgent with the new agent
+      await chatWithAgent(ctx, agentMessage, subAgentName, undefined, false, deps);
       return;
     }
   } catch (error) {
@@ -1263,17 +1322,13 @@ export async function handleManagerInteraction(
 // --- Simple Commands Implementation ---
 export const runCommand = new SlashCommandBuilder()
   .setName('run')
-  .setDescription('Start the Manager Agent (Gemini Flash)');
+  .setDescription('Start a helper agent that will guide you through your task');
 
-export const geminiFastCommand = new SlashCommandBuilder()
-  .setName('gemini_fast')
-  .setDescription('Start a Gemini Flash Coding Session');
+export const killCommand = new SlashCommandBuilder()
+  .setName('kill')
+  .setDescription('Stop the current active agent session');
 
-export const claudeSonnetCommand = new SlashCommandBuilder()
-  .setName('claude_sonnet')
-  .setDescription('Start a Claude Sonnet Coding Session');
-
-export const simpleCommands = [runCommand, geminiFastCommand, claudeSonnetCommand];
+export const simpleCommands = [runCommand, killCommand];
 
 export function handleSimpleCommand(ctx: any, commandName: string, deps: AgentHandlerDeps) {
   // Map simple commands to agent actions
@@ -1281,9 +1336,7 @@ export function handleSimpleCommand(ctx: any, commandName: string, deps: AgentHa
   
   if (commandName === 'run') {
     return handlers.onAgent(ctx, 'start', 'ag-manager');
-  } else if (commandName === 'gemini_fast') {
-     return handlers.onAgent(ctx, 'start', 'ag-coder');
-  } else if (commandName === 'claude_sonnet') {
-    return handlers.onAgent(ctx, 'start', 'cursor-coder');
+  } else if (commandName === 'kill') {
+    return handlers.onAgent(ctx, 'end');
   }
 }
