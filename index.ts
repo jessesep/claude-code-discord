@@ -1282,7 +1282,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     }],
     ['run', {
       execute: async (ctx: InteractionContext) => {
-        await ctx.deferReply();
+        // Don't defer here - handleSimpleCommand will defer via onAgent
         await handleSimpleCommand(ctx, 'run', {
           workDir,
           crashHandler,
@@ -1297,7 +1297,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     }],
     ['kill', {
       execute: async (ctx: InteractionContext) => {
-        await ctx.deferReply();
+        // Don't defer here - handleSimpleCommand will defer via onAgent
         await handleSimpleCommand(ctx, 'kill', {
           workDir,
           crashHandler,
