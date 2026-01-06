@@ -1006,6 +1006,17 @@ export async function chatWithAgent(
       sessionData.session.history.push({ role: 'model', content: result.response });
     }
 
+    // Truncate response if too long and add expand button
+    const MAX_DESCRIPTION_LENGTH = 2000; // Discord embed description limit is ~4096, but we'll use 2000 for safety
+    const fullResponse = result.response || '';
+    let displayResponse = fullResponse;
+    let isTruncated = false;
+    
+    if (fullResponse.length > MAX_DESCRIPTION_LENGTH) {
+      displayResponse = fullResponse.substring(0, MAX_DESCRIPTION_LENGTH - 3) + '...';
+      isTruncated = true;
+    }
+
     // Send completion message
     const completionFields = [
       { name: 'Client', value: clientType === 'cursor' ? '🖱️ Cursor' : clientType === 'antigravity' ? '🌌 Antigravity' : '🤖 Claude', inline: true },
@@ -1023,13 +1034,45 @@ export async function chatWithAgent(
       completionFields.push({ name: 'Chat ID', value: result.chatId, inline: false });
     }
 
+    // Add truncation info if needed
+    if (isTruncated) {
+      completionFields.push({ 
+        name: 'Note', 
+        value: `Response truncated (${fullResponse.length} chars). Click "📖 Show Full Response" to view complete output.`, 
+        inline: false 
+      });
+    }
+
+    const embedData: any = {
+      color: 0x00ff00,
+      title: `✅ ${agent.name} - Completed`,
+      description: displayResponse,
+      fields: completionFields,
+      timestamp: new Date().toISOString()
+    };
+
+    // Add expand button if truncated
+    const components: any[] = [];
+    if (isTruncated) {
+      const expandId = `agent-response-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Store full content for expansion
+      const { expandableContent } = await import("../claude/discord-sender.ts");
+      expandableContent.set(expandId, fullResponse);
+      
+      components.push({
+        type: 'actionRow',
+        components: [{
+          type: 'button',
+          customId: `expand:${expandId}`,
+          label: '📖 Show Full Response',
+          style: 'secondary'
+        }]
+      });
+    }
+
     await ctx.editReply({
-      embeds: [{
-        color: 0x00ff00,
-        title: `✅ ${agent.name} - Completed`,
-        fields: completionFields,
-        timestamp: new Date().toISOString()
-      }]
+      embeds: [embedData],
+      components: components.length > 0 ? components : undefined
     });
 
   } catch (error) {
@@ -1358,8 +1401,17 @@ export async function handleManagerInteraction(
       console.debug('[Manager] Error getting git context:', error);
     }
     
+    // Get MCP tools information
+    let mcpToolsInfo = "";
+    try {
+      const { getMCPToolsInfo } = await import("../util/mcp-client.ts");
+      mcpToolsInfo = await getMCPToolsInfo();
+    } catch (error) {
+      console.debug('[Manager] Error getting MCP tools info:', error);
+    }
+    
     // Construct Prompt
-    const managerPrompt = `${agentConfig.systemPrompt}${contextContent}${gitContext}\n\n=== CONVERSATION HISTORY ===\n${historyPrompt}\n\n=== END HISTORY ===\n\n(Respond to the last User message)`;
+    const managerPrompt = `${agentConfig.systemPrompt}${contextContent}${gitContext}${mcpToolsInfo}\n\n=== CONVERSATION HISTORY ===\n${historyPrompt}\n\n=== END HISTORY ===\n\n(Respond to the last User message)`;
     const controller = new AbortController();
 
     const response = await sendToAntigravityCLI(

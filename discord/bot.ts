@@ -370,19 +370,77 @@ export async function createDiscordBot(
         }
       }
       
-      // If no handler found, show default message
+      // Fallback: Try to get content from expandableContent map
       try {
+        const { expandableContent } = await import("../claude/discord-sender.ts");
+        const fullContent = expandableContent.get(expandId);
+        
+        if (fullContent) {
+          const maxLength = 4090 - "```\n\n```".length;
+          if (fullContent.length <= maxLength) {
+            await ctx.update({
+              embeds: [{
+                color: 0x0099ff,
+                title: '📖 Full Response',
+                description: `\`\`\`\n${fullContent}\n\`\`\``,
+                timestamp: new Date().toISOString()
+              }],
+              components: [{
+                type: 'actionRow',
+                components: [{
+                  type: 'button',
+                  customId: 'collapse-content',
+                  label: '🔼 Collapse',
+                  style: 'secondary'
+                }]
+              }]
+            });
+          } else {
+            // Content is still too large, show first part
+            const chunk = fullContent.substring(0, maxLength - 100);
+            await ctx.update({
+              embeds: [{
+                color: 0x0099ff,
+                title: '📖 Full Response (Large - Showing First Part)',
+                description: `\`\`\`\n${chunk}...\n\`\`\``,
+                fields: [
+                  { name: 'Note', value: `Content is very large (${fullContent.length} chars). This shows the first portion.`, inline: false }
+                ],
+                timestamp: new Date().toISOString()
+              }],
+              components: [{
+                type: 'actionRow',
+                components: [{
+                  type: 'button',
+                  customId: 'collapse-content',
+                  label: '🔼 Collapse',
+                  style: 'secondary'
+                }]
+              }]
+            });
+          }
+        } else {
+          await ctx.update({
+            embeds: [{
+              color: 0xffaa00,
+              title: '📖 Content Not Available',
+              description: 'The full content is no longer available for expansion.',
+              timestamp: new Date().toISOString()
+            }],
+            components: []
+          });
+        }
+      } catch (error) {
+        console.error(`Error handling expand button fallback:`, error);
         await ctx.update({
           embeds: [{
-            color: 0xffaa00,
-            title: '📖 Content Not Available',
-            description: 'The full content is no longer available for expansion.',
+            color: 0xff0000,
+            title: '❌ Error',
+            description: 'Failed to expand content.',
             timestamp: new Date().toISOString()
           }],
           components: []
         });
-      } catch (error) {
-        console.error(`Error handling expand button fallback:`, error);
       }
       return;
     }
