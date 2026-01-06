@@ -69,28 +69,31 @@ export async function getMCPToolsInfo(): Promise<string> {
     const tools = await listMCPTools();
     const resources = await listMCPResources();
     
-    if (tools.length === 0 && resources.length === 0) {
-      return '';
-    }
-    
-    let info = '\n\n=== AVAILABLE MCP TOOLS ===\n';
+    let info = '\n\n=== AVAILABLE TOOLS ===\n';
     
     if (tools.length > 0) {
-      info += 'Tools:\n';
+      info += 'MCP Tools:\n';
       for (const tool of tools) {
         info += `- ${tool.name}: ${tool.description}\n`;
       }
     }
     
     if (resources.length > 0) {
-      info += '\nResources:\n';
+      info += '\nMCP Resources:\n';
       for (const resource of resources) {
         info += `- ${resource.name} (${resource.uri}): ${resource.description || 'No description'}\n`;
       }
     }
     
+    // Add fallback tools info
+    info += '\nFallback Tools (available if MCP is not configured):\n';
+    info += '- GitHub Issue Creation: Use the GitHub issue creation utility function from util/github-issues.ts\n';
+    info += '  This uses the GitHub CLI (gh) to create issues directly.\n';
+    info += '  Function: createGitHubIssueWithCLI({ title, body, labels? })\n';
+    
     info += '\nTo use an MCP tool, ask the system to call it with the appropriate parameters.\n';
-    info += '=== END MCP TOOLS ===\n';
+    info += 'If MCP is not available, use the fallback utility functions instead of generating scripts.\n';
+    info += '=== END TOOLS ===\n';
     
     return info;
   } catch (error) {
