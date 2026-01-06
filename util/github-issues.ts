@@ -14,13 +14,20 @@ export interface GitHubIssue {
  */
 export async function createGitHubIssueWithCLI(issue: GitHubIssue): Promise<{ success: boolean; issueNumber?: number; error?: string }> {
   try {
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
-
     // Check if gh CLI is installed
     try {
-      await execAsync("gh --version");
+      const checkCmd = new Deno.Command("gh", {
+        args: ["--version"],
+        stdout: "piped",
+        stderr: "piped"
+      });
+      const checkResult = await checkCmd.output();
+      if (!checkResult.success) {
+        return {
+          success: false,
+          error: "GitHub CLI (gh) is not installed. Install it from https://cli.github.com/"
+        };
+      }
     } catch (error) {
       return {
         success: false,
@@ -28,34 +35,39 @@ export async function createGitHubIssueWithCLI(issue: GitHubIssue): Promise<{ su
       };
     }
 
-    // Build gh issue create command
-    let command = `gh issue create --title "${issue.title.replace(/"/g, '\\"')}"`;
+    // Build gh issue create command arguments
+    const args = ["issue", "create", "--title", issue.title];
     
-    // Add body (use heredoc for multiline)
-    const bodyEscaped = issue.body.replace(/`/g, '\\`').replace(/\$/g, '\\$');
-    command += ` --body "${bodyEscaped.replace(/"/g, '\\"')}"`;
+    // Add body
+    args.push("--body", issue.body);
 
     // Add labels if provided
     if (issue.labels && issue.labels.length > 0) {
-      command += ` --label "${issue.labels.join(',')}"`;
+      args.push("--label", issue.labels.join(','));
     }
 
     // Execute command
-    const { stdout, stderr } = await execAsync(command, {
+    const cmd = new Deno.Command("gh", {
+      args,
       cwd: Deno.cwd(),
-      maxBuffer: 10 * 1024 * 1024 // 10MB
+      stdout: "piped",
+      stderr: "piped"
     });
+
+    const result = await cmd.output();
+    const stdout = new TextDecoder().decode(result.stdout);
+    const stderr = new TextDecoder().decode(result.stderr);
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: stderr || "Failed to create GitHub issue"
+      };
+    }
 
     // Parse issue number from output (gh CLI returns "https://github.com/owner/repo/issues/123")
     const issueMatch = stdout.match(/issues\/(\d+)/);
     const issueNumber = issueMatch ? parseInt(issueMatch[1]) : undefined;
-
-    if (stderr && !issueNumber) {
-      return {
-        success: false,
-        error: stderr
-      };
-    }
 
     return {
       success: true,
