@@ -11,7 +11,7 @@ export interface AgentConfig {
   maxTokens: number;
   capabilities: string[];
   riskLevel: 'low' | 'medium' | 'high';
-  client?: 'claude' | 'cursor'; // Which CLI client to use (default: claude)
+  client?: 'claude' | 'cursor' | 'antigravity'; // Which CLI client to use (default: claude)
   workspace?: string; // For cursor: working directory
   force?: boolean; // For cursor: auto-approve operations
   sandbox?: 'enabled' | 'disabled'; // For cursor: sandbox mode
@@ -154,6 +154,32 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     client: 'cursor',
     force: true, // Auto-approve for speed
     sandbox: 'disabled'
+  },
+
+  // Antigravity-powered agents (Google Agentic Platform)
+  'ag-coder': {
+    name: 'Antigravity Coder',
+    description: 'Google Antigravity agent for autonomous coding tasks',
+    model: 'gemini-2.0-flash-thinking-exp',
+    systemPrompt: 'You are an autonomous coding agent powered by Google Antigravity. You can plan, execute, and verify complex coding tasks.',
+    temperature: 0.3,
+    maxTokens: 30000,
+    capabilities: ['file-editing', 'planning', 'autonomous', 'browser-interaction'],
+    riskLevel: 'high',
+    client: 'antigravity',
+    force: false,
+    sandbox: 'enabled'
+  },
+  'ag-architect': {
+    name: 'Antigravity Architect',
+    description: 'High-level system design and planning agent',
+    model: 'gemini-1.5-pro',
+    systemPrompt: 'You are a software architect agent. Analyze requirements, design systems, and create implementation plans using Antigravity tools.',
+    temperature: 0.4,
+    maxTokens: 30000,
+    capabilities: ['system-design', 'planning', 'architecture'],
+    riskLevel: 'medium',
+    client: 'antigravity'
   }
 };
 
@@ -240,7 +266,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             }
             await startAgentSession(ctx, agentName);
             break;
-            
+
           case 'chat':
             if (!message) {
               await ctx.editReply({
@@ -251,7 +277,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             }
             await chatWithAgent(ctx, message, agentName, contextFiles, includeSystemInfo, deps);
             break;
-            
+
           case 'switch':
             if (!agentName) {
               await ctx.editReply({
@@ -262,15 +288,15 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             }
             await switchAgent(ctx, agentName);
             break;
-            
+
           case 'status':
             await showAgentStatus(ctx);
             break;
-            
+
           case 'end':
             await endAgentSession(ctx);
             break;
-            
+
           case 'info':
             if (!agentName) {
               await ctx.editReply({
@@ -281,7 +307,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             }
             await showAgentInfo(ctx, agentName);
             break;
-            
+
           default:
             await ctx.editReply({
               embeds: [{
@@ -488,8 +514,44 @@ async function chatWithAgent(
               timestamp: new Date().toISOString()
             }];
 
-            await deps.sendClaudeMessages(claudeMessages).catch(() => {});
+            await deps.sendClaudeMessages(claudeMessages).catch(() => { });
             currentChunk = ""; // Reset after sending to avoid duplicates
+          }
+        }
+      );
+    } else if (clientType === 'antigravity') {
+      // Import Antigravity CLI client
+      const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+
+      // Build Prompt
+      const fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+
+      // Call Antigravity CLI with streaming
+      result = await sendToAntigravityCLI(
+        fullPrompt,
+        controller,
+        {
+          model: agent.model,
+          workspace: agent.workspace,
+          force: agent.force,
+          sandbox: agent.sandbox,
+          streamJson: true,
+        },
+        async (chunk) => {
+          currentChunk += chunk;
+
+          const now = Date.now();
+          if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+            lastUpdate = now;
+
+            const claudeMessages = [{
+              type: 'text' as const,
+              content: currentChunk,
+              timestamp: new Date().toISOString()
+            }];
+
+            await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+            currentChunk = "";
           }
         }
       );
@@ -520,7 +582,7 @@ async function chatWithAgent(
               timestamp: new Date().toISOString()
             }];
 
-            await deps.sendClaudeMessages(claudeMessages).catch(() => {});
+            await deps.sendClaudeMessages(claudeMessages).catch(() => { });
             currentChunk = ""; // Reset after sending to avoid duplicates
           }
         }
@@ -534,23 +596,23 @@ async function chatWithAgent(
         content: currentChunk,
         timestamp: new Date().toISOString()
       }];
-      await deps.sendClaudeMessages(claudeMessages).catch(() => {});
+      await deps.sendClaudeMessages(claudeMessages).catch(() => { });
     }
 
     // Send completion message
     const completionFields = [
-      { name: 'Client', value: clientType === 'cursor' ? '🖱️ Cursor' : '🤖 Claude', inline: true },
+      { name: 'Client', value: clientType === 'cursor' ? '🖱️ Cursor' : clientType === 'antigravity' ? '🌌 Antigravity' : '🤖 Claude', inline: true },
       { name: 'Model', value: result.modelUsed || agent.model, inline: true },
       { name: 'Duration', value: result.duration ? `${(result.duration / 1000).toFixed(1)}s` : 'N/A', inline: true },
     ];
 
     // Add cost for Claude (not applicable to Cursor)
-    if (clientType === 'claude' && result.cost) {
+    if (clientType === 'claude' && 'cost' in result && typeof result.cost === 'number') {
       completionFields.splice(2, 0, { name: 'Cost', value: `$${result.cost.toFixed(4)}`, inline: true });
     }
 
-    // Add chatId for Cursor (for session resumption)
-    if (clientType === 'cursor' && result.chatId) {
+    // Add chatId for Cursor/Antigravity (for session resumption)
+    if ((clientType === 'cursor' || clientType === 'antigravity') && 'chatId' in result && typeof result.chatId === 'string') {
       completionFields.push({ name: 'Chat ID', value: result.chatId, inline: false });
     }
 
