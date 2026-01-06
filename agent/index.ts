@@ -1421,21 +1421,22 @@ export async function chatWithAgent(
   } catch (error) {
     const clientType = agent.client || 'claude';
     console.error(`[Agent] Error calling ${clientType}:`, error);
+    
+    // Provide user-friendly error messages
+    let errorMessage = String(error);
+    if (errorMessage.includes("ConnectError") || errorMessage.includes("[canceled]")) {
+      if (errorMessage.includes("timeout") || errorMessage.includes("too long")) {
+        errorMessage = "⏱️ Request timed out. The operation took too long and was cancelled. Try breaking your request into smaller tasks or using a faster model.";
+      } else {
+        errorMessage = "🔌 Connection cancelled. This may be due to network issues. Please try again in a moment.";
+      }
+    } else if (errorMessage.includes("exited with code 1")) {
+      errorMessage = "❌ Cursor CLI encountered an error. This might be a temporary issue - please try again.";
+    }
+    
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        // Provide user-friendly error messages
-        let errorMessage = String(error);
-        if (errorMessage.includes("ConnectError") || errorMessage.includes("[canceled]")) {
-          if (errorMessage.includes("timeout") || errorMessage.includes("too long")) {
-            errorMessage = "⏱️ Request timed out. The operation took too long and was cancelled. Try breaking your request into smaller tasks or using a faster model.";
-          } else {
-            errorMessage = "🔌 Connection cancelled. This may be due to network issues. Please try again in a moment.";
-          }
-        } else if (errorMessage.includes("exited with code 1")) {
-          errorMessage = "❌ Cursor CLI encountered an error. This might be a temporary issue - please try again.";
-        }
-        
         title: `❌ Agent Error (${clientType === 'cursor' ? 'Cursor' : 'Claude'})`,
         description: `Failed to process: ${errorMessage}`,
         timestamp: new Date().toISOString()
