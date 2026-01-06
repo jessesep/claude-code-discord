@@ -205,6 +205,44 @@ deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User
 - `auto-accept` - Automatically apply suggested changes
 - `danger` - Unrestricted mode (high risk)
 
+#### Claude Code (Discord Bot Edition)
+
+A powerful Discord-based AI coding assistant that acts as a "Main Agent" (Manager) to orchestrate specialized subagents for complex coding tasks.
+
+## 🌟 New Architecture (Manager-Subagent)
+
+This bot now uses a **Gemini 2.0 Flash** powered "Manager Agent" to:
+1.  **Interact with the User**: Provides instant, helpful responses and remembers conversation context.
+2.  **Orchestrate Work**: Intelligently delegates complex tasks (like coding or architecture design) to specialized subagents.
+3.  **Provide Summaries**: Consolidates subagent outputs into concise, human-readable status updates.
+
+### Key Features
+*   **🧠 Main Agent**: Powered by Google's `gemini-2.0-flash`. Fast, smart, and context-aware.
+*   **🛠️ Subagents**: Specialized agents (e.g., `ag-coder`) that run headlessly to perform heavy lifting.
+*   **💬 Interactive UI**: (Coming Soon) Buttons, Select Menus, and rich embeds.
+*   **📂 Local Context**: Full access to your local filesystem.
+
+## Getting Started
+
+1.  **Clone the Repo**
+2.  **Configure**: Copy `.env.example` to `.env` and add your tokens:
+    *   `DISCORD_TOKEN`
+    *   `GEMINI_API_KEY` or `GOOGLE_API_KEY`
+3.  **Run**:
+    ```bash
+    ./start-bot.sh
+    ```
+
+## Project Structure
+*   `agent/`: Core agent logic.
+    *   `manager.ts`: Brain of the Main Agent.
+    *   `index.ts`: Agent orchestration and session management.
+*   `claude/`: Gemini API client ("Antigravity").
+*   `discord/`: Discord bot interaction handlers.
+
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to add new agents.
+
 #### `/todos` Command ✨
 - **Action types**: list, add, complete, generate, prioritize, rate-status
 - **Priority levels**: low, medium, high, critical  
