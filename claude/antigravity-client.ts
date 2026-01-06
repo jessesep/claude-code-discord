@@ -28,20 +28,28 @@ const API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY")
 
 /**
  * Get Access Token from gcloud CLI
+ * Prefers Application Default Credentials (ADC), falls back to user credentials.
  */
 async function getGcloudToken(): Promise<string | null> {
-  try {
-    const cmd = new Deno.Command("gcloud", {
-      args: ["auth", "print-access-token"],
-      stdout: "piped",
-      stderr: "null"
-    });
-    const output = await cmd.output();
-    if (output.success) {
-      return new TextDecoder().decode(output.stdout).trim();
+  const commands = [
+    ["auth", "application-default", "print-access-token"],
+    ["auth", "print-access-token"]
+  ];
+
+  for (const args of commands) {
+    try {
+      const cmd = new Deno.Command("gcloud", {
+        args,
+        stdout: "piped",
+        stderr: "null"
+      });
+      const output = await cmd.output();
+      if (output.success) {
+        return new TextDecoder().decode(output.stdout).trim();
+      }
+    } catch {
+      // Try next method
     }
-  } catch {
-    // gcloud not found or failed
   }
   return null;
 }
