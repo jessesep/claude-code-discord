@@ -1856,10 +1856,13 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
     
     // Get available providers and models
     const availableAgents = [
-      { name: 'ag-manager', label: '🤖 Manager Agent (Gemini)', description: 'Helper agent that orchestrates tasks', model: 'gemini-2.0-flash' },
-      { name: 'ag-manager', label: '🚀 Manager Agent (Gemini 3 Flash)', description: 'Latest Gemini 3 Flash model', model: 'gemini-3-flash' },
-      { name: 'ag-coder', label: '💻 Coder Agent (Gemini)', description: 'Autonomous coding agent', model: 'gemini-2.0-flash' },
-      { name: 'ag-architect', label: '🏗️ Architect Agent (Gemini)', description: 'System design and planning', model: 'gemini-2.0-flash' },
+      { name: 'ag-manager', label: 'Manager Agent (Gemini 2.0 Flash)', description: 'Helper agent that orchestrates tasks - Fast and efficient', model: 'gemini-2.0-flash' },
+      { name: 'ag-manager', label: 'Manager Agent (Gemini 3 Flash)', description: 'Latest Gemini 3 Flash model - Most advanced', model: 'gemini-3-flash' },
+      { name: 'ag-manager', label: 'Manager Agent (Gemini 3 Pro)', description: 'Gemini 3 Pro - Best for complex reasoning', model: 'gemini-3-pro' },
+      { name: 'ag-coder', label: 'Coder Agent (Gemini 2.0 Flash)', description: 'Autonomous coding agent - Fast implementation', model: 'gemini-2.0-flash' },
+      { name: 'ag-coder', label: 'Coder Agent (Gemini 3 Flash)', description: 'Latest coding agent - Advanced capabilities', model: 'gemini-3-flash' },
+      { name: 'ag-architect', label: 'Architect Agent (Gemini 2.0 Flash)', description: 'System design and planning - Fast analysis', model: 'gemini-2.0-flash' },
+      { name: 'ag-architect', label: 'Architect Agent (Gemini 3 Pro)', description: 'Advanced architecture - Complex system design', model: 'gemini-3-pro' },
     ];
     
     // Create select menu for provider/model selection using Discord.js components
@@ -1872,8 +1875,7 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
         availableAgents.map(agent => ({
           label: agent.label.substring(0, 100), // Discord limit
           description: agent.description.substring(0, 100), // Discord limit
-          value: `${agent.name}:${agent.model}`,
-          emoji: agent.label.includes('Manager') ? '🤖' : agent.label.includes('Coder') ? '💻' : '🏗️'
+          value: `${agent.name}:${agent.model}`
         }))
       );
     
