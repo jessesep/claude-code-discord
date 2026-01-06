@@ -1138,6 +1138,7 @@ export async function handleManagerInteraction(
       {
         model: agentConfig.model,
         streamJson: false, // We need full JSON block, not streaming text for logic
+        authorized: isAuthorized,
       }
     );
 
