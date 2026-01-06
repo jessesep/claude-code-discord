@@ -34,8 +34,8 @@ export interface AgentSession {
   history: { role: 'user' | 'model'; content: string }[];
 }
 
-// Mandatory Context Read rule for all agents
-const MANDATORY_CONTEXT_RULE = `\n\n> **MANDATORY READ**: Your VERY FIRST action MUST be to use the \`view_file\` tool to read the root \`.agent-context.md\` and the \`.agent-context.md\` in your specific compartment (if it exists). This ensures you work with the latest local knowledge.`;
+// Context note for all agents (context is automatically injected, no tool needed)
+const CONTEXT_NOTE = `\n\n> **CONTEXT AVAILABLE**: The root \`.agent-context.md\` and relevant compartment context files have been automatically loaded into your prompt. Use this information to understand the project structure and conventions.`;
 
 // Predefined agent configurations
 export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
@@ -55,7 +55,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Code Reviewer',
     description: 'Specialized in code review and quality analysis',
     model: 'claude-sonnet-4',
-    systemPrompt: 'You are an expert code reviewer. Focus on code quality, security, performance, and best practices. Provide detailed feedback with specific suggestions for improvement.' + MANDATORY_CONTEXT_RULE,
+    systemPrompt: 'You are an expert code reviewer. Focus on code quality, security, performance, and best practices. Provide detailed feedback with specific suggestions for improvement.' + CONTEXT_NOTE,
     temperature: 0.3,
     maxTokens: 4096,
     capabilities: ['code-review', 'security-analysis', 'performance-optimization'],
@@ -651,6 +651,36 @@ export async function chatWithAgent(
   // Build the enhanced prompt with agent's system prompt
   const safeMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   let enhancedPrompt = `${agent.systemPrompt}\n\n<user_query>${safeMessage}</user_query>`;
+
+  // Inject .agent-context.md files into prompt (since Gemini doesn't have tool access)
+  let contextContent = "";
+  try {
+    const workDir = deps?.workDir || Deno.cwd();
+    const rootContextPath = `${workDir}/.agent-context.md`;
+    
+    // Read root context
+    try {
+      const rootContext = await Deno.readTextFile(rootContextPath);
+      contextContent += `\n\n=== ROOT AGENT CONTEXT ===\n${rootContext}\n=== END ROOT CONTEXT ===\n`;
+    } catch (e) {
+      console.debug('[Agent] Could not read root .agent-context.md:', e);
+    }
+    
+    // Read compartment-specific context if available
+    const compartmentContextPath = `${workDir}/${activeAgentName.includes('architect') ? 'agent' : activeAgentName.includes('coder') ? 'agent' : ''}/.agent-context.md`;
+    if (compartmentContextPath !== `${workDir}/.agent-context.md`) {
+      try {
+        const compartmentContext = await Deno.readTextFile(compartmentContextPath);
+        contextContent += `\n\n=== COMPARTMENT CONTEXT ===\n${compartmentContext}\n=== END COMPARTMENT CONTEXT ===\n`;
+      } catch (e) {
+        // Silently fail - not all compartments have context files
+      }
+    }
+  } catch (error) {
+    console.debug('[Agent] Error reading context files:', error);
+  }
+  
+  enhancedPrompt = `${enhancedPrompt}${contextContent}`;
 
   // Inject claude-mem context (if available)
   try {
