@@ -20,6 +20,7 @@ export interface AntigravityOptions {
   streamJson?: boolean;
   force?: boolean;
   sandbox?: "enabled" | "disabled";
+  authorized?: boolean;
 }
 
 // Environment variable for API Key
@@ -95,9 +96,10 @@ export async function sendToAntigravityCLI(
   }
 
   // 2. Try gcloud OAuth Strategy (REST)
-  const token = await getGcloudToken();
-  if (token) {
-    try {
+  if (options.authorized) {
+    const token = await getGcloudToken();
+    if (token) {
+      try {
       // Use Generative Language REST API with OAuth
       // Note: model name needs 'models/' prefix for REST usually, SDK handles it.
       // Endpoint: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
@@ -173,6 +175,8 @@ export async function sendToAntigravityCLI(
     } catch (error) {
       handleError(error, controller, startTime, modelName);
     }
+  }
+
   }
 
   throw new Error(

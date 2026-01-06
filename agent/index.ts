@@ -378,11 +378,22 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             }]
           });
 
-          subAgentOutput = await runAgentTask(subAgentName, pending.task);
+          // Security: Calculate Authorization for GCP Credentials
+          const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
+          const isAuthorized = !!(ownerId && userId === ownerId);
+
+          subAgentOutput = await runAgentTask(subAgentName, pending.task, undefined, isAuthorized);
 
           const summaryPrompt = `You are the Manager. You spawned '${subAgentName}' to do this task: "${pending.task}".\n\nOutput:\n${subAgentOutput.substring(0, 40000)}\n\nProvide CONCISE summary.`;
           const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
-          const summaryResponse = await sendToAntigravityCLI(summaryPrompt, new AbortController(), { model: pending.managerConfig.model });
+          const summaryResponse = await sendToAntigravityCLI(
+            summaryPrompt,
+            new AbortController(),
+            {
+              model: pending.managerConfig.model,
+              authorized: isAuthorized
+            }
+          );
           const summaryText = summaryResponse.response;
 
           await progressMsg.edit({
@@ -509,7 +520,8 @@ async function startAgentSession(ctx: any, agentName: string) {
 export async function runAgentTask(
   agentId: string,
   task: string,
-  onChunk?: (text: string) => void
+  onChunk?: (text: string) => void,
+  isAuthorized: boolean = false
 ): Promise<string> {
   const agent = PREDEFINED_AGENTS[agentId];
   if (!agent) throw new Error(`Agent ${agentId} not found`);
@@ -521,7 +533,8 @@ export async function runAgentTask(
 
   if (clientType === 'cursor') {
     const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
-    const prompt = `${agent.systemPrompt}\n\nTask: ${task}`;
+    const safeTask = task.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const prompt = `${agent.systemPrompt}\n\n<task>${safeTask}</task>`;
     const result = await sendToCursorCLI(
       prompt,
       controller,
@@ -536,7 +549,8 @@ export async function runAgentTask(
     resultText = result.response;
   } else if (clientType === 'antigravity') {
     const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
-    const prompt = `${agent.systemPrompt}\n\nTask: ${task}`;
+    const safeTask = task.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const prompt = `${agent.systemPrompt}\n\n<task>${safeTask}</task>`;
     const result = await sendToAntigravityCLI(
       prompt,
       controller,
@@ -546,6 +560,7 @@ export async function runAgentTask(
         streamJson: true,
         force: agent.force,
         sandbox: agent.sandbox,
+        authorized: isAuthorized,
       },
       onChunk
     );
@@ -608,7 +623,8 @@ export async function chatWithAgent(
   // ---------------------------
 
   // Build the enhanced prompt with agent's system prompt
-  let enhancedPrompt = `${agent.systemPrompt}\n\nUser Query: ${message}`;
+  const safeMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  let enhancedPrompt = `${agent.systemPrompt}\n\n<user_query>${safeMessage}</user_query>`;
 
   // Add context if requested
   if (includeSystemInfo) {
@@ -752,6 +768,10 @@ export async function chatWithAgent(
         }
       }
 
+      // Security: Calculate Authorization for GCP Credentials
+      const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
+      const isAuthorized = !!(ownerId && userId === ownerId);
+
       // Call Antigravity CLI with streaming
       result = await sendToAntigravityCLI(
         fullPrompt,
@@ -762,6 +782,7 @@ export async function chatWithAgent(
           force: agent.force,
           sandbox: agent.sandbox,
           streamJson: true,
+          authorized: isAuthorized,
         },
         async (chunk) => {
           currentChunk += chunk;
@@ -1085,17 +1106,26 @@ export async function handleManagerInteraction(
     const sessionData = getActiveSession(userId, channelId);
     let historyPrompt = "";
 
+    // Security: Calculate Authorization for GCP Credentials
+    const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
+    const isAuthorized = !!(ownerId && userId === ownerId);
+
     if (sessionData && sessionData.session) {
       // Append current user message to history
       sessionData.session.history.push({ role: 'user', content: userMessage });
 
-      // Build History String
-      historyPrompt = sessionData.session.history.map(msg =>
-        `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
-      ).join("\n\n");
+      // Build History String with XML-style tags and escaping to prevent injection
+      historyPrompt = "<conversation_history>\n";
+      for (const msg of sessionData.session.history) {
+        const role = msg.role === 'user' ? 'user' : 'assistant';
+        const safeContent = msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        historyPrompt += `  <entry role="${role}">${safeContent}</entry>\n`;
+      }
+      historyPrompt += "</conversation_history>\n";
     } else {
       // Fallback if no session (shouldn't happen if properly started)
-      historyPrompt = `User: ${userMessage}`;
+      const safeContent = userMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      historyPrompt = `<conversation_history>\n  <entry role="user">${safeContent}</entry>\n</conversation_history>\n`;
     }
 
     // Construct Prompt
