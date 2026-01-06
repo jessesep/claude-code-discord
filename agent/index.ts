@@ -1,7 +1,8 @@
 // Agent command implementation
 import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "npm:discord.js@14.14.1";
 import * as path from "https://deno.land/std/path/mod.ts";
-import { MANAGER_SYSTEM_PROMPT, parseManagerResponse, ManagerAction } from "./manager.ts";
+import { MANAGER_SYSTEM_PROMPT, parseManagerResponse, parseGitHubIssueRequest, ManagerAction } from "./manager.ts";
+import { AgentRegistry } from "./registry.ts";
 
 // Agent types and interfaces
 export interface AgentConfig {
@@ -420,7 +421,8 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
 
 // Helper functions for agent management
 async function listAgents(ctx: any) {
-  const agentList = Object.entries(PREDEFINED_AGENTS).map(([key, agent]) => {
+  const agents = AgentRegistry.getInstance().listAgents();
+  const agentList = Object.entries(agents).map(([key, agent]) => {
     const riskEmoji = agent.riskLevel === 'high' ? '🔴' : agent.riskLevel === 'medium' ? '🟡' : '🟢';
     return `${riskEmoji} **${agent.name}** (\`${key}\`)\n   ${agent.description}\n   Capabilities: ${agent.capabilities.join(', ')}`;
   }).join('\n\n');
@@ -444,7 +446,7 @@ async function listAgents(ctx: any) {
 }
 
 async function startAgentSession(ctx: any, agentName: string) {
-  const agent = PREDEFINED_AGENTS[agentName];
+  const agent = AgentRegistry.getInstance().getAgent(agentName);
   if (!agent) {
     await ctx.editReply({
       embeds: [{
@@ -540,7 +542,7 @@ export async function runAgentTask(
   onChunk?: (text: string) => void,
   isAuthorized: boolean = false
 ): Promise<string> {
-  const agent = PREDEFINED_AGENTS[agentId];
+  const agent = AgentRegistry.getInstance().getAgent(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
 
   const controller = new AbortController(); // No external control for now in headless
@@ -566,8 +568,9 @@ export async function runAgentTask(
     resultText = result.response;
   } else if (clientType === 'antigravity') {
     const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+    const safeSystemPrompt = agent.systemPrompt.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeTask = task.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const prompt = `${agent.systemPrompt}\n\n<task>${safeTask}</task>`;
+    const prompt = `${safeSystemPrompt}\n\n<task>${safeTask}</task>`;
     const result = await sendToAntigravityCLI(
       prompt,
       controller,
@@ -603,20 +606,8 @@ export async function chatWithAgent(
 ) {
   const userId = ctx.user.id;
   const activeAgentName = agentName || currentUserAgent[userId];
-
-  if (!activeAgentName) {
-    await ctx.editReply({
-      embeds: [{
-        color: 0xff6600,
-        title: '⚠️ No Active Agent',
-        description: 'No agent session active. Use `/agent action:start agent_name:[name]` to start one.',
-        timestamp: new Date().toISOString()
-      }]
-    });
-    return;
-  }
-
-  const agent = PREDEFINED_AGENTS[activeAgentName];
+  // ...
+  const agent = AgentRegistry.getInstance().getAgent(activeAgentName || '');
   if (!agent) {
     await ctx.editReply({
       embeds: [{
@@ -705,8 +696,9 @@ export async function chatWithAgent(
   }
 
   // Build the enhanced prompt with agent's system prompt
+  const safeSystemPrompt = agent.systemPrompt.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const safeMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  let enhancedPrompt = `${agent.systemPrompt}${gitContext}\n\n${historyPrompt ? `=== CONVERSATION HISTORY ===\n${historyPrompt}=== END HISTORY ===\n\n` : ''}<user_query>${safeMessage}</user_query>`;
+  let enhancedPrompt = `${safeSystemPrompt}${gitContext}\n\n${historyPrompt ? `=== CONVERSATION HISTORY ===\n${historyPrompt}=== END HISTORY ===\n\n` : ''}<user_query>${safeMessage}</user_query>`;
 
   // Inject .agent-context.md files into prompt (since Gemini doesn't have tool access)
   let contextContent = "";
@@ -778,6 +770,22 @@ export async function chatWithAgent(
     }]
   });
 
+  // Helper function to detect rate limit/quota errors
+  const isRateLimitError = (error: unknown): boolean => {
+    if (!(error instanceof Error)) return false;
+    const msg = error.message.toLowerCase();
+    return (
+      msg.includes('exit code 1') ||
+      msg.includes('exited with code 1') ||
+      msg.includes('rate limit') ||
+      msg.includes('quota') ||
+      msg.includes('usage limit') ||
+      msg.includes('out of extra usage') ||
+      msg.includes('exceeds') ||
+      msg.includes('429')
+    );
+  };
+
   // Call actual Claude API with agent configuration
   try {
     // Create controller for this request
@@ -787,11 +795,176 @@ export async function chatWithAgent(
     let lastUpdate = Date.now();
     const UPDATE_INTERVAL = 2000; // Update Discord every 2 seconds
     let result;
+    let fallbackUsed = false;
 
     // Determine which client to use based on agent configuration
     const clientType = agent.client || 'claude'; // Default to Claude
 
-    if (clientType === 'cursor') {
+    // Try Claude first (if not explicitly set to cursor/antigravity)
+    if (clientType === 'claude' || !clientType) {
+      try {
+        // Import the Claude CLI client (uses Claude subscription, no API key needed!)
+        const { sendToClaudeCLI } = await import("../claude/cli-client.ts");
+
+        // Use simple model alias for CLI (sonnet/opus) instead of full model ID
+        const cliModel = agent.model.includes("sonnet") ? "sonnet" : agent.model.includes("opus") ? "opus" : "sonnet";
+        result = await sendToClaudeCLI(
+          agent.systemPrompt,
+          message,
+          controller,
+          cliModel,
+          8000,
+          async (chunk) => {
+            currentChunk += chunk;
+
+            // Send updates to Discord periodically
+            const now = Date.now();
+            if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+              lastUpdate = now;
+
+              // Send the accumulated text as a message
+              const claudeMessages = [{
+                type: 'text' as const,
+                content: currentChunk,
+                timestamp: new Date().toISOString()
+              }];
+
+              await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+              currentChunk = ""; // Reset after sending to avoid duplicates
+            }
+          }
+        );
+      } catch (claudeError) {
+        // If Claude fails due to rate limit/quota, try fallback providers
+        if (isRateLimitError(claudeError)) {
+          console.log("⚠️ Claude rate limit/quota exceeded, trying fallback providers...");
+          fallbackUsed = true;
+          
+          // Notify user about fallback
+          await ctx.editReply({
+            embeds: [{
+              color: 0xffaa00,
+              title: `⚠️ ${agent.name} - Using Fallback Provider`,
+              description: 'Claude API limit reached. Trying alternative providers (Cursor → Antigravity)...',
+              timestamp: new Date().toISOString()
+            }]
+          }).catch(() => {});
+
+          // Try Cursor as first fallback
+          try {
+            const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
+            let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+
+            // Inject claude-mem context for Cursor agents
+            try {
+              const { injectClaudeMemContext } = await import("../util/claude-mem-context.ts");
+              const workDir = deps?.workDir || Deno.cwd();
+              fullPrompt = await injectClaudeMemContext(
+                fullPrompt,
+                workDir,
+                activeAgentName,
+                message
+              );
+            } catch {
+              // Silently fail if claude-mem is not available
+            }
+
+            result = await sendToCursorCLI(
+              fullPrompt,
+              controller,
+              {
+                model: agent.model,
+                workspace: deps?.workDir || Deno.cwd(),
+                streamJson: true,
+              },
+              async (chunk) => {
+                currentChunk += chunk;
+                const now = Date.now();
+                if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+                  lastUpdate = now;
+                  const claudeMessages = [{
+                    type: 'text' as const,
+                    content: currentChunk,
+                    timestamp: new Date().toISOString()
+                  }];
+                  await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+                  currentChunk = "";
+                }
+              }
+            );
+            console.log("✅ Successfully used Cursor as fallback");
+          } catch (cursorError) {
+            // If Cursor also fails, try Antigravity as final fallback
+            if (isRateLimitError(cursorError)) {
+              console.log("⚠️ Cursor also hit limits, trying Antigravity (Gemini) as final fallback...");
+            }
+            
+            try {
+              const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+              let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+
+              // Inject claude-mem context for Antigravity agents
+              try {
+                const { injectClaudeMemContext } = await import("../util/claude-mem-context.ts");
+                const workDir = deps?.workDir || Deno.cwd();
+                fullPrompt = await injectClaudeMemContext(
+                  fullPrompt,
+                  workDir,
+                  activeAgentName,
+                  message
+                );
+              } catch {
+                // Silently fail if claude-mem is not available
+              }
+
+              const ownerId = deps?.ownerId;
+              const userId = ctx.user?.id;
+              const isAuthorized = !!(ownerId && userId === ownerId);
+
+              result = await sendToAntigravityCLI(
+                fullPrompt,
+                controller,
+                {
+                  model: agent.model,
+                  workspace: agent.workspace,
+                  force: agent.force,
+                  sandbox: agent.sandbox,
+                  streamJson: true,
+                  authorized: isAuthorized,
+                },
+                async (chunk) => {
+                  currentChunk += chunk;
+                  const now = Date.now();
+                  if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+                    lastUpdate = now;
+                    const claudeMessages = [{
+                      type: 'text' as const,
+                      content: currentChunk,
+                      timestamp: new Date().toISOString()
+                    }];
+                    await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+                    currentChunk = "";
+                  }
+                }
+              );
+              console.log("✅ Successfully used Antigravity (Gemini) as fallback");
+            } catch (antigravityError) {
+              // All fallbacks failed
+              throw new Error(
+                `All providers failed:\n` +
+                `- Claude: ${claudeError instanceof Error ? claudeError.message : String(claudeError)}\n` +
+                `- Cursor: ${cursorError instanceof Error ? cursorError.message : String(cursorError)}\n` +
+                `- Antigravity: ${antigravityError instanceof Error ? antigravityError.message : String(antigravityError)}\n\n` +
+                `Please wait a moment and try again, or check your API keys/quotas.`
+              );
+            }
+          }
+        } else {
+          // Non-rate-limit error, re-throw
+          throw claudeError;
+        }
+      }
+    } else if (clientType === 'cursor') {
       // Import Cursor CLI client
       const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
 
@@ -957,38 +1130,6 @@ export async function chatWithAgent(
           }
         }
       );
-    } else {
-      // Import the Claude CLI client (uses Claude subscription, no API key needed!)
-      const { sendToClaudeCLI } = await import("../claude/cli-client.ts");
-
-      // Use simple model alias for CLI (sonnet/opus) instead of full model ID
-      const cliModel = agent.model.includes("sonnet") ? "sonnet" : agent.model.includes("opus") ? "opus" : "sonnet";
-      result = await sendToClaudeCLI(
-        agent.systemPrompt,
-        message,
-        controller,
-        cliModel,
-        8000,
-        async (chunk) => {
-          currentChunk += chunk;
-
-          // Send updates to Discord periodically
-          const now = Date.now();
-          if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
-            lastUpdate = now;
-
-            // Send the accumulated text as a message
-            const claudeMessages = [{
-              type: 'text' as const,
-              content: currentChunk,
-              timestamp: new Date().toISOString()
-            }];
-
-            await deps.sendClaudeMessages(claudeMessages).catch(() => { });
-            currentChunk = ""; // Reset after sending to avoid duplicates
-          }
-        }
-      );
     }
 
     // Send final chunk if there's any remaining content
@@ -1001,6 +1142,91 @@ export async function chatWithAgent(
       await deps.sendClaudeMessages(claudeMessages).catch(() => { });
     }
 
+    // Notify user if fallback was used (before processing response)
+    if (fallbackUsed && result?.response) {
+      const providerUsed = result.modelUsed?.includes('Cursor') || result.modelUsed?.includes('cursor') ? 'Cursor' : 
+                          result.modelUsed?.includes('Gemini') || result.modelUsed?.includes('gemini') ? 'Antigravity (Gemini)' : 
+                          result.modelUsed || 'Fallback Provider';
+      console.log(`✅ Successfully completed using ${providerUsed} as fallback provider`);
+    }
+
+    // Check for GitHub issue creation request before processing response
+    const fullResponse = result.response || '';
+    const githubIssueRequest = parseGitHubIssueRequest(fullResponse);
+    
+    if (githubIssueRequest && githubIssueRequest.action === 'create_github_issue') {
+      // Intercept and execute GitHub issue creation
+      try {
+        const { createGitHubIssueWithCLI } = await import("../util/github-issues.ts");
+        const issueResult = await createGitHubIssueWithCLI({
+          title: githubIssueRequest.title!,
+          body: githubIssueRequest.body!,
+          labels: githubIssueRequest.labels
+        });
+
+        if (issueResult.success) {
+          const successMessage = `✅ **GitHub Issue Created Successfully!**\n\n` +
+            `**Issue #${issueResult.issueNumber}**: ${githubIssueRequest.title}\n\n` +
+            `The issue has been created in the repository.`;
+          
+          // Save to history
+          if (sessionData && sessionData.session) {
+            sessionData.session.history.push({ role: 'model', content: successMessage });
+          }
+
+          await ctx.editReply({
+            embeds: [{
+              color: 0x00ff00,
+              title: `✅ ${agent.name} - GitHub Issue Created`,
+              description: successMessage,
+              fields: [
+                { name: 'Issue Number', value: `#${issueResult.issueNumber}`, inline: true },
+                { name: 'Title', value: githubIssueRequest.title!, inline: false }
+              ],
+              timestamp: new Date().toISOString()
+            }]
+          });
+          return; // Exit early, don't process the original response
+        } else {
+          const errorMessage = `❌ **Failed to Create GitHub Issue**\n\n` +
+            `Error: ${issueResult.error || 'Unknown error'}\n\n` +
+            `Please check that:\n` +
+            `- GitHub CLI (gh) is installed and authenticated\n` +
+            `- You are in a Git repository\n` +
+            `- You have permissions to create issues`;
+          
+          // Save to history
+          if (sessionData && sessionData.session) {
+            sessionData.session.history.push({ role: 'model', content: errorMessage });
+          }
+
+          await ctx.editReply({
+            embeds: [{
+              color: 0xff0000,
+              title: `❌ ${agent.name} - GitHub Issue Creation Failed`,
+              description: errorMessage,
+              timestamp: new Date().toISOString()
+            }]
+          });
+          return; // Exit early
+        }
+      } catch (error) {
+        const errorMessage = `❌ **Error Creating GitHub Issue**\n\n${error}`;
+        if (sessionData && sessionData.session) {
+          sessionData.session.history.push({ role: 'model', content: errorMessage });
+        }
+        await ctx.editReply({
+          embeds: [{
+            color: 0xff0000,
+            title: `❌ ${agent.name} - Error`,
+            description: errorMessage,
+            timestamp: new Date().toISOString()
+          }]
+        });
+        return;
+      }
+    }
+
     // Save response to session history
     if (sessionData && sessionData.session && result.response) {
       sessionData.session.history.push({ role: 'model', content: result.response });
@@ -1008,7 +1234,7 @@ export async function chatWithAgent(
 
     // Truncate response if too long and add expand button
     const MAX_DESCRIPTION_LENGTH = 2000; // Discord embed description limit is ~4096, but we'll use 2000 for safety
-    const fullResponse = result.response || '';
+    // fullResponse already declared above for GitHub issue check
     let displayResponse = fullResponse;
     let isTruncated = false;
     
@@ -1434,7 +1660,73 @@ export async function handleManagerInteraction(
     }
 
     // 3. Handle Action
-    if (action.action === 'reply' && action.message) {
+    if (action.action === 'create_github_issue' && action.title && action.body) {
+      // GitHub Issue Creation
+      try {
+        const { createGitHubIssueWithCLI } = await import("../util/github-issues.ts");
+        const issueResult = await createGitHubIssueWithCLI({
+          title: action.title,
+          body: action.body,
+          labels: action.labels || []
+        });
+
+        if (issueResult.success) {
+          const successMessage = `✅ **GitHub Issue Created Successfully!**\n\n` +
+            `**Issue #${issueResult.issueNumber}**: ${action.title}\n\n` +
+            `The issue has been created in the repository.`;
+          
+          if (sessionData && sessionData.session) {
+            sessionData.session.history.push({ role: 'model', content: successMessage });
+          }
+
+          await ctx.editReply({
+            embeds: [{
+              color: 0x00ff00,
+              title: '✅ Manager - GitHub Issue Created',
+              description: successMessage,
+              fields: [
+                { name: 'Issue Number', value: `#${issueResult.issueNumber}`, inline: true },
+                { name: 'Title', value: action.title, inline: false }
+              ],
+              timestamp: new Date().toISOString()
+            }]
+          });
+        } else {
+          const errorMessage = `❌ **Failed to Create GitHub Issue**\n\n` +
+            `Error: ${issueResult.error || 'Unknown error'}\n\n` +
+            `Please check that:\n` +
+            `- GitHub CLI (gh) is installed and authenticated\n` +
+            `- You are in a Git repository\n` +
+            `- You have permissions to create issues`;
+          
+          if (sessionData && sessionData.session) {
+            sessionData.session.history.push({ role: 'model', content: errorMessage });
+          }
+
+          await ctx.editReply({
+            embeds: [{
+              color: 0xff0000,
+              title: '❌ Manager - GitHub Issue Creation Failed',
+              description: errorMessage,
+              timestamp: new Date().toISOString()
+            }]
+          });
+        }
+      } catch (error) {
+        const errorMessage = `❌ **Error Creating GitHub Issue**\n\n${error}`;
+        if (sessionData && sessionData.session) {
+          sessionData.session.history.push({ role: 'model', content: errorMessage });
+        }
+        await ctx.editReply({
+          embeds: [{
+            color: 0xff0000,
+            title: '❌ Manager - Error',
+            description: errorMessage,
+            timestamp: new Date().toISOString()
+          }]
+        });
+      }
+    } else if (action.action === 'reply' && action.message) {
       // Direct Reply
       if (sessionData && sessionData.session) {
         sessionData.session.history.push({ role: 'model', content: action.message });
