@@ -38,10 +38,33 @@ When delegating to sub-agents, instruct them to use MCP tools for external servi
 
 ## GitHub Issue Creation
 
-If MCP tools are not available, you can create GitHub issues using the GitHub CLI (gh). The system has a utility function that can create issues directly. When a user asks to create GitHub issues:
+If MCP tools are not available, you can create GitHub issues using a special action format. When a user asks to create GitHub issues:
+
 1. First check if MCP tools are available (they will be listed in the context)
-2. If MCP is not available, use the GitHub issue creation utility function
-3. Do NOT generate shell scripts - use the provided utility functions instead
+2. If MCP is not available, use the GitHub issue creation action format below
+3. Do NOT generate shell scripts - use the action format instead
+
+**To create a GitHub issue, output this JSON block in your response:**
+
+\`\`\`json
+{
+  "action": "create_github_issue",
+  "title": "Issue title here",
+  "body": "Issue description here",
+  "labels": ["bug", "enhancement"],  // Optional: array of label strings
+  "assignees": ["username1", "username2"],  // Optional: GitHub usernames to assign
+  "milestone": "v1.0",  // Optional: milestone name
+  "project": "Project Name"  // Optional: project name or number
+}
+\`\`\`
+
+**Enhanced Features:**
+- **Labels**: Add multiple labels to categorize issues (e.g., ["bug", "high", "security"])
+- **Assignees**: Assign issues to specific GitHub users by their username
+- **Milestones**: Link issues to project milestones
+- **Projects**: Add issues to GitHub projects
+
+The system will automatically execute this action and create the issue with all specified metadata. You will receive the result (success/failure and issue number) which you should report to the user.
 
 ## Interaction Protocol
 
@@ -66,10 +89,17 @@ To switch to a specialized agent (which will take over the conversation), output
 `;
 
 export interface ManagerAction {
-    action: 'spawn_agent' | 'reply';
+    action: 'spawn_agent' | 'reply' | 'create_github_issue';
     agent_name?: string;
     task?: string;
     message?: string;
+    // For GitHub issue creation
+    title?: string;
+    body?: string;
+    labels?: string[];
+    assignees?: string[];
+    milestone?: string;
+    project?: string;
 }
 
 export function parseManagerResponse(response: string): ManagerAction | null {
@@ -84,6 +114,17 @@ export function parseManagerResponse(response: string): ManagerAction | null {
                     task: data.task
                 };
             }
+            if (data.action === 'create_github_issue' && data.title && data.body) {
+                return {
+                    action: 'create_github_issue',
+                    title: data.title,
+                    body: data.body,
+                    labels: data.labels || [],
+                    assignees: data.assignees || [],
+                    milestone: data.milestone,
+                    project: data.project
+                };
+            }
         } catch (e) {
             console.error("Failed to parse manager JSON:", e);
         }
@@ -94,4 +135,32 @@ export function parseManagerResponse(response: string): ManagerAction | null {
         action: 'reply',
         message: response
     };
+}
+
+/**
+ * Parse GitHub issue creation request from any agent response
+ * Looks for JSON blocks with create_github_issue action
+ */
+export function parseGitHubIssueRequest(response: string): ManagerAction | null {
+    // Try to find JSON block with create_github_issue action
+    const jsonBlock = response.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonBlock) {
+        try {
+            const data = JSON.parse(jsonBlock[1]);
+            if (data.action === 'create_github_issue' && data.title && data.body) {
+                return {
+                    action: 'create_github_issue',
+                    title: data.title,
+                    body: data.body,
+                    labels: data.labels || [],
+                    assignees: data.assignees || [],
+                    milestone: data.milestone,
+                    project: data.project
+                };
+            }
+        } catch (e) {
+            // Not a valid GitHub issue request
+        }
+    }
+    return null;
 }

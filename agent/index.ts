@@ -1161,7 +1161,10 @@ export async function chatWithAgent(
         const issueResult = await createGitHubIssueWithCLI({
           title: githubIssueRequest.title!,
           body: githubIssueRequest.body!,
-          labels: githubIssueRequest.labels
+          labels: githubIssueRequest.labels,
+          assignees: githubIssueRequest.assignees,
+          milestone: githubIssueRequest.milestone,
+          project: githubIssueRequest.project
         });
 
         if (issueResult.success) {
@@ -1848,7 +1851,51 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
   const handlers = createAgentHandlers(deps);
   
   if (commandName === 'run') {
-    return await handlers.onAgent(ctx, 'start', 'ag-manager');
+    // Show provider/model selection menu
+    await ctx.deferReply({ ephemeral: false });
+    
+    // Get available providers and models
+    const availableAgents = [
+      { name: 'ag-manager', label: '🤖 Manager Agent (Gemini)', description: 'Helper agent that orchestrates tasks', model: 'gemini-2.0-flash' },
+      { name: 'ag-manager', label: '🚀 Manager Agent (Gemini 3 Flash)', description: 'Latest Gemini 3 Flash model', model: 'gemini-3-flash' },
+      { name: 'ag-coder', label: '💻 Coder Agent (Gemini)', description: 'Autonomous coding agent', model: 'gemini-2.0-flash' },
+      { name: 'ag-architect', label: '🏗️ Architect Agent (Gemini)', description: 'System design and planning', model: 'gemini-2.0-flash' },
+    ];
+    
+    // Create select menu for provider/model selection using Discord.js components
+    const { StringSelectMenuBuilder, ActionRowBuilder } = await import("npm:discord.js@14.14.1");
+    
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId('select-agent-model')
+      .setPlaceholder('Choose an agent and model...')
+      .addOptions(
+        availableAgents.map(agent => ({
+          label: agent.label.substring(0, 100), // Discord limit
+          description: agent.description.substring(0, 100), // Discord limit
+          value: `${agent.name}:${agent.model}`,
+          emoji: agent.label.includes('Manager') ? '🤖' : agent.label.includes('Coder') ? '💻' : '🏗️'
+        }))
+      );
+    
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+    
+    await ctx.editReply({
+      embeds: [{
+        color: 0x5865F2,
+        title: '🚀 Start Helper Agent',
+        description: 'Choose which agent and model you want to use:',
+        fields: [
+          { name: '🤖 Manager Agent', value: 'Orchestrates tasks and delegates to specialized agents', inline: false },
+          { name: '💻 Coder Agent', value: 'Autonomous coding and implementation', inline: false },
+          { name: '🏗️ Architect Agent', value: 'System design and planning', inline: false }
+        ],
+        footer: { text: 'Select an option below to start' },
+        timestamp: new Date().toISOString()
+      }],
+      components: [row]
+    });
+    
+    return;
   } else if (commandName === 'kill') {
     return await handlers.onAgent(ctx, 'end');
   }

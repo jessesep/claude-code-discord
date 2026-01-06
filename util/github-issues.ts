@@ -7,6 +7,10 @@ export interface GitHubIssue {
   title: string;
   body: string;
   labels?: string[];
+  assignees?: string[];
+  milestone?: string;
+  project?: string;
+  projectColumn?: string;
 }
 
 /**
@@ -44,6 +48,21 @@ export async function createGitHubIssueWithCLI(issue: GitHubIssue): Promise<{ su
     // Add labels if provided
     if (issue.labels && issue.labels.length > 0) {
       args.push("--label", issue.labels.join(','));
+    }
+
+    // Add assignees if provided
+    if (issue.assignees && issue.assignees.length > 0) {
+      args.push("--assignee", issue.assignees.join(','));
+    }
+
+    // Add milestone if provided
+    if (issue.milestone) {
+      args.push("--milestone", issue.milestone);
+    }
+
+    // Add project if provided (requires project number or name)
+    if (issue.project) {
+      args.push("--project", issue.project);
     }
 
     // Execute command
