@@ -463,7 +463,7 @@ export async function runAgentTask(
   return resultText;
 }
 
-async function chatWithAgent(
+export async function chatWithAgent(
   ctx: any,
   message: string,
   agentName?: string,
