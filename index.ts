@@ -335,8 +335,13 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
   // Start OSC Server
   try {
+    const phoneIP = Deno.env.get("OSC_PHONE_IP") || "127.0.0.1";
     const oscManager = new OSCManager(
-      { port: 9000 },
+      { 
+        port: 9000, 
+        remoteHost: phoneIP, 
+        remotePort: 9001 
+      },
       { 
         gitHandlers, 
         claudeHandlers, 
