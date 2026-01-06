@@ -671,9 +671,42 @@ export async function chatWithAgent(
     historyPrompt += "</conversation_history>\n";
   }
 
+  // Get git repository information
+  let gitContext = "";
+  try {
+    const workDir = deps?.workDir || Deno.cwd();
+    const { getGitInfo, getGitStatus } = await import("../git/handler.ts");
+    
+    try {
+      const gitInfo = await getGitInfo(workDir);
+      const gitStatus = await getGitStatus(workDir);
+      
+      gitContext = `\n\n=== REPOSITORY CONTEXT ===\n`;
+      gitContext += `Working Directory: ${workDir}\n`;
+      gitContext += `Repository: ${gitInfo.repo}\n`;
+      gitContext += `Branch: ${gitInfo.branch}\n`;
+      if (gitStatus.remote && gitStatus.remote !== "No remotes configured") {
+        gitContext += `Remote: ${gitStatus.remote}\n`;
+      }
+      gitContext += `\nYou are working in a local Git repository on the user's computer.\n`;
+      gitContext += `All file paths should be relative to: ${workDir}\n`;
+      gitContext += `=== END REPOSITORY CONTEXT ===\n`;
+    } catch (error) {
+      // Not a git repo or error getting info
+      const workDir = deps?.workDir || Deno.cwd();
+      gitContext = `\n\n=== WORKING DIRECTORY ===\n`;
+      gitContext += `Working Directory: ${workDir}\n`;
+      gitContext += `Note: This directory is not a Git repository.\n`;
+      gitContext += `All file paths should be relative to: ${workDir}\n`;
+      gitContext += `=== END WORKING DIRECTORY ===\n`;
+    }
+  } catch (error) {
+    console.debug('[Agent] Error getting git context:', error);
+  }
+
   // Build the enhanced prompt with agent's system prompt
   const safeMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  let enhancedPrompt = `${agent.systemPrompt}\n\n${historyPrompt ? `=== CONVERSATION HISTORY ===\n${historyPrompt}=== END HISTORY ===\n\n` : ''}<user_query>${safeMessage}</user_query>`;
+  let enhancedPrompt = `${agent.systemPrompt}${gitContext}\n\n${historyPrompt ? `=== CONVERSATION HISTORY ===\n${historyPrompt}=== END HISTORY ===\n\n` : ''}<user_query>${safeMessage}</user_query>`;
 
   // Inject .agent-context.md files into prompt (since Gemini doesn't have tool access)
   let contextContent = "";
@@ -1293,8 +1326,40 @@ export async function handleManagerInteraction(
       console.warn('[Manager] Error reading context files:', error);
     }
     
+    // Get git repository information for manager
+    let gitContext = "";
+    try {
+      const workDir = deps?.workDir || Deno.cwd();
+      const { getGitInfo, getGitStatus } = await import("../git/handler.ts");
+      
+      try {
+        const gitInfo = await getGitInfo(workDir);
+        const gitStatus = await getGitStatus(workDir);
+        
+        gitContext = `\n\n=== REPOSITORY CONTEXT ===\n`;
+        gitContext += `Working Directory: ${workDir}\n`;
+        gitContext += `Repository: ${gitInfo.repo}\n`;
+        gitContext += `Branch: ${gitInfo.branch}\n`;
+        if (gitStatus.remote && gitStatus.remote !== "No remotes configured") {
+          gitContext += `Remote: ${gitStatus.remote}\n`;
+        }
+        gitContext += `\nYou are working in a local Git repository on the user's computer.\n`;
+        gitContext += `All file paths should be relative to: ${workDir}\n`;
+        gitContext += `=== END REPOSITORY CONTEXT ===\n`;
+      } catch (error) {
+        // Not a git repo or error getting info
+        gitContext = `\n\n=== WORKING DIRECTORY ===\n`;
+        gitContext += `Working Directory: ${workDir}\n`;
+        gitContext += `Note: This directory is not a Git repository.\n`;
+        gitContext += `All file paths should be relative to: ${workDir}\n`;
+        gitContext += `=== END WORKING DIRECTORY ===\n`;
+      }
+    } catch (error) {
+      console.debug('[Manager] Error getting git context:', error);
+    }
+    
     // Construct Prompt
-    const managerPrompt = `${agentConfig.systemPrompt}${contextContent}\n\n=== CONVERSATION HISTORY ===\n${historyPrompt}\n\n=== END HISTORY ===\n\n(Respond to the last User message)`;
+    const managerPrompt = `${agentConfig.systemPrompt}${contextContent}${gitContext}\n\n=== CONVERSATION HISTORY ===\n${historyPrompt}\n\n=== END HISTORY ===\n\n(Respond to the last User message)`;
     const controller = new AbortController();
 
     const response = await sendToAntigravityCLI(
