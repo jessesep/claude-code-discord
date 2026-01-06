@@ -1330,13 +1330,13 @@ export const killCommand = new SlashCommandBuilder()
 
 export const simpleCommands = [runCommand, killCommand];
 
-export function handleSimpleCommand(ctx: any, commandName: string, deps: AgentHandlerDeps) {
+export async function handleSimpleCommand(ctx: any, commandName: string, deps: AgentHandlerDeps) {
   // Map simple commands to agent actions
   const handlers = createAgentHandlers(deps);
   
   if (commandName === 'run') {
-    return handlers.onAgent(ctx, 'start', 'ag-manager');
+    return await handlers.onAgent(ctx, 'start', 'ag-manager');
   } else if (commandName === 'kill') {
-    return handlers.onAgent(ctx, 'end');
+    return await handlers.onAgent(ctx, 'end');
   }
 }
