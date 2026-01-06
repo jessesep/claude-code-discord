@@ -1,11 +1,21 @@
 #!/usr/bin/env -S deno run --allow-all
-import { getGitInfo } from "./git/index.ts";
-
 import { agentCommand, createAgentHandlers, simpleCommands, handleSimpleCommand } from "./agent/index.ts";
 import { ProcessCrashHandler, setupGlobalErrorHandlers, ProcessHealthMonitor } from "./process/index.ts";
-import { handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "./discord/index.ts";
+import { createDiscordBot, handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "./discord/index.ts";
 import { SettingsPersistence } from "./util/settings-persistence.ts";
 import { WebServer } from "./server/index.ts";
+import { getGitInfo, WorktreeBotManager, createGitHandlers, gitCommands } from "./git/index.ts";
+import { ShellManager, createShellHandlers, shellCommands } from "./shell/index.ts";
+import { ClaudeSessionManager, createClaudeHandlers, claudeCommands, enhancedClaudeCommands, createEnhancedClaudeHandlers, cleanSessionId, createClaudeSender, convertToClaudeMessages, expandableContent } from "./claude/index.ts";
+import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
+import { helpCommand, createHelpHandlers } from "./help/index.ts";
+import { unifiedSettingsCommands, createUnifiedSettingsHandlers, createAdvancedSettingsHandlers, DEFAULT_SETTINGS, UNIFIED_DEFAULT_SETTINGS } from "./settings/index.ts";
+import { utilsCommands, createUtilsHandlers } from "./util/index.ts";
+import { systemCommands, createSystemHandlers } from "./system/index.ts";
+
+
+
+
 
 
 
