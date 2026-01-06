@@ -703,7 +703,6 @@ export async function chatWithAgent(
   // ---------------------------
 
   // Get active session and add message to history
-  const channelId = ctx.channelId || ctx.channel?.id;
   const sessionData = getActiveSession(userId, channelId || '');
   
   if (sessionData && sessionData.session) {
