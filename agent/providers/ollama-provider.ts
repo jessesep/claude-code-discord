@@ -146,7 +146,21 @@ export class OllamaProvider implements AgentProvider {
     }
 
     // Determine model to use
-    const model = options.model || availableModels[0];
+    // Prefer smaller/faster models for better performance on Mac
+    // Priority: 1.5B/7B models > 14B models > larger models
+    let model = options.model;
+    if (!model) {
+      // Find the fastest/smallest model available
+      const fastModels = availableModels.filter(m => 
+        m.includes('1.5b') || m.includes('7b') || m.includes('3b')
+      );
+      const mediumModels = availableModels.filter(m => 
+        m.includes('14b') && !m.includes('32b')
+      );
+      
+      // Prefer fast models, then medium, then any available
+      model = fastModels[0] || mediumModels[0] || availableModels[0];
+    }
 
     // Parse system prompt and user message
     const parts = prompt.split('\n\nTask: ');

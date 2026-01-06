@@ -271,6 +271,16 @@ export async function sendToCursorCLI(
         };
       }
 
+      // Handle ConnectError (HTTP/2 stream cancellation)
+      if (errorOutput.includes("ConnectError") || errorOutput.includes("[canceled]") || errorOutput.includes("CANCEL")) {
+        const isTimeout = errorOutput.includes("timeout") || duration > 300000; // 5 minutes
+        const errorMsg = isTimeout
+          ? "Cursor CLI request timed out. The operation took too long and was cancelled. Try breaking your request into smaller tasks."
+          : "Cursor CLI connection was cancelled. This may be due to network issues or the request being interrupted. Please try again.";
+        
+        throw new Error(errorMsg);
+      }
+
       // Other errors
       throw new Error(
         `Cursor CLI exited with code ${status.code}\n` +

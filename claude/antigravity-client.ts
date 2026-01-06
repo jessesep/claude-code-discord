@@ -255,15 +255,71 @@ export async function sendToAntigravityCLI(
       };
 
     } catch (error) {
+      // If OAuth fails, log but don't throw yet - try API key fallback
+      console.warn("[Antigravity] OAuth authentication failed, trying API key fallback:", error);
+      // Fall through to API key fallback
+    }
+  }
+}
+
+  // 2. Fallback to API Key Strategy (SDK) - only if OAuth unavailable or failed
+  // SECURITY NOTE: API keys are less secure than OAuth but provided as fallback
+  if (API_KEY) {
+    try {
+      const genAI = new GoogleGenerativeAI(API_KEY);
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      let fullText = "";
+
+      if (options.streamJson && onChunk) {
+        const result = await model.generateContentStream(prompt);
+        for await (const chunk of result.stream) {
+          if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+          const chunkText = chunk.text();
+          fullText += chunkText;
+          onChunk(chunkText);
+        }
+      } else {
+        const result = await model.generateContent(prompt);
+        fullText = result.response.text();
+      }
+
+      console.warn("[Antigravity] Using API key fallback (OAuth preferred for security)");
+      return {
+        response: fullText,
+        duration: Date.now() - startTime,
+        modelUsed: modelName,
+        chatId: `genai-key-${Date.now()}`
+      };
+    } catch (error) {
       handleError(error, controller, startTime, modelName);
     }
   }
 
+  // No authentication method available
+  const gcloudManager = GcloudTokenManager.getInstance();
+  const hasGcloud = await gcloudManager.isAvailable();
+  
+  if (!hasGcloud && !API_KEY) {
+    throw new Error(
+      "Authentication failed. Please install and configure 'gcloud' CLI:\n" +
+      "  1. Install: https://cloud.google.com/sdk/docs/install\n" +
+      "  2. Run: gcloud auth login\n" +
+      "  3. Run: gcloud auth application-default login\n\n" +
+      "Alternatively, set GEMINI_API_KEY environment variable (less secure)."
+    );
+  } else if (hasGcloud && !API_KEY) {
+    throw new Error(
+      "gcloud is installed but not authenticated. Please run:\n" +
+      "  gcloud auth login\n" +
+      "  gcloud auth application-default login"
+    );
+  } else {
+    throw new Error(
+      "Authentication failed. Both gcloud OAuth and API key methods failed. " +
+      "Please check your gcloud credentials or API key."
+    );
   }
-
-  throw new Error(
-    "Authentication failed. Please provide GEMINI_API_KEY environment variable OR install/configure 'gcloud' CLI with 'gcloud auth login'."
-  );
 }
 
 function handleError(error: unknown, controller: AbortController, startTime: number, modelName: string): never | AntigravityResponse {

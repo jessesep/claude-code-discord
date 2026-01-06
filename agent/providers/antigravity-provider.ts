@@ -62,13 +62,14 @@ export class AntigravityProvider implements AgentProvider {
     }
 
     // Build Antigravity options
+    // SECURITY: Default to authorized=true (gcloud OAuth) unless explicitly disabled
     const antigravityOptions = {
       model: options.model || 'gemini-3-flash',
       workspace: options.workspace,
       streamJson: options.streaming !== false,
       force: options.force,
       sandbox: options.sandbox === false ? 'disabled' : 'enabled',
-      authorized: options.providerOptions?.authorized as boolean,
+      authorized: options.providerOptions?.authorized !== false, // Default to true for security
     };
 
     // Call the existing Antigravity client
