@@ -616,8 +616,6 @@ export async function chatWithAgent(
     return;
   }
 
-
-
   const agent = PREDEFINED_AGENTS[activeAgentName];
   if (!agent) {
     await ctx.editReply({
@@ -629,6 +627,17 @@ export async function chatWithAgent(
       }]
     });
     return;
+  }
+
+  // Use tested model if available
+  if (agent.client === 'antigravity') {
+    try {
+      const { getBestAvailableModel } = await import("../util/model-tester.ts");
+      const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      agent.model = getBestAvailableModel(agent.model, fallbackModels);
+    } catch (error) {
+      console.warn('[Agent] Could not get tested model, using configured model:', error);
+    }
   }
 
   // --- MANAGER AGENT LOGIC ---
@@ -1146,6 +1155,17 @@ export async function handleManagerInteraction(
   agentConfig: AgentConfig,
   deps?: AgentHandlerDeps
 ) {
+  // Use tested model if available
+  if (agentConfig.client === 'antigravity') {
+    try {
+      const { getBestAvailableModel } = await import("../util/model-tester.ts");
+      const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      agentConfig.model = getBestAvailableModel(agentConfig.model, fallbackModels);
+    } catch (error) {
+      console.warn('[Manager] Could not get tested model, using configured model:', error);
+    }
+  }
+
   // 1. Initial acknowledgment (invisible update to change state)
   await ctx.editReply({
     embeds: [{
