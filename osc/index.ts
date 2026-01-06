@@ -40,6 +40,12 @@ export class OSCManager {
   private setupListeners() {
     this.osc.on('*', (message: any) => {
       console.log(`[OSC] Received: ${message.address}`, message.args);
+      
+      // Handle wildcard agent selection
+      if (message.address.startsWith('/agent/select/')) {
+        const agentKey = message.address.split('/').pop();
+        this.handleAgentSelect(agentKey);
+      }
     });
 
     this.osc.on('/ping', () => {
@@ -50,85 +56,61 @@ export class OSCManager {
     this.osc.on('/git/status', async () => {
       if (this.deps.gitHandlers) {
         try {
-          const status = await this.deps.gitHandlers.getStatus();
-          this.send('/label/git_branch', [status.branch]);
-          this.send('/label/git_status', [status.status.substring(0, 100)]);
+          console.log('[OSC] Fetching git status...');
+          this.send('/label/console', ['Fetching Git Status...']);
+          const status = await this.deps.gitHandlers.getGitStatus(Deno.cwd());
+          this.send('/label/git_branch', [\`Branch: \${status.branch}\`]);
+          this.send('/label/console', [\`Git: \${status.status.replace(/\\n/g, ' ')}\`]);
         } catch (err) {
           console.error('[OSC] Git status error:', err);
+          this.send('/label/console', [\`Git Error: \${err.message}\`]);
         }
       }
     });
 
-    // GitHub Sync (Pull & Push)
+    // GitHub Sync
     this.osc.on('/github/sync', async () => {
       if (this.deps.gitHandlers) {
         try {
-          console.log('[OSC] Triggering GitHub Sync...');
-          this.send('/label/console', ['Syncing to GitHub...']);
+          console.log('[OSC] GitHub Sync initiated');
+          this.send('/label/console', ['Syncing: git pull...']);
+          await this.deps.gitHandlers.executeGitCommand(Deno.cwd(), "git pull");
           
-          const pullResult = await this.deps.gitHandlers.onGit(null, "pull");
-          console.log('[OSC] Pull Result:', pullResult);
+          this.send('/label/console', ['Syncing: git push...']);
+          await this.deps.gitHandlers.executeGitCommand(Deno.cwd(), "git push");
           
-          const pushResult = await this.deps.gitHandlers.onGit(null, "push");
-          console.log('[OSC] Push Result:', pushResult);
-          
-          this.send('/label/console', ['Sync Complete']);
-          this.send('/git/sync/done', [1.0]);
+          this.send('/label/console', ['Sync Complete!']);
         } catch (err) {
           console.error('[OSC] Sync error:', err);
-          this.send('/label/console', [`Sync failed: ${err.message}`]);
+          this.send('/label/console', [\`Sync Failed: \${err.message}\`]);
         }
       }
     });
+  }
 
-    // GitHub New Issue
-    this.osc.on('/github/issue/new', async (message: any) => {
-      const title = message.args[0];
-      const body = message.args[1] || "Created via TouchOSC";
-      
-      if (title) {
-        try {
-          console.log(`[OSC] Creating GitHub Issue: ${title}`);
-          this.send('/label/console', [`Creating Issue: ${title}...`]);
-          
-          const cmd = new Deno.Command("gh", {
-            args: ["issue", "create", "--title", title, "--body", body],
-            stdout: "piped",
-            stderr: "piped"
-          });
-          
-          const { stdout, stderr, code } = await cmd.output();
-          const outText = new TextDecoder().decode(stdout).trim();
-          const errText = new TextDecoder().decode(stderr).trim();
-          
-          if (code === 0) {
-            console.log(`[OSC] Issue Created: ${outText}`);
-            this.send('/label/console', [`Issue #${outText.split('/').pop()} Created`]);
-          } else {
-            console.error(`[OSC] Issue creation failed: ${errText}`);
-            this.send('/label/console', [`Issue creation failed: ${errText.substring(0, 50)}`]);
-          }
-        } catch (err) {
-          console.error('[OSC] Issue error:', err);
-          this.send('/label/console', [`Error: ${err.message}`]);
-        }
-      }
-    });
-
-    // Agent Selection
-    this.osc.on('/agent/select', async (message: any) => {
-      const agentKey = message.args[0];
-      if (this.deps.agentHandlers && agentKey) {
-        console.log(`[OSC] Selecting agent: ${agentKey}`);
-        this.send('/label/agent_name', [agentKey]);
-      }
-    });
+  private handleAgentSelect(agentKey: string | undefined) {
+    if (!agentKey) return;
+    
+    // Convert short keys to full keys if needed
+    const fullKeys: Record<string, string> = {
+      'manager': 'ag-manager',
+      'coder': 'ag-coder',
+      'architect': 'architect',
+      'reviewer': 'code-reviewer'
+    };
+    
+    const actualKey = fullKeys[agentKey] || agentKey;
+    
+    console.log(\`[OSC] Selecting agent: \${actualKey}\`);
+    this.send('/label/agent_name', [\`Agent: \${actualKey}\`]);
+    this.send('/label/console', [\`Switched to \${actualKey}\`]);
   }
 
   public async start() {
     try {
       await this.osc.open();
-      console.log(`[OSC] Server listening on port ${this.port}`);
+      console.log(\`[OSC] Server listening on port \${this.port}\`);
+      console.log(\`[OSC] Feedback target: \${this.remoteHost}:\${this.remotePort}\`);
     } catch (error) {
       console.error('[OSC] Failed to start server:', error);
     }
@@ -139,7 +121,7 @@ export class OSCManager {
       const message = new OSC.Message(address, ...args);
       this.osc.send(message, { host: this.remoteHost, port: this.remotePort });
     } catch (error) {
-      console.error(`[OSC] Failed to send message to ${address}:`, error);
+      // Phone might be offline
     }
   }
 }
