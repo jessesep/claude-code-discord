@@ -1,0 +1,15 @@
+{
+  "name": "test-agent",
+  "version": "1.0.0",
+  "enabled": true,
+  "metadata": {
+    "created": "2026-01-06",
+    "environment": "testing",
+    "agent": "cursor-coder"
+  },
+  "capabilities": [
+    "file-creation",
+    "file-modification",
+    "code-generation"
+  ]
+}

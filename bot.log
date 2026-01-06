@@ -1,0 +1,11 @@
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Registering slash commands...
+Slash commands registered
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1457890654729404621)
+Bot has started. Press Ctrl+C to stop.
+Error polling connection: error shutting down connection

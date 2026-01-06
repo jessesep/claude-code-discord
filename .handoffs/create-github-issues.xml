@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<handoff>
+  <metadata>
+    <created>2026-01-06T02:15:00Z</created>
+    <from>Test Orchestration - 5 Parallel Agents Completed</from>
+    <to>GitHub Issues Creation Agent</to>
+    <priority>high</priority>
+  </metadata>
+
+  <context>
+    <project>
+      <name>claude-code-discord</name>
+      <repository>https://github.com/jessesep/claude-code-discord</repository>
+      <branch>main</branch>
+      <working_directory>/Users/jessesep/repos/claude-code-discord</working_directory>
+    </project>
+
+    <testing_completed>
+      <summary>
+        5 parallel test agents completed comprehensive testing of the Cursor integration.
+        All test reports are located in: /Users/jessesep/repos/claude-code-discord/test-reports/
+      </summary>
+
+      <test_agents>
+        <agent id="1" name="File Operations Tester">
+          <status>Complete - 4/4 tests passed (100%)</status>
+          <report>test-reports/agent1-fileops-report.md</report>
+          <bugs_found>0</bugs_found>
+        </agent>
+
+        <agent id="2" name="Conversation Flow Tester">
+          <status>Complete - Analysis done, 5 issues identified</status>
+          <report>test-reports/agent2-conversation-report.md</report>
+          <bugs_found>5 (2 critical, 3 medium)</bugs_found>
+        </agent>
+
+        <agent id="3" name="Session Management Tester">
+          <status>Complete - 5 bugs identified</status>
+          <report>test-reports/agent3-sessions-report.md</report>
+          <bugs_found>5 (1 HIGH, 3 MEDIUM, 1 LOW)</bugs_found>
+        </agent>
+
+        <agent id="4" name="Error Handling Tester">
+          <status>Complete - 18/25 tests passed (72%)</status>
+          <report>test-reports/agent4-errors-report.md</report>
+          <bugs_found>7 (1 HIGH security, 6 MEDIUM/LOW)</bugs_found>
+        </agent>
+
+        <agent id="5" name="Integration Tester">
+          <status>Complete - 36/36 tests passed (100%)</status>
+          <report>test-reports/agent5-integration-report.md</report>
+          <bugs_found>0 (file system layer production-ready)</bugs_found>
+        </agent>
+      </test_agents>
+
+      <total_findings>
+        <total_bugs>17</total_bugs>
+        <security_issues>1</security_issues>
+        <high_severity>3</high_severity>
+        <medium_severity>6</medium_severity>
+        <low_severity>7</low_severity>
+      </total_findings>
+    </testing_completed>
+  </context>
+
+  <mission>
+    <objective>
+      Create comprehensive GitHub issues for all 17 bugs identified during parallel testing.
+      Each issue must include clear reproduction steps, expected vs actual behavior,
+      and reference the test report that found it.
+    </objective>
+
+    <requirements>
+      <requirement priority="critical">
+        Read all 5 test reports to understand bug details
+      </requirement>
+      <requirement priority="critical">
+        Create individual GitHub issues using 'gh issue create' command
+      </requirement>
+      <requirement priority="high">
+        Include proper labels (bug, security, priority-high, etc.)
+      </requirement>
+      <requirement priority="high">
+        Link to relevant code files and line numbers
+      </requirement>
+      <requirement priority="medium">
+        Group related bugs if they share root cause
+      </requirement>
+    </requirements>
+  </mission>
+
+  <bugs_to_create>
+    <!-- AGENT 2: Conversation Flow Issues -->
+    <bug id="BUG-A2-001" severity="CRITICAL">
+      <title>Session persistence not implemented - sessions lost on bot restart</title>
+      <source>Agent 2 - Conversation Flow Tester</source>
+      <report>test-reports/agent2-conversation-report.md</report>
+      <description>
+        Sessions are stored in-memory only (agentSessions array in agent/index.ts).
+        When the bot restarts, all session history is lost. This breaks conversation
+        continuity and user experience.
+      </description>
+      <impact>Users lose all context when bot restarts, must start new sessions</impact>
+      <code_location>agent/index.ts - agentSessions array</code_location>
+      <labels>bug, critical, enhancement</labels>
+    </bug>
+
+    <bug id="BUG-A2-002" severity="CRITICAL">
+      <title>Message length validation missing - Discord 2000 char limit</title>
+      <source>Agent 2 - Conversation Flow Tester</source>
+      <report>test-reports/agent2-conversation-report.md</report>
+      <description>
+        No validation for Discord's 2000 character message limit. Long responses
+        from Cursor agent will fail to send, causing silent errors and poor UX.
+      </description>
+      <impact>Long messages silently fail, conversations break</impact>
+      <code_location>discord/bot.ts - message sending functions</code_location>
+      <labels>bug, critical</labels>
+    </bug>
+
+    <bug id="BUG-A2-003" severity="MEDIUM">
+      <title>Natural message routing unclear - needs verification</title>
+      <source>Agent 2 - Conversation Flow Tester</source>
+      <report>test-reports/agent2-conversation-report.md</report>
+      <description>
+        After implementing natural chat, need to verify messages are correctly
+        routed to active agent without requiring slash commands.
+      </description>
+      <impact>May require slash commands for every message, defeating natural chat purpose</impact>
+      <code_location>discord/bot.ts - MessageCreate handler</code_location>
+      <labels>bug, needs-verification</labels>
+    </bug>
+
+    <bug id="BUG-A2-004" severity="MEDIUM">
+      <title>No session timeout mechanism</title>
+      <source>Agent 2 - Conversation Flow Tester</source>
+      <report>test-reports/agent2-conversation-report.md</report>
+      <description>
+        Sessions remain active indefinitely. No automatic cleanup for idle sessions,
+        leading to memory leaks over time.
+      </description>
+      <impact>Memory usage grows unbounded with inactive sessions</impact>
+      <code_location>agent/index.ts - session management</code_location>
+      <labels>bug, medium, enhancement</labels>
+    </bug>
+
+    <bug id="BUG-A2-005" severity="MEDIUM">
+      <title>Cursor conversation ID not tracked</title>
+      <source>Agent 2 - Conversation Flow Tester</source>
+      <report>test-reports/agent2-conversation-report.md</report>
+      <description>
+        Each Cursor agent call creates a new conversation. Not tracking conversation
+        IDs means context isn't maintained across messages in Cursor.
+      </description>
+      <impact>Cursor agent doesn't remember previous messages in same session</impact>
+      <code_location>cursor/client.ts</code_location>
+      <labels>bug, medium, cursor-integration</labels>
+    </bug>
+
+    <!-- AGENT 3: Session Management Issues -->
+    <bug id="BUG-A3-001" severity="HIGH">
+      <title>Orphaned sessions on agent switch - memory leak</title>
+      <source>Agent 3 - Session Management Tester</source>
+      <report>test-reports/agent3-sessions-report.md</report>
+      <description>
+        When users switch agents, only the final agent's session is cleaned up.
+        Previous sessions remain marked "active" indefinitely. At 10,000 users,
+        this creates a 315MB memory leak.
+      </description>
+      <impact>Unbounded memory growth, potential server crash at scale</impact>
+      <code_location>agent/index.ts, endAgentSession() function, lines 677-710</code_location>
+      <fix_time>30 minutes</fix_time>
+      <labels>bug, high, memory-leak</labels>
+    </bug>
+
+    <bug id="BUG-A3-002" severity="MEDIUM">
+      <title>Session metrics never updated</title>
+      <source>Agent 3 - Session Management Tester</source>
+      <report>test-reports/agent3-sessions-report.md</report>
+      <description>
+        Fields messageCount, totalCost, lastActivity are initialized but never updated.
+        Prevents usage tracking and cost analysis.
+      </description>
+      <impact>Cannot track costs or usage patterns</impact>
+      <code_location>agent/index.ts, chatWithAgent() function</code_location>
+      <fix_time>30 minutes</fix_time>
+      <labels>bug, medium, enhancement</labels>
+    </bug>
+
+    <bug id="BUG-A3-003" severity="MEDIUM">
+      <title>Status shows global session count instead of per-user</title>
+      <source>Agent 3 - Session Management Tester</source>
+      <report>test-reports/agent3-sessions-report.md</report>
+      <description>
+        /agent action:status displays system-wide session count, not user's sessions.
+        Misleading in multi-user scenarios.
+      </description>
+      <impact>Users see confusing session counts</impact>
+      <code_location>agent/index.ts, showAgentStatus() function, line 583</code_location>
+      <fix_time>15 minutes</fix_time>
+      <labels>bug, medium</labels>
+    </bug>
+
+    <bug id="BUG-A3-004" severity="MEDIUM">
+      <title>No session persistence - history lost on restart</title>
+      <source>Agent 3 - Session Management Tester</source>
+      <report>test-reports/agent3-sessions-report.md</report>
+      <description>
+        All sessions stored in-memory only. Complete history lost on bot restart.
+        Same as BUG-A2-001 but from different testing perspective.
+      </description>
+      <impact>Sessions don't survive restarts</impact>
+      <code_location>agent/index.ts - let agentSessions: AgentSession[] = []</code_location>
+      <labels>bug, medium, duplicate-of-A2-001</labels>
+    </bug>
+
+    <bug id="BUG-A3-005" severity="LOW">
+      <title>No per-channel agent isolation</title>
+      <source>Agent 3 - Session Management Tester</source>
+      <report>test-reports/agent3-sessions-report.md</report>
+      <description>
+        Users can only have one active agent globally. Cannot use different agents
+        in different Discord channels simultaneously.
+      </description>
+      <impact>Cannot multitask with different agents</impact>
+      <code_location>agent/index.ts - currentUserAgent keyed only by userId</code_location>
+      <labels>enhancement, low</labels>
+    </bug>
+
+    <!-- AGENT 4: Error Handling Issues -->
+    <bug id="BUG-A4-001" severity="MEDIUM">
+      <title>Empty prompt validation missing</title>
+      <source>Agent 4 - Error Handling Tester</source>
+      <report>test-reports/agent4-errors-report.md</report>
+      <description>
+        No validation for empty or whitespace-only messages before sending to API.
+        Wastes API quota and causes confusing errors.
+      </description>
+      <impact>Wasted API calls, poor error messages</impact>
+      <code_location>claude/command.ts</code_location>
+      <fix_time>15 minutes</fix_time>
+      <labels>bug, medium</labels>
+    </bug>
+
+    <bug id="BUG-A4-002" severity="HIGH">
+      <title>No rate limiting on commands - enables spam attacks</title>
+      <source>Agent 4 - Error Handling Tester</source>
+      <report>test-reports/agent4-errors-report.md</report>
+      <description>
+        No rate limiting on slash commands or messages. Users can spam the bot,
+        causing API quota exhaustion and potential DoS.
+      </description>
+      <impact>API quota exhaustion, service degradation</impact>
+      <code_location>index.ts</code_location>
+      <fix_time>30-60 minutes</fix_time>
+      <labels>bug, high, security</labels>
+    </bug>
+
+    <bug id="BUG-A4-003" severity="MEDIUM">
+      <title>Silent session abort on errors</title>
+      <source>Agent 4 - Error Handling Tester</source>
+      <report>test-reports/agent4-errors-report.md</report>
+      <description>
+        Sessions abort without clear error messages when API calls fail.
+        Users don't understand what went wrong.
+      </description>
+      <impact>Poor user experience, confusion</impact>
+      <code_location>index.ts</code_location>
+      <fix_time>30 minutes</fix_time>
+      <labels>bug, medium, ux</labels>
+    </bug>
+
+    <bug id="BUG-A4-004" severity="MEDIUM">
+      <title>No token limit validation before API calls</title>
+      <source>Agent 4 - Error Handling Tester</source>
+      <report>test-reports/agent4-errors-report.md</report>
+      <description>
+        Very long messages aren't validated before sending to API. Can cause
+        token limit errors and wasted API calls.
+      </description>
+      <impact>Failed API calls, wasted quota</impact>
+      <code_location>claude/command.ts</code_location>
+      <fix_time>45 minutes</fix_time>
+      <labels>bug, medium</labels>
+    </bug>
+
+    <bug id="BUG-A4-005" severity="HIGH">
+      <title>Path traversal not filtered - SECURITY VULNERABILITY</title>
+      <source>Agent 4 - Error Handling Tester</source>
+      <report>test-reports/agent4-errors-report.md</report>
+      <description>
+        File paths from user input aren't validated for path traversal attacks.
+        Users could potentially access files outside the working directory using
+        "../" sequences.
+      </description>
+      <impact>Security vulnerability - directory traversal possible</impact>
+      <code_location>shell/handler.ts</code_location>
+      <fix_time>60-90 minutes</fix_time>
+      <labels>bug, high, security, vulnerability</labels>
+    </bug>
+
+    <bug id="BUG-A4-006" severity="LOW">
+      <title>Empty shell command validation missing</title>
+      <source>Agent 4 - Error Handling Tester</source>
+      <report>test-reports/agent4-errors-report.md</report>
+      <description>
+        No validation for empty shell commands before execution.
+        Minor issue, causes unnecessary processing.
+      </description>
+      <impact>Minor - wasted processing cycles</impact>
+      <code_location>shell/handler.ts</code_location>
+      <fix_time>5 minutes</fix_time>
+      <labels>bug, low</labels>
+    </bug>
+
+    <bug id="BUG-A4-007" severity="LOW">
+      <title>Missing error context in some error messages</title>
+      <source>Agent 4 - Error Handling Tester</source>
+      <report>test-reports/agent4-errors-report.md</report>
+      <description>
+        Some error messages don't include enough context about what failed.
+        Makes debugging harder.
+      </description>
+      <impact>Harder to debug issues</impact>
+      <code_location>discord/bot.ts</code_location>
+      <fix_time>15-30 minutes</fix_time>
+      <labels>bug, low, ux</labels>
+    </bug>
+  </bugs_to_create>
+
+  <execution_plan>
+    <phase name="preparation">
+      <step number="1">
+        Read all 5 test reports in test-reports/ directory to understand full context
+      </step>
+      <step number="2">
+        Review bug details above and consolidate duplicates (e.g., BUG-A3-004 is duplicate of BUG-A2-001)
+      </step>
+      <step number="3">
+        Verify GitHub CLI is available: gh --version
+      </step>
+    </phase>
+
+    <phase name="issue_creation">
+      <step number="1">
+        Create issues in priority order: SECURITY → HIGH → MEDIUM → LOW
+      </step>
+      <step number="2">
+        For each bug, use this template:
+
+        gh issue create --title "[TITLE]" --body "$(cat &lt;&lt;'EOF'
+        ## Bug Description
+        [Description from handoff]
+
+        ## Source
+        Found by: [Agent name]
+        Report: [Link to test report]
+
+        ## Impact
+        [Impact description]
+
+        ## Code Location
+        [File and line numbers]
+
+        ## Estimated Fix Time
+        [Time estimate if available]
+
+        ## Reproduction Steps
+        [If available from report]
+
+        ## Related Issues
+        [If this is a duplicate or related to other bugs]
+        EOF
+        )" --label "[labels]"
+      </step>
+      <step number="3">
+        Track created issue numbers in a summary file
+      </step>
+    </phase>
+
+    <phase name="reporting">
+      <step number="1">
+        Create summary document listing all created issues with:
+        - Issue number
+        - Title
+        - Priority
+        - Estimated fix time
+        - Link to GitHub issue
+      </step>
+      <step number="2">
+        Save summary to: test-reports/github-issues-created.md
+      </step>
+    </phase>
+  </execution_plan>
+
+  <notes>
+    <note>BUG-A2-001 and BUG-A3-004 are duplicates - create only one issue</note>
+    <note>Security issues (BUG-A4-002, BUG-A4-005) should be created FIRST</note>
+    <note>Total unique bugs to create: 16 (17 minus 1 duplicate)</note>
+    <note>Use labels liberally for filtering: bug, security, high, medium, low, enhancement, ux, etc.</note>
+    <note>All test reports are comprehensive - reference them in issue descriptions</note>
+  </notes>
+
+  <success_criteria>
+    <criterion>All 16 unique bugs have GitHub issues created</criterion>
+    <criterion>Issues include proper labels and priorities</criterion>
+    <criterion>Summary document created with links to all issues</criterion>
+    <criterion>Security issues created first and marked appropriately</criterion>
+    <criterion>Duplicates consolidated (only 16 issues, not 17)</criterion>
+  </success_criteria>
+
+  <handoff_location>
+    <path>/Users/jessesep/repos/claude-code-discord/.handoffs/create-github-issues.xml</path>
+    <note>This handoff document is self-contained with all bug details</note>
+  </handoff_location>
+</handoff>

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<handoff>
+  <metadata>
+    <created>2026-01-06T01:45:00Z</created>
+    <from>Claude Sonnet 4.5 - Natural Chat Implementation</from>
+    <to>Test Orchestrator Agent</to>
+    <priority>high</priority>
+  </metadata>
+
+  <context>
+    <project>
+      <name>claude-code-discord</name>
+      <repository>claude-code-discord</repository>
+      <branch>main</branch>
+      <working_directory>/Users/jessesep/repos/claude-code-discord</working_directory>
+    </project>
+
+    <current_state>
+      <recent_work>
+        - Natural chat implementation completed and pushed (commit 83194c7)
+        - Category duplication bug fixed (commit 9e817b8)
+        - Cursor integration working via Discord slash commands
+        - Bot running with all changes deployed
+      </recent_work>
+
+      <key_features>
+        - Discord bot with slash command interface
+        - Multiple specialized agents (Cursor Autonomous Coder, Code Reviewer, etc.)
+        - Natural chat flow after starting agent sessions
+        - Cursor CLI integration for autonomous coding
+      </key_features>
+    </current_state>
+  </context>
+
+  <mission>
+    <objective>
+      Orchestrate comprehensive parallel testing of the Cursor agent integration
+      by spawning multiple Claude instances that work concurrently to test
+      different aspects and scenarios.
+    </objective>
+
+    <requirements>
+      <requirement priority="critical">
+        Spawn 3-5 Claude instances in parallel, each in their own browser tab
+      </requirement>
+      <requirement priority="critical">
+        Each instance should test a different Cursor agent workflow via Discord
+      </requirement>
+      <requirement priority="high">
+        Create GitHub issues for any bugs, improvements, or observations found
+      </requirement>
+      <requirement priority="high">
+        Coordinate testing to avoid conflicts (different test files, etc.)
+      </requirement>
+    </requirements>
+  </mission>
+
+  <execution_plan>
+    <phase name="preparation">
+      <step number="1">
+        Review the current codebase structure:
+        - discord/bot.ts - Discord bot implementation
+        - agent/index.ts - Agent command handlers
+        - cursor/client.ts - Cursor CLI integration
+      </step>
+      <step number="2">
+        Identify test scenarios:
+        - File creation/modification via Cursor agent
+        - Multi-turn conversations with context
+        - Natural chat flow after session start
+        - Error handling and edge cases
+        - Session management (switch, end, status)
+      </step>
+    </phase>
+
+    <phase name="parallel_execution">
+      <step number="1">
+        Launch 3-5 browser tabs using Claude in Chrome
+      </step>
+      <step number="2">
+        In each tab, spawn a Task agent with specific testing focus:
+
+        Agent 1: "File Operations Tester"
+        - Test creating, reading, modifying files via Cursor agent
+        - Test different file types (.ts, .md, .json)
+        - Verify file contents match requests
+
+        Agent 2: "Conversation Flow Tester"
+        - Test multi-turn conversations
+        - Test context retention across messages
+        - Test natural chat flow (no slash commands after session start)
+
+        Agent 3: "Session Management Tester"
+        - Test session start, switch, end
+        - Test concurrent sessions in different channels
+        - Test session status and info commands
+
+        Agent 4: "Error Handling Tester"
+        - Test invalid inputs and edge cases
+        - Test Cursor agent failures and recovery
+        - Test timeout scenarios
+
+        Agent 5: "Integration Tester"
+        - Test full workflows end-to-end
+        - Test interaction with git operations
+        - Test complex coding tasks
+      </step>
+      <step number="3">
+        Monitor all agents concurrently and collect results
+      </step>
+    </phase>
+
+    <phase name="issue_creation">
+      <step number="1">
+        Aggregate findings from all test agents
+      </step>
+      <step number="2">
+        For each bug/issue found, create a GitHub issue with:
+        - Clear title and description
+        - Steps to reproduce
+        - Expected vs actual behavior
+        - Priority/severity label
+      </step>
+      <step number="3">
+        For improvements/enhancements, create issues with:
+        - Use case description
+        - Proposed solution
+        - Benefits/impact
+      </step>
+    </phase>
+
+    <phase name="reporting">
+      <step number="1">
+        Create summary document with:
+        - Total tests executed
+        - Pass/fail rates
+        - Issues created (with links)
+        - Recommendations for next steps
+      </step>
+    </phase>
+  </execution_plan>
+
+  <technical_details>
+    <discord_setup>
+      <bot_token>Stored in .env file</bot_token>
+      <channel>main channel in claude-code-discord category</channel>
+      <test_approach>Each agent should work in the same channel but coordinate to avoid conflicts</test_approach>
+    </discord_setup>
+
+    <cursor_integration>
+      <command>cursor agent --model sonnet-4.5 --dangerously-skip-permissions</command>
+      <workspace>/Users/jessesep/repos/claude-code-discord</workspace>
+      <agents_available>
+        - cursor-coder (Cursor Autonomous Coder)
+        - cursor-refactor (Cursor Refactoring Specialist)
+        - cursor-debug (Cursor Debug Agent)
+        - cursor-fast (Cursor Fast Agent)
+      </agents_available>
+    </cursor_integration>
+
+    <testing_guidelines>
+      - Use unique test file names to avoid conflicts (e.g., test-agent1-*.txt)
+      - Log all interactions for debugging
+      - Take screenshots of key moments
+      - Report both successes and failures
+    </testing_guidelines>
+  </technical_details>
+
+  <success_criteria>
+    <criterion>At least 15 different test scenarios executed</criterion>
+    <criterion>All major features tested (file ops, chat, sessions)</criterion>
+    <criterion>Issues created for all bugs found</criterion>
+    <criterion>Summary report completed with findings</criterion>
+    <criterion>No critical failures in core functionality</criterion>
+  </success_criteria>
+
+  <constraints>
+    <constraint>Do not modify production code during testing</constraint>
+    <constraint>Use test files only (test-*.txt, test-*.ts, etc.)</constraint>
+    <constraint>Do not commit test artifacts to git</constraint>
+    <constraint>Coordinate to avoid overwhelming the Discord bot</constraint>
+  </constraints>
+
+  <next_actions>
+    <action priority="immediate">
+      Launch browser tabs and spawn parallel test agents
+    </action>
+    <action priority="immediate">
+      Begin coordinated testing across all agents
+    </action>
+    <action priority="high">
+      Create GitHub issues for findings
+    </action>
+    <action priority="medium">
+      Generate comprehensive test report
+    </action>
+  </next_actions>
+</handoff>

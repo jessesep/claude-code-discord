@@ -19,6 +19,7 @@ export interface AntigravityOptions {
   sandbox?: "enabled" | "disabled"; // Sandbox mode
   resume?: string; // Chat ID to resume
   streamJson?: boolean; // Use stream-json format for real-time updates
+  commandPath?: string; // Path to the executable (for testing)
 }
 
 /**
@@ -38,7 +39,9 @@ export async function sendToAntigravityCLI(
 ): Promise<AntigravityResponse> {
   try {
     // Build Antigravity CLI command arguments
-    // Using 'agy' as the command based on research
+    // Using 'agy' as the default command
+    const command = options.commandPath || "agy";
+
     const args: string[] = [
       "agent",
       "--print", // Non-interactive mode
@@ -76,10 +79,10 @@ export async function sendToAntigravityCLI(
     // Add prompt as last argument
     args.push(prompt);
 
-    // Using 'agy' command
-    const cmd = new Deno.Command("agy", {
+    // Using configured command
+    const cmd = new Deno.Command(command, {
       args,
-      stdin: "null",
+      stdin: "null", // or "piped" if input is needed via stdin
       stdout: "piped",
       stderr: "piped",
       signal: controller.signal,
@@ -127,11 +130,11 @@ export async function sendToAntigravityCLI(
                       onChunk(event.content);
                     }
                   } else if (event.type === "content_block_delta" && event.delta?.text) {
-                     // Alternate format support
-                     fullResponse += event.delta.text;
-                     if (onChunk) {
-                       onChunk(event.delta.text);
-                     }
+                    // Alternate format support
+                    fullResponse += event.delta.text;
+                    if (onChunk) {
+                      onChunk(event.delta.text);
+                    }
                   }
 
                   // Extract chat ID if available
@@ -139,8 +142,13 @@ export async function sendToAntigravityCLI(
                     chatId = event.chatId;
                   }
                 } catch (e) {
-                  // Invalid JSON line, skip
-                  console.warn("Invalid JSON in stream:", line);
+                  // Invalid JSON line, might be plain text error or info
+                  // If it's not JSON, we treat it as raw text if it looks like content
+                  // But usually we prefer to skip debug info
+                  // console.warn("Invalid JSON in stream:", line);
+
+                  // Optional: if line is not JSON, maybe treat as text content?
+                  // For now, logging to stderr to avoid polluting output
                 }
               }
             }
@@ -236,8 +244,8 @@ export async function sendToAntigravityCLI(
       // Other errors
       throw new Error(
         `Antigravity CLI exited with code ${status.code}\n` +
-          `stderr: ${errorOutput}\n` +
-          `stdout: ${fullResponse}`
+        `stderr: ${errorOutput}\n` +
+        `stdout: ${fullResponse}`
       );
     }
 

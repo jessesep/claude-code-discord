@@ -1,0 +1,3 @@
+Hello from Cursor Agent! Testing file creation.
+Additional content added to test file modification.
+Testing append operation.
