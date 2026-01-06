@@ -835,62 +835,37 @@ export function createHelpHandlers(deps: HelpHandlerDeps) {
         await ctx.reply({
           embeds: [{
             color: 0x00ff00,
-            title: "🤖 Claude Code Discord Bot - Help",
+            title: "🤖 Antigravity AI Bot - Help",
             description: `Bot for **${deps.repoName}** (${deps.branchName} branch)\n\nUse \`/help command:[name]\` for detailed help on specific commands.`,
             fields: [
               {
-                name: "🤖 Claude Code Commands",
-                value: "`/claude` - Send prompts to Claude Code\n`/claude-enhanced` - Advanced Claude with options\n`/continue` - Continue conversation\n`/claude-cancel` - Cancel running operation",
+                name: "🧠 Specialized AI Agents",
+                value: "`/agent start` - Launch a specialized agent session\n`/agent chat` - Interact with your active agent\n`/agent list` - View all available agent profiles\n`/agent status` - Check current agent and session state\n`/agent end` - Terminate the current agent session",
                 inline: false
               },
               {
-                name: "🚀 Enhanced Claude Features",
-                value: "`/claude-models` - List available models\n`/claude-sessions` - Manage sessions\n`/claude-context` - Preview context",
+                name: "🌌 Agent Profiles",
+                value: "**Gemini Manager** (\`ag-manager\`) - Main orchestrator & planner\n**Code Reviewer** (\`code-reviewer\`) - Expert quality analysis\n**Debugger** (\`debugger\`) - Root cause & fix specialist",
                 inline: false
               },
               {
-                name: "🧠 Claude Development Tools",
-                value: "`/claude-explain` - Explain code/concepts\n`/claude-debug` - Debug assistance\n`/claude-optimize` - Code optimization\n`/claude-review` - Code review\n`/claude-generate` - Generate code\n`/claude-refactor` - Refactor code\n`/claude-learn` - Programming tutor",
+                name: "🤖 Claude & Other LLMs",
+                value: "`/claude` - Direct Claude Code integration\n`/claude-enhanced` - Advanced prompts with templates\n`/continue` - Resume your last conversation\n`/claude-models` - List available AI models",
                 inline: false
               },
               {
-                name: "🆕 New Features",
-                value: "`/todos` - Development task management\n`/mcp` - Model Context Protocol servers\n`/agent` - Specialized AI agents",
+                name: "⚙️ Settings & Configuration",
+                value: "`/settings` - Global bot configuration\n`/status` - Check system health & bot state",
                 inline: false
               },
               {
-                name: "⚙️ Advanced Settings",
-                value: "`/settings` - Unified bot settings (NEW)\n`/claude-settings` - Claude preferences\n`/output-settings` - Display settings\n`/quick-model` - Switch Claude model",
+                name: "📂 DevOps & System Tools", 
+                value: "`/git` - Git operations\n`/shell` - Terminal access\n`/system-info` - Hardware & OS metrics\n`/processes` - Monitor running tasks",
                 inline: false
               },
               {
-                name: "📂 Git Commands", 
-                value: "`/git` - Execute git commands\n`/worktree` - Create worktrees\n`/worktree-list` - List worktrees\n`/worktree-remove` - Remove worktree\n`/worktree-bots` - List bot instances\n`/worktree-kill` - Kill bot instance",
-                inline: false
-              },
-              {
-                name: "🖥️ Shell Commands",
-                value: "`/shell` - Execute shell commands\n`/shell-input` - Send input to process\n`/shell-list` - List running processes\n`/shell-kill` - Kill process",
-                inline: false
-              },
-              {
-                name: "📊 System Monitoring",
-                value: "`/system-info` - System information\n`/processes` - Running processes\n`/system-resources` - Resource usage\n`/network-info` - Network details\n`/disk-usage` - Disk space\n`/uptime` - System uptime",
-                inline: false
-              },
-              {
-                name: "🔧 System Tools",
-                value: "`/env-vars` - Environment variables\n`/system-logs` - System logs\n`/port-scan` - Check open ports\n`/service-status` - Service status",
-                inline: false
-              },
-              {
-                name: "⚙️ Utility Commands",
-                value: "`/status` - Show system status\n`/settings` - Manage bot settings\n`/pwd` - Show working directory\n`/shutdown` - Shutdown bot",
-                inline: false
-              },
-              {
-                name: "💡 Quick Tips",
-                value: "• Use buttons on Claude responses for quick actions\n• Shell processes support interactive input\n• Each worktree gets its own bot instance\n• Session IDs persist across restarts",
+                name: "💡 Pro Tips",
+                value: "• Use \`/agent start\` with \`ag-manager\` for project-level task delegation\n• Each channel has its own persistent agent memory\n• Use buttons on responses for quick actions",
                 inline: false
               }
             ],

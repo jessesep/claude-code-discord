@@ -9,7 +9,7 @@ import { ShellManager, createShellHandlers, shellCommands } from "./shell/index.
 import { ClaudeSessionManager, createClaudeHandlers, claudeCommands, enhancedClaudeCommands, createEnhancedClaudeHandlers, cleanSessionId, createClaudeSender, convertToClaudeMessages, expandableContent } from "./claude/index.ts";
 import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
 import { helpCommand, createHelpHandlers } from "./help/index.ts";
-import { unifiedSettingsCommands, createUnifiedSettingsHandlers, createAdvancedSettingsHandlers, DEFAULT_SETTINGS, UNIFIED_DEFAULT_SETTINGS } from "./settings/index.ts";
+import { unifiedSettingsCommands, createUnifiedSettingsHandlers, createAdvancedSettingsHandlers, DEFAULT_SETTINGS, UNIFIED_DEFAULT_SETTINGS, advancedSettingsCommands } from "./settings/index.ts";
 import { utilsCommands, createUtilsHandlers } from "./util/index.ts";
 import { systemCommands, createSystemHandlers } from "./system/index.ts";
 
@@ -1298,16 +1298,16 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Create dependencies object
   const dependencies: BotDependencies = {
     commands: [
-      // ...claudeCommands,
-      // ...enhancedClaudeCommands, // claude-templates already removed from source
-      // ...additionalClaudeCommands,
-      // ...advancedSettingsCommands,
+      ...claudeCommands,
+      ...enhancedClaudeCommands, // claude-templates already removed from source
+      ...additionalClaudeCommands,
+      ...advancedSettingsCommands,
       ...unifiedSettingsCommands,
       agentCommand,
-      // ...gitCommands,
-      // ...shellCommands,
-      // ...utilsCommands,
-      // ...systemCommands,
+      ...gitCommands,
+      ...shellCommands,
+      ...utilsCommands,
+      ...systemCommands,
       helpCommand,
     ],
     cleanSessionId,

@@ -42,7 +42,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-manager': {
     name: 'Gemini Manager',
     description: 'Main orchestrator agent that manages other agents and interacts with the user',
-    model: 'gemini-1.5-flash',
+    model: 'gemini-1.5-flash-latest',
     systemPrompt: MANAGER_SYSTEM_PROMPT,
     temperature: 0.3,
     maxTokens: 10000,
