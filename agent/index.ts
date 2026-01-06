@@ -42,11 +42,11 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-manager': {
     name: 'Gemini Manager',
     description: 'Main orchestrator agent that manages other agents and interacts with the user',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     systemPrompt: MANAGER_SYSTEM_PROMPT,
     temperature: 0.3,
     maxTokens: 10000,
-    capabilities: ['orchestration', 'planning', 'subagent-management'],
+    capabilities: ['orchestration', 'planning', 'subagent-management', 'task-decomposition', 'coordination'],
     riskLevel: 'low',
     client: 'antigravity',
     isManager: true
@@ -1214,5 +1214,33 @@ export async function handleManagerInteraction(
     await ctx.editReply({
       content: `Manager crashed: ${error}`
     });
+  }
+}
+
+// --- Simple Commands Implementation ---
+export const runCommand = new SlashCommandBuilder()
+  .setName('run')
+  .setDescription('Start the Manager Agent (Gemini Flash)');
+
+export const geminiFastCommand = new SlashCommandBuilder()
+  .setName('gemini_fast')
+  .setDescription('Start a Gemini Flash Coding Session');
+
+export const claudeSonnetCommand = new SlashCommandBuilder()
+  .setName('claude_sonnet')
+  .setDescription('Start a Claude Sonnet Coding Session');
+
+export const simpleCommands = [runCommand, geminiFastCommand, claudeSonnetCommand];
+
+export function handleSimpleCommand(ctx: any, commandName: string, deps: AgentHandlerDeps) {
+  // Map simple commands to agent actions
+  const handlers = createAgentHandlers(deps);
+  
+  if (commandName === 'run') {
+    return handlers.onAgent(ctx, 'start', 'ag-manager');
+  } else if (commandName === 'gemini_fast') {
+     return handlers.onAgent(ctx, 'start', 'ag-coder');
+  } else if (commandName === 'claude_sonnet') {
+    return handlers.onAgent(ctx, 'start', 'cursor-coder');
   }
 }

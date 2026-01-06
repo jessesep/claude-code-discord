@@ -408,20 +408,7 @@ export async function createDiscordBot(
     }
   }
   
-  // Register commands
-  const rest = new REST({ version: '10' }).setToken(discordToken);
-  
-  try {
-    console.log('Registering slash commands...');
-    await rest.put(
-      Routes.applicationCommands(applicationId),
-      { body: commands.map(cmd => cmd.toJSON()) },
-    );
-    console.log('Slash commands registered');
-  } catch (error) {
-    console.error('Failed to register slash commands:', error);
-    throw error;
-  }
+  // Command registration moved to ClientReady
   
   // Event handlers
   client.once(Events.ClientReady, async () => {
@@ -429,6 +416,8 @@ export async function createDiscordBot(
     console.log(`Category: ${actualCategoryName}`);
     console.log(`Branch: ${branchName}`);
     console.log(`Working directory: ${workDir}`);
+
+    
     
     const guilds = client.guilds.cache;
     if (guilds.size === 0) {
@@ -445,6 +434,24 @@ export async function createDiscordBot(
     try {
       myChannel = await ensureChannelExists(guild);
       console.log(`Using channel "${myChannel.name}" (ID: ${myChannel.id})`);
+
+// Register Guild Commands
+    const rest = new REST({ version: '10' }).setToken(discordToken);
+    const commandsData = commands.map(cmd => cmd.toJSON());
+
+    try {
+      console.log('Clearing global commands...');
+      await rest.put(Routes.applicationCommands(applicationId), { body: [] });
+      
+      console.log(`Registering slash commands for guild ${guild.id}...`);
+      await rest.put(
+        Routes.applicationGuildCommands(applicationId, guild.id),
+        { body: commandsData },
+      );
+      console.log('Guild slash commands registered');
+    } catch (error) {
+      console.error('Failed to register slash commands:', error);
+    }
       
       await myChannel.send(convertMessageContent({
         embeds: [{
@@ -593,6 +600,7 @@ export async function createDiscordBot(
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
+    console.log(`[InteractionCreate] Received interaction: ${interaction.type}, isCommand: ${interaction.isCommand()}`);
     if (interaction.isCommand()) {
       await handleCommand(interaction as CommandInteraction);
     } else if (interaction.isButton()) {
