@@ -1,9 +1,9 @@
 
 import { createDiscordBot } from "./bot.ts";
-import { PREDEFINED_AGENTS } from "../agent/index.ts";
+import { PREDEFINED_AGENTS, createAgentHandlers } from "../agent/index.ts";
 import { Collection } from "npm:discord.js@14.14.1";
 import type { CommandHandlers, ButtonHandlers, BotDependencies } from "./types.ts";
-import { getAgentCommand } from "./commands.ts";
+import { getAgentCommand, setAgentHandlers } from "./commands.ts";
 
 // Main Execution
 if (import.meta.main) {
@@ -31,8 +31,29 @@ if (import.meta.main) {
     const commandHandlers: CommandHandlers = new Collection();
     const buttonHandlers: ButtonHandlers = new Collection();
 
-    // Register 'agent' command
-    const agentCmd = await getAgentCommand();
+    // Create minimal dependencies for agent handlers
+    const agentDeps = {
+        workDir: workDir,
+        crashHandler: {
+            reportCrash: async (module: string, error: Error, context?: string, details?: string) => {
+                console.error(`[CrashHandler] ${module}:`, error, context, details);
+            }
+        },
+        sendClaudeMessages: async (messages: any[]) => {
+            // Will be set up when bot channel is available
+            console.log("[Agent] Would send messages:", messages.length);
+        },
+        sessionManager: null // Will be set up if needed
+    };
+
+    // Create agent handlers
+    const agentHandlers = createAgentHandlers(agentDeps);
+
+    // Set agent handlers for button handling
+    setAgentHandlers(agentHandlers);
+
+    // Register 'agent' command with dependencies
+    const agentCmd = await getAgentCommand(agentDeps);
     commandHandlers.set(agentCmd.data.name, agentCmd);
 
     // Setup Dependencies

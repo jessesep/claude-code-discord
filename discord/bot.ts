@@ -387,6 +387,35 @@ export async function createDiscordBot(
       return;
     }
     
+    // Handle agent spawn approval buttons: "agent_spawn_approve:agentName" or "agent_spawn_decline:agentName"
+    if (buttonId.startsWith('agent_spawn_approve:') || buttonId.startsWith('agent_spawn_decline:')) {
+      console.log(`[ButtonHandler] Routing agent button: ${buttonId}`);
+      // Try to find the agent command handler
+      const agentHandler = handlers.get('agent');
+      if (agentHandler?.handleButton) {
+        try {
+          await agentHandler.handleButton(ctx, buttonId);
+          return;
+        } catch (error) {
+          console.error(`Error in agent handleButton for ${buttonId}:`, error);
+          if (crashHandler) {
+            await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'button', `Agent button: ${buttonId}`);
+          }
+          try {
+            await ctx.followUp({
+              content: `Error handling agent button: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              ephemeral: true
+            });
+          } catch {
+            // Ignore errors when sending error message
+          }
+        }
+      } else {
+        console.warn(`[ButtonHandler] Agent command handler not found for button: ${buttonId}`);
+      }
+      return;
+    }
+    
     // If no specific handler found, try to delegate to command handlers with handleButton method
     const commandHandler = Array.from(handlers.values()).find(h => h.handleButton);
     if (commandHandler?.handleButton) {

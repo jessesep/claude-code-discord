@@ -1,35 +1,7 @@
 #!/usr/bin/env -S deno run --allow-all
-
-import {
-  createDiscordBot,
-  type BotConfig,
-  type InteractionContext,
-  type CommandHandlers,
-  type ButtonHandlers,
-  type BotDependencies
-} from "./discord/index.ts";
-
-import { ShellManager } from "./shell/index.ts";
 import { getGitInfo } from "./git/index.ts";
 
-import { createClaudeHandlers, claudeCommands, cleanSessionId, createClaudeSender, expandableContent, type DiscordSender, ClaudeMessage, enhancedClaudeCommands, createEnhancedClaudeHandlers, ClaudeSessionManager } from "./claude/index.ts";
-import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
-import {
-  advancedSettingsCommands,
-  createAdvancedSettingsHandlers,
-  DEFAULT_SETTINGS,
-  type AdvancedBotSettings,
-  unifiedSettingsCommands,
-  createUnifiedSettingsHandlers,
-  UNIFIED_DEFAULT_SETTINGS,
-  type UnifiedBotSettings
-} from "./settings/index.ts";
-import { createGitHandlers, gitCommands, WorktreeBotManager } from "./git/index.ts";
-import { createShellHandlers, shellCommands } from "./shell/index.ts";
-import { createUtilsHandlers, utilsCommands } from "./util/index.ts";
-import { systemCommands, createSystemHandlers } from "./system/index.ts";
-import { helpCommand, createHelpHandlers } from "./help/index.ts";
-import { agentCommand, createAgentHandlers } from "./agent/index.ts";
+import { agentCommand, createAgentHandlers, simpleCommands, handleSimpleCommand } from "./agent/index.ts";
 import { ProcessCrashHandler, setupGlobalErrorHandlers, ProcessHealthMonitor } from "./process/index.ts";
 import { handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "./discord/index.ts";
 import { SettingsPersistence } from "./util/settings-persistence.ts";
@@ -1316,16 +1288,16 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Create dependencies object
   const dependencies: BotDependencies = {
     commands: [
-      ...claudeCommands,
-      ...enhancedClaudeCommands, // claude-templates already removed from source
-      ...additionalClaudeCommands,
-      ...advancedSettingsCommands,
+      // ...claudeCommands,
+      // ...enhancedClaudeCommands, // claude-templates already removed from source
+      // ...additionalClaudeCommands,
+      // ...advancedSettingsCommands,
       ...unifiedSettingsCommands,
       agentCommand,
-      ...gitCommands,
-      ...shellCommands,
-      ...utilsCommands,
-      ...systemCommands,
+      // ...gitCommands,
+      // ...shellCommands,
+      // ...utilsCommands,
+      // ...systemCommands,
       helpCommand,
     ],
     cleanSessionId,

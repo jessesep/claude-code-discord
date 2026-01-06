@@ -1,9 +1,16 @@
 
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { PREDEFINED_AGENTS, chatWithAgent, getActiveSession, clearAgentSession, setAgentSession } from "../agent/index.ts";
+import { PREDEFINED_AGENTS, chatWithAgent, getActiveSession, clearAgentSession, setAgentSession, createAgentHandlers, AgentHandlerDeps } from "../agent/index.ts";
 import { InteractionContext } from "./types.ts";
 
-export async function getAgentCommand() {
+// Store agent handlers (will be initialized by main.ts)
+let agentHandlers: ReturnType<typeof createAgentHandlers> | null = null;
+
+export function setAgentHandlers(handlers: ReturnType<typeof createAgentHandlers>) {
+    agentHandlers = handlers;
+}
+
+export async function getAgentCommand(deps?: AgentHandlerDeps) {
     const agentNames = Object.keys(PREDEFINED_AGENTS).map(key => ({ name: PREDEFINED_AGENTS[key].name, value: key }));
 
     const data = new SlashCommandBuilder()
@@ -131,6 +138,22 @@ export async function getAgentCommand() {
                 // Updating signature is cleaner. 
                 await chatWithAgent(ctx, message, agentName || undefined, undefined, false, { ...deps, includeGit });
                 return;
+            }
+        },
+        handleButton: async (ctx: InteractionContext, customId: string) => {
+            // Delegate to agent handlers if available
+            if (agentHandlers) {
+                await agentHandlers.handleButton(ctx, customId);
+            } else if (deps) {
+                // Create handlers on the fly if deps provided
+                const handlers = createAgentHandlers(deps);
+                await handlers.handleButton(ctx, customId);
+            } else {
+                console.warn(`[AgentCommand] No agent handlers available for button: ${customId}`);
+                await ctx.followUp({
+                    content: "Agent handlers not initialized. Please restart the bot.",
+                    ephemeral: true
+                });
             }
         }
     };
