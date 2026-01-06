@@ -1873,9 +1873,9 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
       .setPlaceholder('Choose an agent and model...')
       .addOptions(
         availableAgents.map(agent => ({
-          label: agent.label.substring(0, 100), // Discord limit
-          description: agent.description.substring(0, 100), // Discord limit
-          value: `${agent.name}:${agent.model}`
+          label: String(agent.label).substring(0, 100), // Discord limit - ensure string
+          description: String(agent.description).substring(0, 100), // Discord limit - ensure string
+          value: String(`${agent.name}:${agent.model}`) // Ensure string
         }))
       );
     
@@ -1892,9 +1892,9 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
           { name: '🏗️ Architect Agent', value: 'System design and planning', inline: false }
         ],
         footer: { text: 'Select an option below to start' },
-        timestamp: new Date().toISOString()
+        timestamp: true
       }],
-      components: [row.toJSON()]
+      components: [row]
     });
     
     return;

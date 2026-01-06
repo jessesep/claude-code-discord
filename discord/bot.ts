@@ -52,25 +52,49 @@ function convertMessageContent(content: MessageContent): any {
   }
   
   if (content.components) {
-    payload.components = content.components.map(row => {
-      const actionRow = new ActionRowBuilder<ButtonBuilder>();
-      row.components.forEach(comp => {
-        const button = new ButtonBuilder()
-          .setCustomId(comp.customId)
-          .setLabel(comp.label);
-        
-        switch (comp.style) {
-          case 'primary': button.setStyle(ButtonStyle.Primary); break;
-          case 'secondary': button.setStyle(ButtonStyle.Secondary); break;
-          case 'success': button.setStyle(ButtonStyle.Success); break;
-          case 'danger': button.setStyle(ButtonStyle.Danger); break;
-          case 'link': button.setStyle(ButtonStyle.Link); break;
+    // Check if components are already in Discord.js format (ActionRowBuilder instances or toJSON() results)
+    // Discord.js ActionRowBuilder instances have a 'toJSON' method
+    // Discord.js serialized components have a 'type' property that's a number (1 for ActionRow, 3 for StringSelectMenu)
+    const isDiscordJSFormat = content.components.length > 0 && (
+      // Check if it's an ActionRowBuilder instance
+      (typeof content.components[0] === 'object' && 'toJSON' in content.components[0] && typeof (content.components[0] as any).toJSON === 'function') ||
+      // Check if it's a serialized Discord.js component (has numeric type property)
+      (typeof content.components[0] === 'object' && 'type' in content.components[0] && typeof (content.components[0] as any).type === 'number')
+    );
+    
+    if (isDiscordJSFormat) {
+      // Components are already in Discord.js format
+      // Convert ActionRowBuilder instances to serialized format for consistency
+      payload.components = content.components.map((comp: any) => {
+        // If it's an ActionRowBuilder instance, serialize it
+        if (comp && typeof comp === 'object' && 'toJSON' in comp && typeof comp.toJSON === 'function') {
+          return comp.toJSON();
         }
-        
-        actionRow.addComponents(button);
+        // If it's already serialized (plain object), pass it through
+        return comp;
       });
-      return actionRow;
-    });
+    } else {
+      // Convert from MessageContent format (buttons only)
+      payload.components = content.components.map(row => {
+        const actionRow = new ActionRowBuilder<ButtonBuilder>();
+        row.components.forEach(comp => {
+          const button = new ButtonBuilder()
+            .setCustomId(comp.customId)
+            .setLabel(comp.label);
+          
+          switch (comp.style) {
+            case 'primary': button.setStyle(ButtonStyle.Primary); break;
+            case 'secondary': button.setStyle(ButtonStyle.Secondary); break;
+            case 'success': button.setStyle(ButtonStyle.Success); break;
+            case 'danger': button.setStyle(ButtonStyle.Danger); break;
+            case 'link': button.setStyle(ButtonStyle.Link); break;
+          }
+          
+          actionRow.addComponents(button);
+        });
+        return actionRow;
+      });
+    }
   }
   
   return payload;
