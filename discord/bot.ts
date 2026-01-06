@@ -319,56 +319,6 @@ export async function createDiscordBot(
     // Default: acknowledge the interaction
     await ctx.update({ content: 'Selection received', components: [] }).catch(() => {});
   }
-    if (!myChannel || interaction.channelId !== myChannel.id) {
-      return;
-    }
-    
-    const ctx = createInteractionContext(interaction);
-    const customId = interaction.customId;
-    const values = interaction.values;
-    
-    // Handle agent/model selection
-    if (customId === 'select-agent-model' && values && values.length > 0) {
-      const [agentName, model] = values[0].split(':');
-      
-      if (agentName && model) {
-        // Import agent handlers
-        const { createAgentHandlers, PREDEFINED_AGENTS } = await import("../agent/index.ts");
-        
-        // Temporarily override the agent's model for this session
-        const originalAgent = PREDEFINED_AGENTS[agentName];
-        if (originalAgent) {
-          // Create a modified agent config with the selected model
-          const modifiedAgent = { ...originalAgent, model };
-          PREDEFINED_AGENTS[agentName] = modifiedAgent;
-        }
-        
-        // Create handlers and start agent
-        const handlers = createAgentHandlers({
-          workDir: dependencies.workDir || Deno.cwd(),
-          crashHandler: crashHandler,
-          sendClaudeMessages: async (messages) => {
-            // Handle Claude messages if needed
-          },
-          sessionManager: dependencies.sessionManager
-        });
-        
-        await ctx.deferUpdate();
-        await handlers.onAgent(ctx, 'start', agentName);
-        
-        // Restore original agent config after a delay
-        if (originalAgent) {
-          setTimeout(() => {
-            PREDEFINED_AGENTS[agentName] = originalAgent;
-          }, 1000);
-        }
-        return;
-      }
-    }
-    
-    // Default: acknowledge the interaction
-    await ctx.update({ content: 'Selection received', components: [] }).catch(() => {});
-  }
 
   // Button handler - completely generic
   async function handleButton(interaction: ButtonInteraction) {
