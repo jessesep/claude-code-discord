@@ -28,7 +28,9 @@ export interface AgentSession {
   messageCount: number;
   totalCost: number;
   lastActivity: Date;
+
   status: 'active' | 'paused' | 'completed' | 'error';
+  history: { role: 'user' | 'model'; content: string }[];
 }
 
 // Predefined agent configurations
@@ -393,7 +395,8 @@ async function startAgentSession(ctx: any, agentName: string) {
     messageCount: 0,
     totalCost: 0,
     lastActivity: new Date(),
-    status: 'active'
+    status: 'active',
+    history: []
   };
 
   agentSessions.push(session);
@@ -927,7 +930,8 @@ export function setAgentSession(userId: string, channelId: string, agentName: st
     messageCount: 0,
     totalCost: 0,
     lastActivity: new Date(),
-    status: 'active'
+    status: 'active',
+    history: []
   };
   agentSessions.push(session);
 }
@@ -995,8 +999,27 @@ export async function handleManagerInteraction(
     // We reuse the Antigravity client directly here
     const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
 
+    // Retrieve Session for History
+    const userId = ctx.user.id;
+    const channelId = ctx.channelId || ctx.channel?.id;
+    const sessionData = getActiveSession(userId, channelId);
+    let historyPrompt = "";
+
+    if (sessionData && sessionData.session) {
+      // Append current user message to history
+      sessionData.session.history.push({ role: 'user', content: userMessage });
+
+      // Build History String
+      historyPrompt = sessionData.session.history.map(msg =>
+        `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+      ).join("\n\n");
+    } else {
+      // Fallback if no session (shouldn't happen if properly started)
+      historyPrompt = `User: ${userMessage}`;
+    }
+
     // Construct Prompt
-    const managerPrompt = `${agentConfig.systemPrompt}\n\nUser Query: ${userMessage}`;
+    const managerPrompt = `${agentConfig.systemPrompt}\n\n=== CONVERSATION HISTORY ===\n${historyPrompt}\n\n=== END HISTORY ===\n\n(Respond to the last User message)`;
     const controller = new AbortController();
 
     const response = await sendToAntigravityCLI(
@@ -1020,6 +1043,10 @@ export async function handleManagerInteraction(
     // 3. Handle Action
     if (action.action === 'reply' && action.message) {
       // Direct Reply
+      if (sessionData && sessionData.session) {
+        sessionData.session.history.push({ role: 'model', content: action.message });
+      }
+
       await ctx.editReply({
         embeds: [{
           color: 0x00cc99, // Teal for direct reply
@@ -1091,6 +1118,10 @@ Based on this output, provide a CONCISE summary to the user.
       );
 
       const summaryText = summaryResponse.response;
+
+      if (sessionData && sessionData.session) {
+        sessionData.session.history.push({ role: 'model', content: summaryText });
+      }
 
       // Final Success Embed
       await ctx.editReply({
