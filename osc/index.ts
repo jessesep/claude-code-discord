@@ -53,14 +53,21 @@ export class OSCManager {
     });
 
     // Git Status
-    this.osc.on('/git/status', async () => {
+    this.osc.on('/git/status', async (message: any) => {
+      // Buttons send 1 on press, 0 on release. We only care about 1.
+      if (message.args[0] === 0) return;
+
       if (this.deps.gitHandlers) {
         try {
           console.log('[OSC] Fetching git status...');
           this.send('/label/console', ['Fetching Git Status...']);
-          const status = await this.deps.gitHandlers.getGitStatus(Deno.cwd());
-          this.send('/label/git_branch', [\`Branch: \${status.branch}\`]);
-          this.send('/label/console', [\`Git: \${status.status.replace(/\\n/g, ' ')}\`]);
+          const status = await this.deps.gitHandlers.getStatus();
+          
+          // Send just the value to the labeled value labels
+          this.send('/label/git_branch', [status.branch]);
+          
+          const cleanStatus = status.status.replace(/\n/g, ' ').substring(0, 50);
+          this.send('/label/console', [\`Git: \${cleanStatus}...\`]);
         } catch (err) {
           console.error('[OSC] Git status error:', err);
           this.send('/label/console', [\`Git Error: \${err.message}\`]);
@@ -69,21 +76,61 @@ export class OSCManager {
     });
 
     // GitHub Sync
-    this.osc.on('/github/sync', async () => {
+    this.osc.on('/github/sync', async (message: any) => {
+      if (message.args[0] === 0) return;
+
       if (this.deps.gitHandlers) {
         try {
           console.log('[OSC] GitHub Sync initiated');
           this.send('/label/console', ['Syncing: git pull...']);
-          await this.deps.gitHandlers.executeGitCommand(Deno.cwd(), "git pull");
+          await this.deps.gitHandlers.onGit(null, "pull");
           
           this.send('/label/console', ['Syncing: git push...']);
-          await this.deps.gitHandlers.executeGitCommand(Deno.cwd(), "git push");
+          await this.deps.gitHandlers.onGit(null, "push");
           
           this.send('/label/console', ['Sync Complete!']);
+          
+          // Refresh branch label after sync
+          const status = await this.deps.gitHandlers.getStatus();
+          this.send('/label/git_branch', [status.branch]);
         } catch (err) {
           console.error('[OSC] Sync error:', err);
           this.send('/label/console', [\`Sync Failed: \${err.message}\`]);
         }
+      }
+    });
+
+    // GitHub Issue Creation
+    this.osc.on('/github/issue/new', async (message: any) => {
+      if (message.args[0] === 0) return;
+
+      try {
+        // Use provided argument as title, or default to a quick bug report
+        const title = (message.args && typeof message.args[1] === 'string') 
+          ? message.args[1] 
+          : "Bug Report: Detected via Mobile Dashboard";
+        
+        console.log(\`[OSC] Creating GitHub issue: \${title}\`);
+        this.send('/label/console', [\`Creating Issue...\`]);
+
+        const cmd = new Deno.Command("gh", {
+          args: ["issue", "create", "--title", title, "--body", "This issue was created via the ClaudeOps TouchOSC Mobile Dashboard."],
+          stdout: "piped",
+          stderr: "piped"
+        });
+
+        const { stdout, code } = await cmd.output();
+        const outText = new TextDecoder().decode(stdout).trim();
+
+        if (code === 0) {
+          const issueNum = outText.split('/').pop();
+          this.send('/label/console', [\`Issue #\${issueNum} Created Successfully\`]);
+        } else {
+          this.send('/label/console', ['Failed to create issue via gh CLI']);
+        }
+      } catch (err) {
+        console.error('[OSC] Issue creation error:', err);
+        this.send('/label/console', [\`Error: \${err.message}\`]);
       }
     });
   }
@@ -100,10 +147,11 @@ export class OSCManager {
     };
     
     const actualKey = fullKeys[agentKey] || agentKey;
+    const displayName = agentKey.charAt(0).toUpperCase() + agentKey.slice(1);
     
     console.log(\`[OSC] Selecting agent: \${actualKey}\`);
-    this.send('/label/agent_name', [\`Agent: \${actualKey}\`]);
-    this.send('/label/console', [\`Switched to \${actualKey}\`]);
+    this.send('/label/agent_name', [displayName]);
+    this.send('/label/console', [\`Switched Agent to: \${displayName}\`]);
   }
 
   public async start() {
