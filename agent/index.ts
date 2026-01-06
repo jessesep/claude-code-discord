@@ -1879,7 +1879,7 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
         }))
       );
     
-    const row = new ActionRowBuilder().addComponents(selectMenu);
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
     
     await ctx.editReply({
       embeds: [{
