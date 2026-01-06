@@ -1326,20 +1326,24 @@ export async function createClaudeCodeBot(config: BotConfig) {
   ]);
 
   // Create dependencies object
+  // Simplified interface: Only register /run, /kill, and /help
+  // Old commands are still available via handlers for power users, but not shown in Discord
   const dependencies: BotDependencies = {
     commands: [
-      ...simpleCommands, // Add /run and /kill commands
-      ...claudeCommands,
-      ...enhancedClaudeCommands, // claude-templates already removed from source
-      ...additionalClaudeCommands,
-      ...advancedSettingsCommands,
-      ...unifiedSettingsCommands,
-      agentCommand,
-      ...gitCommands,
-      ...shellCommands,
-      ...utilsCommands,
-      ...systemCommands,
-      helpCommand,
+      ...simpleCommands, // /run and /kill
+      helpCommand, // /help
+      // Old commands commented out to simplify Discord interface
+      // They can still be accessed programmatically if needed
+      // ...claudeCommands,
+      // ...enhancedClaudeCommands,
+      // ...additionalClaudeCommands,
+      // ...advancedSettingsCommands,
+      // ...unifiedSettingsCommands,
+      // agentCommand,
+      // ...gitCommands,
+      // ...shellCommands,
+      // ...utilsCommands,
+      // ...systemCommands,
     ],
     cleanSessionId,
     botSettings
