@@ -99,7 +99,7 @@ export async function testAllModels(authorized: boolean = false): Promise<ModelT
     'gemini-2.0-flash-thinking-exp',
     'gemini-1.5-flash',
     'gemini-1.5-pro',
-    'gemini-1.5-flash-latest', // Test even if deprecated
+    'gemini-1.5-flash-latest', 
   ];
   
   for (const model of commonModels) {
@@ -137,21 +137,21 @@ export async function testAllModels(authorized: boolean = false): Promise<ModelT
   const workingModels = results.filter(r => r.status === 'working').map(r => r.model);
   const failedModels = results.filter(r => r.status === 'failed').map(r => r.model);
   
-  const testResults: ModelTestResults = {
+  const finalResults: ModelTestResults = {
     results,
     testedAt: new Date(),
     workingModels,
     failedModels
   };
   
-  modelTestCache = testResults;
+  modelTestCache = finalResults;
   
   console.log(`[ModelTester] Tests complete: ${workingModels.length} working, ${failedModels.length} failed`);
   if (failedModels.length > 0) {
     console.log(`[ModelTester] Failed models: ${failedModels.join(', ')}`);
   }
   
-  return testResults;
+  return finalResults;
 }
 
 /**

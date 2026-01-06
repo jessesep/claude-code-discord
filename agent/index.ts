@@ -672,7 +672,7 @@ export async function chatWithAgent(
   const channelId = ctx.channelId || ctx.channel?.id;
   // If agentName is provided, use it; otherwise get the first active agent for this user/channel
   const activeAgents = getActiveAgents(userId, channelId);
-  const activeAgentName = agentName || (activeAgents.length > 0 ? activeAgents[0] : undefined);
+  const activeAgentName: string = agentName || (activeAgents.length > 0 ? activeAgents[0] || 'general-assistant' : 'general-assistant');
   // ...
   const agent = AgentRegistry.getInstance().getAgent(activeAgentName || '');
   if (!agent) {
@@ -691,7 +691,7 @@ export async function chatWithAgent(
   if (agent.client === 'antigravity') {
     try {
       const { getBestAvailableModel } = await import("../util/model-tester.ts");
-      const fallbackModels = ['gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       agent.model = getBestAvailableModel(agent.model, fallbackModels);
     } catch (error) {
       console.warn('[Agent] Could not get tested model, using configured model:', error);
@@ -1308,7 +1308,7 @@ export async function chatWithAgent(
     // Notify user if fallback was used (before processing response)
     if (fallbackUsed && result?.response) {
       const providerUsed = result.modelUsed?.includes('Cursor') || result.modelUsed?.includes('cursor') ? 'Cursor' : 
-                          result.modelUsed?.includes('Gemini') || result.modelUsed?.includes('gemini') ? 'Antigravity (Gemini)' : 
+                          result.modelUsed?.includes('Gemini') || result.modelUsed?.includes('gemini') ? 'Antigravity (Gemini 2.0 Flash)' : 
                           result.modelUsed || 'Fallback Provider';
       console.log(`✅ Successfully completed using ${providerUsed} as fallback provider`);
     }
@@ -1739,7 +1739,7 @@ export async function handleManagerInteraction(
   if (agentConfig.client === 'antigravity') {
     try {
       const { getBestAvailableModel } = await import("../util/model-tester.ts");
-      const fallbackModels = ['gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       agentConfig.model = getBestAvailableModel(agentConfig.model, fallbackModels);
     } catch (error) {
       console.warn('[Manager] Could not get tested model, using configured model:', error);
@@ -2206,162 +2206,42 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
   // Map simple commands to agent actions
   const handlers = createAgentHandlers(deps);
   
-  if (commandName === 'run') {
-    // Show provider/model selection menu
+  if (commandName === 'run' || commandName === 'run-adv') {
+    // Advanced run command with multi-step selection
     await ctx.deferReply({ ephemeral: false });
     
-    // Get available models dynamically from API
-    const { getModelsForAgents } = await import("../util/list-models.ts");
-    const { manager: managerModels, coder: coderModels, architect: architectModels } = await getModelsForAgents();
-    
-    // Get webhook configurations
-    const { SettingsPersistence } = await import("../util/settings-persistence.ts");
-    const settings = SettingsPersistence.getInstance().getSettings();
-    const enabledWebhooks = (settings.webhooks || []).filter((w: any) => w.enabled);
-    
-    // Build available agents list from API results
-    const availableAgents: Array<{ name: string; label: string; description: string; model: string; type: 'agent' | 'webhook' }> = [];
-    
-    // Track added model+agent combos to prevent duplicates
-    const addedOptions = new Set<string>();
-    
-    // === DIRECT AGENT OPTIONS (Cursor & Antigravity) ===
-    // These are always available, regardless of webhooks
-    
-    // Cursor Coder Agent (direct)
-    availableAgents.push({
-      name: 'cursor-coder',
-      label: '💻 Cursor Coder Agent',
-      description: 'Direct Cursor agent for coding tasks',
-      model: 'auto', // Use 'auto' to let Cursor pick the best model
-      type: 'agent'
-    });
-    addedOptions.add('agent:cursor-coder:auto');
-    
-    // Antigravity Coder Agent (direct)
-    availableAgents.push({
-      name: 'ag-coder',
-      label: '🚀 Antigravity Coder Agent',
-      description: 'Direct Antigravity agent for coding',
-      model: 'gemini-3-flash', // Use Gemini model for Antigravity
-      type: 'agent'
-    });
-    addedOptions.add('agent:ag-coder:gemini-3-flash');
-    
-    // === GEMINI MODEL OPTIONS ===
-    // Manager agent - pick ONE best model to avoid duplicates
-    if (managerModels.length > 0) {
-      const model = managerModels[0]; // Best manager model
-      const key = `agent:ag-manager:${model.name}`;
-      if (!addedOptions.has(key)) {
-        availableAgents.push({
-          name: 'ag-manager',
-          label: `🤖 Manager Agent (${model.displayName})`,
-          description: 'Orchestrates tasks - Fast and efficient',
-          model: model.name,
-          type: 'agent'
-        });
-        addedOptions.add(key);
-      }
-    }
-    
-    // Coder agent with Gemini - pick best model that's different
-    const coderGeminiModel = coderModels.find(m => !addedOptions.has(`agent:ag-coder-gemini:${m.name}`));
-    if (coderGeminiModel) {
-      const key = `agent:ag-coder-gemini:${coderGeminiModel.name}`;
-      availableAgents.push({
-        name: 'ag-coder-gemini',
-        label: `💻 Gemini Coder (${coderGeminiModel.displayName})`,
-        description: 'Gemini-powered coding agent',
-        model: coderGeminiModel.name,
-        type: 'agent'
-      });
-      addedOptions.add(key);
-    }
-    
-    // Architect agent - pick best model
-    if (architectModels.length > 0) {
-      const model = architectModels[0];
-      const key = `agent:ag-architect:${model.name}`;
-      if (!addedOptions.has(key)) {
-        availableAgents.push({
-          name: 'ag-architect',
-          label: `🏗️ Architect Agent (${model.displayName})`,
-          description: 'System design and planning',
-          model: model.name,
-          type: 'agent'
-        });
-        addedOptions.add(key);
-      }
-    }
-    
-    // === WEBHOOK OPTIONS ===
-    // Add ALL enabled webhooks with appropriate icons
-    for (const webhook of enabledWebhooks) {
-      const webhookName = webhook.name.toLowerCase();
-      let icon = '🔗';
-      let modelType = 'webhook';
-      
-      if (webhookName.includes('cursor')) {
-        icon = '💻';
-        modelType = 'cursor';
-      } else if (webhookName.includes('antigravity') || webhookName.includes('gemini') || webhookName.includes('ag')) {
-        icon = '🚀';
-        modelType = 'antigravity';
-      }
-      
-      const key = `webhook:webhook:${webhook.id}:${webhook.id}`;
-      if (!addedOptions.has(key)) {
-        availableAgents.push({
-          name: `webhook:${webhook.id}`,
-          label: `${icon} Webhook: ${webhook.name}`,
-          description: `Start agent via ${webhook.name} webhook`,
-          model: modelType,
-          type: 'webhook'
-        });
-        addedOptions.add(key);
-      }
-    }
-    
-    // Fallback if no agents available
-    if (availableAgents.length === 0) {
-      availableAgents.push(
-        { name: 'cursor-coder', label: '💻 Cursor Coder Agent', description: 'Direct Cursor agent', model: 'auto', type: 'agent' },
-        { name: 'ag-coder', label: '🚀 Antigravity Coder Agent', description: 'Direct Antigravity agent', model: 'gemini-3-flash', type: 'agent' },
-        { name: 'ag-manager', label: '🤖 Manager Agent (Default)', description: 'Helper agent', model: 'gemini-3-flash', type: 'agent' }
-      );
-    }
-    
-    // Create select menu for provider/model selection using Discord.js components
+    // Step 1: Provider selection
     const { StringSelectMenuBuilder, ActionRowBuilder } = await import("npm:discord.js@14.14.1");
     
-    const selectMenu = new StringSelectMenuBuilder()
-      .setCustomId('select-agent-model')
-      .setPlaceholder('Choose an agent and model...')
-      .addOptions(
-        availableAgents.map(agent => ({
-          label: String(agent.label).substring(0, 100), // Discord limit - ensure string
-          description: String(agent.description).substring(0, 100), // Discord limit - ensure string
-          value: String(`${agent.type}:${agent.name}:${agent.model}`) // Include type: agent or webhook
-        }))
-      );
+    const providerMenu = new StringSelectMenuBuilder()
+      .setCustomId('run-adv-provider')
+      .setPlaceholder('Select a provider...')
+      .addOptions([
+        { label: '💻 Cursor', description: 'Cursor IDE integration', value: 'cursor' },
+        { label: '🤖 Claude CLI', description: 'Anthropic Claude CLI', value: 'claude-cli' },
+        { label: '🚀 Gemini API', description: 'Google Gemini API', value: 'gemini-api' },
+        { label: '⚡ Antigravity', description: 'Google Antigravity platform', value: 'antigravity' },
+        { label: '🦙 Ollama', description: 'Local Ollama LLM server', value: 'ollama' }
+      ]);
     
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+    const providerRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(providerMenu);
     
     await ctx.editReply({
       embeds: [{
         color: 0x5865F2,
         title: '🚀 Start Helper Agent',
-        description: 'Choose which agent and model you want to use:',
+        description: '**Step 1 of 3: Select Provider**\n\nChoose which provider you want to use:',
         fields: [
-          { name: '💻 Cursor / Antigravity', value: 'Direct integration with Cursor IDE or Antigravity agents', inline: false },
-          { name: '🤖 Gemini Agents', value: 'Manager, Coder, and Architect agents powered by Gemini', inline: false },
-          { name: '🔗 Webhooks', value: enabledWebhooks.length > 0 ? `${enabledWebhooks.length} webhook(s) configured` : 'No webhooks configured', inline: false }
+          { name: '💻 Cursor', value: 'Direct integration with Cursor IDE', inline: true },
+          { name: '🤖 Claude CLI', value: 'Anthropic Claude via CLI', inline: true },
+          { name: '🚀 Gemini API', value: 'Google Gemini API', inline: true },
+          { name: '⚡ Antigravity', value: 'Google Antigravity platform', inline: true },
+          { name: '🦙 Ollama', value: 'Local Ollama LLM server', inline: true }
         ],
-        footer: { text: 'Select an option below to start' },
+        footer: { text: 'Select a provider to continue' },
         timestamp: true
       }],
-      components: [row]
+      components: [providerRow]
     });
     
     return;
@@ -2479,45 +2359,6 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
         timestamp: new Date().toISOString()
       }],
       components: [row]
-    });
-    
-    return;
-  } else if (commandName === 'run-adv') {
-    // Advanced run command with multi-step selection
-    await ctx.deferReply({ ephemeral: false });
-    
-    // Step 1: Provider selection
-    const { StringSelectMenuBuilder, ActionRowBuilder, ButtonBuilder } = await import("npm:discord.js@14.14.1");
-    
-    const providerMenu = new StringSelectMenuBuilder()
-      .setCustomId('run-adv-provider')
-      .setPlaceholder('Select a provider...')
-      .addOptions([
-        { label: '💻 Cursor', description: 'Cursor IDE integration', value: 'cursor' },
-        { label: '🤖 Claude CLI', description: 'Anthropic Claude CLI', value: 'claude-cli' },
-        { label: '🚀 Gemini API', description: 'Google Gemini API', value: 'gemini-api' },
-        { label: '⚡ Antigravity', description: 'Google Antigravity platform', value: 'antigravity' },
-        { label: '🦙 Ollama', description: 'Local Ollama LLM server', value: 'ollama' }
-      ]);
-    
-    const providerRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(providerMenu);
-    
-    await ctx.editReply({
-      embeds: [{
-        color: 0x5865F2,
-        title: '🚀 Advanced Agent Runner',
-        description: '**Step 1 of 3: Select Provider**\n\nChoose which provider you want to use:',
-        fields: [
-          { name: '💻 Cursor', value: 'Direct integration with Cursor IDE', inline: true },
-          { name: '🤖 Claude CLI', value: 'Anthropic Claude via CLI', inline: true },
-          { name: '🚀 Gemini API', value: 'Google Gemini API', inline: true },
-          { name: '⚡ Antigravity', value: 'Google Antigravity platform', inline: true },
-          { name: '🦙 Ollama', value: 'Local Ollama LLM server', inline: true }
-        ],
-        footer: { text: 'Select a provider to continue' },
-        timestamp: true
-      }],
-      components: [providerRow]
     });
     
     return;

@@ -184,83 +184,91 @@ export async function sendToAntigravityCLI(
         // Normalize model name for REST API
         const safeModel = modelName.includes("/") ? modelName : `models/${modelName}`;
 
-      // Streaming endpoint: streamGenerateContent
-      const method = options.streamJson ? "streamGenerateContent" : "generateContent";
-      const url = `https://generativelanguage.googleapis.com/v1beta/${safeModel}:${method}?alt=sse`;
+        // Streaming endpoint: streamGenerateContent
+        const method = options.streamJson ? "streamGenerateContent" : "generateContent";
+        const url = `https://generativelanguage.googleapis.com/v1beta/${safeModel}:${method}?alt=sse`;
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "x-goog-user-project": Deno.env.get("GOOGLE_CLOUD_PROJECT") || "" // Optional but helpful
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        }),
-        signal: controller.signal
-      });
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "x-goog-user-project": Deno.env.get("GOOGLE_CLOUD_PROJECT") || "" // Optional but helpful
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          }),
+          signal: controller.signal
+        });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Gemini API Error (${response.status}): ${errText}`);
-      }
+        if (response.ok) {
+          let fullText = "";
 
-      let fullText = "";
+          if (options.streamJson && onChunk) {
+            // Parse SSE stream
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error("No response body");
 
-      if (options.streamJson && onChunk) {
-        // Parse SSE stream
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error("No response body");
+            const decoder = new TextDecoder();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (controller.signal.aborted) {
+                reader.releaseLock();
+                break;
+              }
+              const chunk = decoder.decode(value, { stream: true });
 
-        const decoder = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (controller.signal.aborted) {
-            reader.releaseLock();
-            break;
-          }
-          const chunk = decoder.decode(value, { stream: true });
-
-          // SSE parsing is complex (data: {...}), simplified here assuming standard Gemini SSE format
-          // Usually: 'data: ' + JSON
-          const lines = chunk.split("\n");
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const json = JSON.parse(line.substring(6));
-                // Extract text from candidates
-                const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (part) {
-                  fullText += part;
-                  onChunk(part);
+              // SSE parsing is complex (data: {...}), simplified here assuming standard Gemini SSE format
+              // Usually: 'data: ' + JSON
+              const lines = chunk.split("\n");
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  try {
+                    const json = JSON.parse(line.substring(6));
+                    // Extract text from candidates
+                    const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (part) {
+                      fullText += part;
+                      onChunk(part);
+                    }
+                  } catch (e) {
+                    // ignore incomplete json
+                  }
                 }
-              } catch (e) {
-                // ignore incomplete json
               }
             }
+          } else {
+            const json = await response.json();
+            fullText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          }
+
+          return {
+            response: fullText,
+            duration: Date.now() - startTime,
+            modelUsed: modelName,
+            chatId: `genai-oauth-${Date.now()}`
+          };
+        } else {
+          // If response not OK, read error text
+          const errText = await response.text();
+          // Log but don't throw yet if we have an API key fallback
+          if (API_KEY) {
+            console.warn(`[Antigravity] OAuth API error (${response.status}), trying API key fallback: ${errText}`);
+          } else {
+            throw new Error(`Gemini API Error (${response.status}): ${errText}`);
           }
         }
-      } else {
-        const json = await response.json();
-        fullText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      } catch (error) {
+        // If OAuth fails, log but don't throw yet if we have an API key fallback
+        if (API_KEY) {
+          console.warn("[Antigravity] OAuth authentication failed, trying API key fallback:", error);
+        } else {
+          throw error;
+        }
       }
-
-      return {
-        response: fullText,
-        duration: Date.now() - startTime,
-        modelUsed: modelName,
-        chatId: `genai-oauth-${Date.now()}`
-      };
-
-    } catch (error) {
-      // If OAuth fails, log but don't throw yet - try API key fallback
-      console.warn("[Antigravity] OAuth authentication failed, trying API key fallback:", error);
-      // Fall through to API key fallback
     }
   }
-}
 
   // 2. Fallback to API Key Strategy (SDK) - only if OAuth unavailable or failed
   // SECURITY NOTE: API keys are less secure than OAuth but provided as fallback
@@ -292,34 +300,36 @@ export async function sendToAntigravityCLI(
         chatId: `genai-key-${Date.now()}`
       };
     } catch (error) {
-      handleError(error, controller, startTime, modelName);
+      return handleError(error, controller, startTime, modelName);
     }
   }
 
   // No authentication method available
-  const gcloudManager = GcloudTokenManager.getInstance();
-  const hasGcloud = await gcloudManager.isAvailable();
-  
-  if (!hasGcloud && !API_KEY) {
-    throw new Error(
-      "Authentication failed. Please install and configure 'gcloud' CLI:\n" +
-      "  1. Install: https://cloud.google.com/sdk/docs/install\n" +
-      "  2. Run: gcloud auth login\n" +
-      "  3. Run: gcloud auth application-default login\n\n" +
-      "Alternatively, set GEMINI_API_KEY environment variable (less secure)."
-    );
-  } else if (hasGcloud && !API_KEY) {
-    throw new Error(
-      "gcloud is installed but not authenticated. Please run:\n" +
-      "  gcloud auth login\n" +
-      "  gcloud auth application-default login"
-    );
-  } else {
-    throw new Error(
-      "Authentication failed. Both gcloud OAuth and API key methods failed. " +
-      "Please check your gcloud credentials or API key."
-    );
+  if (!API_KEY) {
+    const gcloudManager = GcloudTokenManager.getInstance();
+    const hasGcloud = await gcloudManager.isAvailable();
+    
+    if (!hasGcloud) {
+      throw new Error(
+        "Authentication failed. Please install and configure 'gcloud' CLI:\n" +
+        "  1. Install: https://cloud.google.com/sdk/docs/install\n" +
+        "  2. Run: gcloud auth login\n" +
+        "  3. Run: gcloud auth application-default login\n\n" +
+        "Alternatively, set GEMINI_API_KEY environment variable (less secure)."
+      );
+    } else {
+      throw new Error(
+        "gcloud is installed but not authenticated. Please run:\n" +
+        "  gcloud auth login\n" +
+        "  gcloud auth application-default login"
+      );
+    }
   }
+
+  throw new Error(
+    "Authentication failed. Both gcloud OAuth and API key methods failed. " +
+    "Please check your API key or gcloud credentials."
+  );
 }
 
 function handleError(error: unknown, controller: AbortController, startTime: number, modelName: string): never | AntigravityResponse {

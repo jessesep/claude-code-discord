@@ -265,8 +265,8 @@ Updated all Antigravity agents to use Gemini 3 Flash as the default model instea
 ## Changes Made
 
 ### Model Updates
-- **Default Model:** Changed from \`gemini-2.0-flash\` to \`gemini-3-flash\`
-- **Fallback Models:** Added \`gemini-3-flash\` to fallback lists
+- **Default Model:** Changed from \`gemini-2.0-flash\` to \`gemini-2.0-flash\`
+- **Fallback Models:** Added \`gemini-2.0-flash\` to fallback lists
 - **Model Lists:** Updated all model selection menus
 
 ### Files Modified

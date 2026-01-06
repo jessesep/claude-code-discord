@@ -28,6 +28,9 @@ export interface UniversalAgentResponse {
   /** Cost information (if applicable) */
   cost?: number;
 
+  /** Execution timing details */
+  timing?: { duration: number };
+
   /** Provider-specific metadata */
   metadata?: Record<string, unknown>;
 

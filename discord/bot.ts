@@ -688,6 +688,7 @@ export async function createDiscordBot(
         // Fallback models
         availableModels = [
           { name: 'gemini-3-flash', displayName: 'Gemini 3 Flash' },
+          { name: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' },
           { name: 'gemini-2.0-flash-exp', displayName: 'Gemini 2.0 Flash (Experimental)' },
           { name: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash' },
           { name: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro' }
@@ -802,6 +803,7 @@ export async function createDiscordBot(
         // Fallback models
         availableModels = [
           { name: 'gemini-3-flash', displayName: 'Gemini 3 Flash' },
+          { name: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' },
           { name: 'gemini-2.0-flash-exp', displayName: 'Gemini 2.0 Flash (Experimental)' },
           { name: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash' }
         ];
