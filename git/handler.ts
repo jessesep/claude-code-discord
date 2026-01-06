@@ -52,19 +52,34 @@ export async function executeGitCommand(workDir: string, command: string): Promi
 
 export async function createWorktree(workDir: string, branch: string, ref?: string): Promise<WorktreeResult> {
   const actualRef = ref || branch;
+  
+  // Check if a repo is currently loaded and use its path
   let baseWorkDir = workDir;
+  try {
+    const { RepoManager } = await import("../repo/index.ts");
+    const repoManager = RepoManager.getInstance();
+    const currentRepo = repoManager.getCurrentRepo();
+    if (currentRepo) {
+      baseWorkDir = currentRepo.path;
+      console.log(`[Worktree] Using current repo path: ${baseWorkDir}`);
+    }
+  } catch {
+    // Repo manager not available, use default workDir
+  }
+  
+  let finalWorkDir = baseWorkDir;
   
   try {
-    const gitFile = await Deno.readTextFile(`${workDir}/.git`);
+    const gitFile = await Deno.readTextFile(`${finalWorkDir}/.git`);
     if (gitFile.includes('gitdir:')) {
-      baseWorkDir = workDir.replace(/\/\.git\/worktrees\/[^\/]+$/, '');
+      finalWorkDir = finalWorkDir.replace(/\/\.git\/worktrees\/[^\/]+$/, '');
     }
   } catch {
     // For .git directory, this is a normal repository
   }
   
   // Check if worktree already exists for this branch
-  const existingWorktrees = await executeGitCommand(baseWorkDir, "git worktree list");
+  const existingWorktrees = await executeGitCommand(finalWorkDir, "git worktree list");
   if (!existingWorktrees.startsWith('Execution error:') && !existingWorktrees.startsWith('Error:')) {
     const worktreeLines = existingWorktrees.split('\n').filter(line => line.trim());
     for (const line of worktreeLines) {
@@ -74,7 +89,7 @@ export async function createWorktree(workDir: string, branch: string, ref?: stri
         return { 
           result: `Found existing worktree. Path: ${existingPath}`, 
           fullPath: existingPath, 
-          baseDir: baseWorkDir,
+          baseDir: finalWorkDir,
           isExisting: true
         };
       }
@@ -82,7 +97,7 @@ export async function createWorktree(workDir: string, branch: string, ref?: stri
   }
   
   // The actual worktree directory path (not the .git/worktrees path)
-  const worktreeDir = `${baseWorkDir}/../${branch}`;
+  const worktreeDir = `${finalWorkDir}/../${branch}`;
   
   // Check if directory already exists
   try {
@@ -90,26 +105,26 @@ export async function createWorktree(workDir: string, branch: string, ref?: stri
     return { 
       result: `Error: Directory '${worktreeDir}' already exists.`, 
       fullPath: worktreeDir, 
-      baseDir: baseWorkDir 
+      baseDir: finalWorkDir 
     };
   } catch {
     // Directory doesn't exist, which is good
   }
   
   // Check if branch already exists
-  const branchCheckResult = await executeGitCommand(baseWorkDir, `git show-ref --verify --quiet refs/heads/${branch}`);
+  const branchCheckResult = await executeGitCommand(finalWorkDir, `git show-ref --verify --quiet refs/heads/${branch}`);
   const branchExists = !branchCheckResult.startsWith('Execution error:') && !branchCheckResult.startsWith('Error:');
   
   let result: string;
   if (branchExists) {
     // Branch exists, use it without creating a new one
-    result = await executeGitCommand(baseWorkDir, `git worktree add ${worktreeDir} ${branch}`);
+    result = await executeGitCommand(finalWorkDir, `git worktree add ${worktreeDir} ${branch}`);
   } else {
     // Branch doesn't exist, create a new one
-    result = await executeGitCommand(baseWorkDir, `git worktree add ${worktreeDir} -b ${branch} ${actualRef}`);
+    result = await executeGitCommand(finalWorkDir, `git worktree add ${worktreeDir} -b ${branch} ${actualRef}`);
   }
   
-  return { result, fullPath: worktreeDir, baseDir: baseWorkDir };
+  return { result, fullPath: worktreeDir, baseDir: finalWorkDir };
 }
 
 export async function listWorktrees(workDir: string): Promise<WorktreeListResult> {

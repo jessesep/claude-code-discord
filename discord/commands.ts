@@ -1,9 +1,17 @@
 
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { PREDEFINED_AGENTS, chatWithAgent, getActiveSession, clearAgentSession, setAgentSession } from "../agent/index.ts";
+import { PREDEFINED_AGENTS, chatWithAgent, getActiveSession, clearAgentSession, setAgentSession, createAgentHandlers, AgentHandlerDeps } from "../agent/index.ts";
 import { InteractionContext } from "./types.ts";
+import { splitText, DISCORD_LIMITS } from "./utils.ts";
 
-export async function getAgentCommand() {
+// Store agent handlers (will be initialized by main.ts)
+let agentHandlers: ReturnType<typeof createAgentHandlers> | null = null;
+
+export function setAgentHandlers(handlers: ReturnType<typeof createAgentHandlers>) {
+    agentHandlers = handlers;
+}
+
+export async function getAgentCommand(deps?: AgentHandlerDeps) {
     const agentNames = Object.keys(PREDEFINED_AGENTS).map(key => ({ name: PREDEFINED_AGENTS[key].name, value: key }));
 
     const data = new SlashCommandBuilder()
@@ -112,12 +120,52 @@ export async function getAgentCommand() {
                 // We need to access it. But typically commands rely on closure or argument.
                 // For now, we'll implement a basic callback here.
 
+                // Use channel context workDir if available, otherwise fall back to current directory
+                const effectiveWorkDir = ctx.channelContext?.projectPath || Deno.cwd();
+                
                 const deps: any = {
-                    workDir: Deno.cwd(),
+                    workDir: effectiveWorkDir,
                     sendClaudeMessages: async (msgs: any[]) => {
-                        const content = msgs[0].content;
-                        // Send to context - handle chunking if needed
-                        await ctx.editReply({ content: content });
+                        const content = msgs[0]?.content || '';
+                        if (!content) return;
+                        
+                        // Use embeds for better length handling (4096 vs 2000 limit)
+                        // Split content if needed to respect embed description limit
+                        const chunks = splitText(content, DISCORD_LIMITS.EMBED_DESCRIPTION, true);
+                        
+                        if (chunks.length === 1) {
+                            // Single chunk - use embed for consistency and higher limit
+                            await ctx.editReply({ 
+                                embeds: [{
+                                    color: 0x0099ff,
+                                    title: 'Assistant Response',
+                                    description: chunks[0],
+                                    timestamp: true
+                                }]
+                            });
+                        } else {
+                            // Multiple chunks - send first as edit, rest as follow-ups
+                            await ctx.editReply({ 
+                                embeds: [{
+                                    color: 0x0099ff,
+                                    title: `Assistant Response (1/${chunks.length})`,
+                                    description: chunks[0],
+                                    timestamp: true
+                                }]
+                            });
+                            
+                            // Send remaining chunks as follow-up messages
+                            for (let i = 1; i < chunks.length; i++) {
+                                await ctx.followUp({
+                                    embeds: [{
+                                        color: 0x0099ff,
+                                        title: `Assistant Response (${i + 1}/${chunks.length})`,
+                                        description: chunks[i],
+                                        timestamp: true
+                                    }]
+                                });
+                            }
+                        }
                     }
                 };
 
@@ -131,6 +179,22 @@ export async function getAgentCommand() {
                 // Updating signature is cleaner. 
                 await chatWithAgent(ctx, message, agentName || undefined, undefined, false, { ...deps, includeGit });
                 return;
+            }
+        },
+        handleButton: async (ctx: InteractionContext, customId: string) => {
+            // Delegate to agent handlers if available
+            if (agentHandlers) {
+                await agentHandlers.handleButton(ctx, customId);
+            } else if (deps) {
+                // Create handlers on the fly if deps provided
+                const handlers = createAgentHandlers(deps);
+                await handlers.handleButton(ctx, customId);
+            } else {
+                console.warn(`[AgentCommand] No agent handlers available for button: ${customId}`);
+                await ctx.followUp({
+                    content: "Agent handlers not initialized. Please restart the bot.",
+                    ephemeral: true
+                });
             }
         }
     };

@@ -1,4 +1,5 @@
 import type { EmbedData, ComponentData } from "./types.ts";
+import { DISCORD_LIMITS } from "./utils.ts";
 
 export interface PaginationOptions {
   pageSize?: number;
@@ -30,7 +31,7 @@ function generatePaginationId(): string {
 }
 
 // Smart text splitting with context preservation
-export function smartSplit(text: string, maxLength: number = 4000): string[] {
+export function smartSplit(text: string, maxLength: number = DISCORD_LIMITS.EMBED_DESCRIPTION): string[] {
   if (text.length <= maxLength) {
     return [text];
   }
@@ -97,8 +98,8 @@ export function createPaginatedEmbeds(
   options: PaginationOptions = {}
 ): PaginatedContent {
   const {
-    pageSize = 4000,
-    maxEmbedSize = 6000,
+    pageSize = DISCORD_LIMITS.EMBED_DESCRIPTION,
+    maxEmbedSize = DISCORD_LIMITS.EMBED_DESCRIPTION,
     includePageInfo = true,
     color = 0x0099ff
   } = options;
@@ -202,7 +203,7 @@ export function initializePagination(
   const paginationState: PaginationState = {
     currentPage: 0,
     totalPages: paginatedContent.totalPages,
-    content: smartSplit(content, options.pageSize || 4000),
+    content: smartSplit(content, options.pageSize || DISCORD_LIMITS.EMBED_DESCRIPTION),
     options
   };
 

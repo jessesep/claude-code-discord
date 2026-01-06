@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #09090b; color: #fafafa; }
+    </style>
+</head>
+<body class="p-8">
+    <h1 class="text-3xl font-bold mb-6 text-indigo-400">Dashboard API Test</h1>
+    
+    <div class="space-y-4">
+        <div>
+            <h2 class="text-xl font-bold mb-2">Agents</h2>
+            <div id="agents" class="bg-zinc-900 p-4 rounded border border-zinc-800">Loading...</div>
+        </div>
+        
+        <div>
+            <h2 class="text-xl font-bold mb-2">Sessions</h2>
+            <div id="sessions" class="bg-zinc-900 p-4 rounded border border-zinc-800">Loading...</div>
+        </div>
+        
+        <div>
+            <h2 class="text-xl font-bold mb-2">Settings</h2>
+            <div id="settings" class="bg-zinc-900 p-4 rounded border border-zinc-800">Loading...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        async function loadData() {
+            try {
+                // Test Agents API
+                const agentsRes = await fetch('/api/agents');
+                const agentsData = await agentsRes.json();
+                document.getElementById('agents').innerHTML = 
+                    `<pre class="text-xs text-zinc-300">${JSON.stringify(agentsData, null, 2)}</pre>`;
+                
+                // Test Sessions API
+                const sessionsRes = await fetch('/api/sessions');
+                const sessionsData = await sessionsRes.json();
+                document.getElementById('sessions').innerHTML = 
+                    `<pre class="text-xs text-zinc-300">${JSON.stringify(sessionsData, null, 2)}</pre>`;
+                
+                // Test Settings API
+                const settingsRes = await fetch('/api/settings');
+                const settingsData = await settingsRes.json();
+                document.getElementById('settings').innerHTML = 
+                    `<pre class="text-xs text-zinc-300">${JSON.stringify(settingsData, null, 2)}</pre>`;
+            } catch (error) {
+                document.body.innerHTML += `<div class="text-red-500">Error: ${error.message}</div>`;
+            }
+        }
+        
+        loadData();
+    </script>
+</body>
+</html>

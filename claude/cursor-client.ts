@@ -77,6 +77,10 @@ export async function sendToCursorCLI(
     // Add prompt as last argument
     args.push(prompt);
 
+    // Log the full command for debugging
+    console.log("[Cursor CLI] Executing command:", "cursor", args.join(" "));
+    console.log("[Cursor CLI] Prompt:", prompt.substring(0, 200) + (prompt.length > 200 ? "..." : ""));
+
     const cmd = new Deno.Command("cursor", {
       args,
       stdin: "null",
@@ -91,6 +95,7 @@ export async function sendToCursorCLI(
     let chatId: string | undefined;
 
     // Spawn the process
+    console.log("[Cursor CLI] Spawning process...");
     const process = cmd.spawn();
 
     // Handle stdout streaming
@@ -101,12 +106,18 @@ export async function sendToCursorCLI(
     const readStdout = async () => {
       try {
         let buffer = "";
+        let chunkCount = 0;
 
         while (true) {
           const { done, value } = await stdoutReader.read();
-          if (done) break;
+          if (done) {
+            console.log("[Cursor CLI] stdout stream ended. Total chunks:", chunkCount);
+            break;
+          }
 
           const chunk = decoder.decode(value, { stream: true });
+          chunkCount++;
+          console.log(`[Cursor CLI] stdout chunk #${chunkCount} (${chunk.length} bytes):`, chunk.substring(0, 500));
 
           if (options.streamJson) {
             // Handle stream-json format (line-delimited JSON objects)
@@ -119,15 +130,37 @@ export async function sendToCursorCLI(
                 try {
                   const event = JSON.parse(line);
 
-                  // Extract text from event
+                  // Extract text from various event types
+                  // Cursor uses: "assistant" for streaming text, "result" for final response
                   if (event.type === "text" && event.content) {
                     fullResponse += event.content;
                     if (onChunk) {
                       onChunk(event.content);
                     }
+                  } else if (event.type === "assistant" && event.message?.content) {
+                    // Handle assistant message events (streaming chunks)
+                    for (const part of event.message.content) {
+                      if (part.type === "text" && part.text) {
+                        // Only add if this is incremental (not the full accumulated message)
+                        // The final chunk contains the full message, so skip incremental ones
+                        if (!event.message.content[0]?.text?.includes("\n") || event.message.content.length === 1) {
+                          // Stream the chunk
+                          if (onChunk) {
+                            onChunk(part.text);
+                          }
+                        }
+                      }
+                    }
+                  } else if (event.type === "result" && event.result) {
+                    // Final result - this is the complete response
+                    fullResponse = event.result;
+                    console.log("[Cursor CLI] Got final result:", event.result.substring(0, 200));
                   }
 
-                  // Extract chat ID if available
+                  // Extract session ID / chat ID if available
+                  if (event.session_id) {
+                    chatId = event.session_id;
+                  }
                   if (event.chatId) {
                     chatId = event.chatId;
                   }
@@ -157,6 +190,12 @@ export async function sendToCursorCLI(
               if (onChunk) {
                 onChunk(event.content);
               }
+            } else if (event.type === "result" && event.result) {
+              fullResponse = event.result;
+              console.log("[Cursor CLI] Got final result from buffer:", event.result.substring(0, 200));
+            }
+            if (event.session_id) {
+              chatId = event.session_id;
             }
             if (event.chatId) {
               chatId = event.chatId;
@@ -187,6 +226,7 @@ export async function sendToCursorCLI(
 
           const chunk = decoder.decode(value, { stream: true });
           errorOutput += chunk;
+          console.log("[Cursor CLI] stderr chunk:", chunk);
         }
       } catch (error) {
         // Ignore abort errors on stderr
@@ -203,6 +243,11 @@ export async function sendToCursorCLI(
 
     const status = await process.status;
     const duration = Date.now() - startTime;
+
+    console.log("[Cursor CLI] Process completed. Exit code:", status.code, "Duration:", duration, "ms");
+    console.log("[Cursor CLI] Full response length:", fullResponse.length);
+    console.log("[Cursor CLI] Full response:", fullResponse.substring(0, 1000) + (fullResponse.length > 1000 ? "..." : ""));
+    console.log("[Cursor CLI] Error output:", errorOutput || "(none)");
 
     // Check for cancellation
     if (controller.signal.aborted) {
@@ -226,6 +271,16 @@ export async function sendToCursorCLI(
         };
       }
 
+      // Handle ConnectError (HTTP/2 stream cancellation)
+      if (errorOutput.includes("ConnectError") || errorOutput.includes("[canceled]") || errorOutput.includes("CANCEL")) {
+        const isTimeout = errorOutput.includes("timeout") || duration > 300000; // 5 minutes
+        const errorMsg = isTimeout
+          ? "Cursor CLI request timed out. The operation took too long and was cancelled. Try breaking your request into smaller tasks."
+          : "Cursor CLI connection was cancelled. This may be due to network issues or the request being interrupted. Please try again.";
+        
+        throw new Error(errorMsg);
+      }
+
       // Other errors
       throw new Error(
         `Cursor CLI exited with code ${status.code}\n` +
@@ -236,19 +291,27 @@ export async function sendToCursorCLI(
 
     // Parse JSON response if not using stream-json
     let finalResponse = fullResponse;
+    console.log("[Cursor CLI] Parsing response. streamJson:", options.streamJson);
+    
     if (!options.streamJson && fullResponse.trim()) {
       try {
         const parsed = JSON.parse(fullResponse);
+        console.log("[Cursor CLI] Parsed JSON keys:", Object.keys(parsed));
+        console.log("[Cursor CLI] Parsed JSON:", JSON.stringify(parsed).substring(0, 500));
         // Extract response text from JSON structure
-        finalResponse = parsed.response || parsed.text || fullResponse;
+        finalResponse = parsed.response || parsed.text || parsed.result || parsed.output || parsed.message || fullResponse;
+        console.log("[Cursor CLI] Extracted finalResponse:", finalResponse?.substring(0, 300));
         if (parsed.chatId) {
           chatId = parsed.chatId;
         }
       } catch (e) {
         // If parsing fails, use raw output
-        console.warn("Could not parse Cursor JSON response, using raw output");
+        console.warn("[Cursor CLI] Could not parse JSON response:", e);
+        console.log("[Cursor CLI] Using raw output as finalResponse");
       }
     }
+
+    console.log("[Cursor CLI] Final response to return:", (finalResponse || "No response received").substring(0, 300));
 
     return {
       response: finalResponse || "No response received",

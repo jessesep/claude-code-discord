@@ -762,6 +762,85 @@ export const COMMAND_HELP = {
       "Shows model capabilities and features",
       "Applies to all new conversations until changed again"
     ]
+  },
+  "agents-status": {
+    title: "🤖 Active Agents Status",
+    description: "View all currently active agents running in this channel",
+    usage: "/agents-status",
+    examples: ["/agents-status"],
+    parameters: [],
+    notes: [
+      "Shows all agents currently active for your user in this channel",
+      "Displays agent name, model, risk level, and capabilities",
+      "Multiple agents can run concurrently on different tasks",
+      "Useful for monitoring which agents are working on what"
+    ]
+  },
+  "category-info": {
+    title: "📁 Category Information",
+    description: "Display category and repository information",
+    usage: "/category-info",
+    examples: ["/category-info"],
+    parameters: [],
+    notes: [
+      "Shows the Discord category name and repository it belongs to",
+      "Category names now include repository: 'CategoryName (RepoName)'",
+      "Helps identify which repository each Discord category belongs to",
+      "Prevents confusion when managing multiple repositories"
+    ]
+  },
+  "repo-info": {
+    title: "📂 Repository Information",
+    description: "Display detailed repository information",
+    usage: "/repo-info",
+    examples: ["/repo-info"],
+    parameters: [],
+    notes: [
+      "Shows repository name, branch, category, and working directory",
+      "Displays how category names include repository information",
+      "Useful for confirming bot context and repository details"
+    ]
+  },
+  "repo-sync": {
+    title: "🔄 Repository Sync",
+    description: "Scan and sync available Git repositories",
+    usage: "/repo-sync action: [scan/list/clear]",
+    examples: [
+      "/repo-sync action: scan",
+      "/repo-sync action: list",
+      "/repo-sync action: clear"
+    ],
+    parameters: [
+      { name: "action", description: "Action to perform: scan (find repos), list (show found repos), clear (clear cache)", required: true }
+    ],
+    notes: [
+      "scan: Scans the base directory and subdirectories (up to 2 levels deep) for Git repositories",
+      "list: Shows all repositories that have been scanned and cached",
+      "clear: Clears the repository cache",
+      "Repositories are cached in memory for quick access"
+    ]
+  },
+  "repo": {
+    title: "📂 Repository Management",
+    description: "Load and switch between repositories",
+    usage: "/repo action: [load/current/list] repo_name: [optional]",
+    examples: [
+      "/repo action: load",
+      "/repo action: load repo_name: my-project",
+      "/repo action: current",
+      "/repo action: list"
+    ],
+    parameters: [
+      { name: "action", description: "Action: load (switch repo), current (show active), list (show available)", required: true },
+      { name: "repo_name", description: "Repository name (optional for load - shows dropdown if omitted)", required: false }
+    ],
+    notes: [
+      "load: Switches to a repository. Shows dropdown menu if repo_name not provided",
+      "current: Shows the currently active repository",
+      "list: Lists all available repositories",
+      "When a repo is loaded, new worktree bots will be spawned from that repository's path",
+      "The dropdown menu allows easy selection from available repositories"
+    ]
   }
 };
 
@@ -835,62 +914,32 @@ export function createHelpHandlers(deps: HelpHandlerDeps) {
         await ctx.reply({
           embeds: [{
             color: 0x00ff00,
-            title: "🤖 Claude Code Discord Bot - Help",
-            description: `Bot for **${deps.repoName}** (${deps.branchName} branch)\n\nUse \`/help command:[name]\` for detailed help on specific commands.`,
+            title: "🤖 Antigravity AI Bot - Help",
+            description: `Bot for **${deps.repoName}** (${deps.branchName} branch)\n\n**Simple & Easy to Use!**`,
             fields: [
               {
-                name: "🤖 Claude Code Commands",
-                value: "`/claude` - Send prompts to Claude Code\n`/claude-enhanced` - Advanced Claude with options\n`/continue` - Continue conversation\n`/claude-cancel` - Cancel running operation",
+                name: "🚀 Getting Started",
+                value: "`/run` - Start a helper agent\n`/kill` - Stop the current agent session",
                 inline: false
               },
               {
-                name: "🚀 Enhanced Claude Features",
-                value: "`/claude-models` - List available models\n`/claude-sessions` - Manage sessions\n`/claude-context` - Preview context",
+                name: "📝 How It Works",
+                value: "1. Use `/run` to start a helper agent\n2. The helper will ask: **\"What do you want to do?\"**\n3. Just type your request in the channel (include your task and repo path)\n4. The helper will analyze your request and launch the right agent\n5. Continue chatting naturally - no more slash commands needed!\n6. Use `/kill` when you're done",
                 inline: false
               },
               {
-                name: "🧠 Claude Development Tools",
-                value: "`/claude-explain` - Explain code/concepts\n`/claude-debug` - Debug assistance\n`/claude-optimize` - Code optimization\n`/claude-review` - Code review\n`/claude-generate` - Generate code\n`/claude-refactor` - Refactor code\n`/claude-learn` - Programming tutor",
+                name: "💡 Example",
+                value: "```\n/run\n[Helper]: Hey! What do you want to do?\n[You]: Fix the bug in the login function, repo: /path/to/myproject\n[Helper]: I'll analyze this and get a debugger agent to help...\n[Debugger Agent takes over and fixes the bug]\n```",
                 inline: false
               },
               {
-                name: "🆕 New Features",
-                value: "`/todos` - Development task management\n`/mcp` - Model Context Protocol servers\n`/agent` - Specialized AI agents",
+                name: "🔧 Advanced Commands (Optional)",
+                value: "`/agent` - Direct agent control (for power users)\n`/settings` - Bot configuration\n`/help command:[name]` - Detailed help on specific commands",
                 inline: false
               },
               {
-                name: "⚙️ Advanced Settings",
-                value: "`/settings` - Unified bot settings (NEW)\n`/claude-settings` - Claude preferences\n`/output-settings` - Display settings\n`/quick-model` - Switch Claude model",
-                inline: false
-              },
-              {
-                name: "📂 Git Commands", 
-                value: "`/git` - Execute git commands\n`/worktree` - Create worktrees\n`/worktree-list` - List worktrees\n`/worktree-remove` - Remove worktree\n`/worktree-bots` - List bot instances\n`/worktree-kill` - Kill bot instance",
-                inline: false
-              },
-              {
-                name: "🖥️ Shell Commands",
-                value: "`/shell` - Execute shell commands\n`/shell-input` - Send input to process\n`/shell-list` - List running processes\n`/shell-kill` - Kill process",
-                inline: false
-              },
-              {
-                name: "📊 System Monitoring",
-                value: "`/system-info` - System information\n`/processes` - Running processes\n`/system-resources` - Resource usage\n`/network-info` - Network details\n`/disk-usage` - Disk space\n`/uptime` - System uptime",
-                inline: false
-              },
-              {
-                name: "🔧 System Tools",
-                value: "`/env-vars` - Environment variables\n`/system-logs` - System logs\n`/port-scan` - Check open ports\n`/service-status` - Service status",
-                inline: false
-              },
-              {
-                name: "⚙️ Utility Commands",
-                value: "`/status` - Show system status\n`/settings` - Manage bot settings\n`/pwd` - Show working directory\n`/shutdown` - Shutdown bot",
-                inline: false
-              },
-              {
-                name: "💡 Quick Tips",
-                value: "• Use buttons on Claude responses for quick actions\n• Shell processes support interactive input\n• Each worktree gets its own bot instance\n• Session IDs persist across restarts",
+                name: "✨ New Features",
+                value: "**Multi-Agent Support:** Multiple agents can now run simultaneously!\n**Category Names:** Category names include repository info (e.g., `MyProject (claude-code-discord)`)\n\n**New Commands:**\n`/agents-status` - View all active agents\n`/category-info` - See category and repo information\n`/repo-info` - View repository details",
                 inline: false
               }
             ],

@@ -14,7 +14,7 @@
 **Error Message**:
 ```
 Cannot use this model: sonnet-4. Available models: composer-1, auto, sonnet-4.5,
-sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash,
+sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-2.0-flash,
 gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high,
 gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
 ```

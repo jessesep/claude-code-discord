@@ -1,5 +1,6 @@
 import { sendToClaudeCode } from "./client.ts";
 import type { ClaudeMessage } from "./types.ts";
+import { DISCORD_LIMITS } from "../discord/utils.ts";
 
 // Enhanced Claude Code client with additional features
 export interface EnhancedClaudeOptions {
@@ -189,8 +190,8 @@ async function getFileContext(filePaths: string[]): Promise<string | null> {
     for (const filePath of filePaths) {
       try {
         const content = await Deno.readTextFile(filePath);
-        const truncatedContent = content.length > 2000 
-          ? content.substring(0, 2000) + '\n... (truncated)'
+        const truncatedContent = content.length > DISCORD_LIMITS.CONTENT 
+          ? content.substring(0, DISCORD_LIMITS.CONTENT - 20) + '\n... (truncated)'
           : content;
         
         fileContents.push(`<file path="${filePath}">

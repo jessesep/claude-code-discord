@@ -1,40 +1,25 @@
 #!/usr/bin/env -S deno run --allow-all
-
-import {
-  createDiscordBot,
-  type BotConfig,
-  type InteractionContext,
-  type CommandHandlers,
-  type ButtonHandlers,
-  type BotDependencies
-} from "./discord/index.ts";
-
-import { ShellManager } from "./shell/index.ts";
-import { getGitInfo } from "./git/index.ts";
-
-import { createClaudeHandlers, claudeCommands, cleanSessionId, createClaudeSender, expandableContent, type DiscordSender, ClaudeMessage, enhancedClaudeCommands, createEnhancedClaudeHandlers, ClaudeSessionManager } from "./claude/index.ts";
-import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
-import {
-  advancedSettingsCommands,
-  createAdvancedSettingsHandlers,
-  DEFAULT_SETTINGS,
-  type AdvancedBotSettings,
-  unifiedSettingsCommands,
-  createUnifiedSettingsHandlers,
-  UNIFIED_DEFAULT_SETTINGS,
-  type UnifiedBotSettings
-} from "./settings/index.ts";
-import { createGitHandlers, gitCommands, WorktreeBotManager } from "./git/index.ts";
-import { createShellHandlers, shellCommands } from "./shell/index.ts";
-import { createUtilsHandlers, utilsCommands } from "./util/index.ts";
-import { systemCommands, createSystemHandlers } from "./system/index.ts";
-import { helpCommand, createHelpHandlers } from "./help/index.ts";
-import { agentCommand, createAgentHandlers } from "./agent/index.ts";
+import { agentCommand, createAgentHandlers, simpleCommands, handleSimpleCommand } from "./agent/index.ts";
 import { ProcessCrashHandler, setupGlobalErrorHandlers, ProcessHealthMonitor } from "./process/index.ts";
-import { handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "./discord/index.ts";
+import { createDiscordBot, handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "./discord/index.ts";
 import { SettingsPersistence } from "./util/settings-persistence.ts";
 import { WebServer } from "./server/index.ts";
 import { OSCManager } from "./osc/index.ts";
+
+import { getGitInfo, WorktreeBotManager, createGitHandlers, gitCommands } from "./git/index.ts";
+import { ShellManager, createShellHandlers, shellCommands } from "./shell/index.ts";
+import { repoCommands, createRepoHandlers } from "./repo/index.ts";
+import { ClaudeSessionManager, createClaudeHandlers, claudeCommands, enhancedClaudeCommands, createEnhancedClaudeHandlers, cleanSessionId, createClaudeSender, convertToClaudeMessages, expandableContent } from "./claude/index.ts";
+import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
+import { helpCommand, createHelpHandlers } from "./help/index.ts";
+import { unifiedSettingsCommands, createUnifiedSettingsHandlers, createAdvancedSettingsHandlers, DEFAULT_SETTINGS, UNIFIED_DEFAULT_SETTINGS, advancedSettingsCommands } from "./settings/index.ts";
+import { utilsCommands, createUtilsHandlers } from "./util/index.ts";
+import { systemCommands, createSystemHandlers } from "./system/index.ts";
+
+
+
+
+
 
 
 
@@ -76,8 +61,20 @@ export { sendToClaudeCode } from "./claude/index.ts";
 export async function createClaudeCodeBot(config: BotConfig) {
   const { discordToken, applicationId, workDir, repoName, branchName, categoryName, defaultMentionUserId } = config;
 
-  // Determine category name (use repository name if not specified)
-  const actualCategoryName = categoryName || repoName;
+  // Determine category name (include repo name for visibility)
+  // Format: "categoryName (repoName)" if categoryName provided, otherwise just "repoName"
+  const actualCategoryName = categoryName ? `${categoryName} (${repoName})` : repoName;
+
+  // Initialize conversation sync system (for /sync command and conversation persistence)
+  try {
+    const { initializeConversationSync } = await import("./util/conversation-sync.ts");
+    const syncResult = await initializeConversationSync();
+    if (!syncResult.success) {
+      console.warn("[Startup] Conversation sync initialization failed:", syncResult.error);
+    }
+  } catch (error) {
+    console.warn("[Startup] Could not initialize conversation sync:", error);
+  }
 
   // Claude Code session management
   let claudeController: AbortController | null = null;
@@ -251,6 +248,17 @@ export async function createClaudeCodeBot(config: BotConfig) {
     worktreeBotManager
   });
 
+  const repoHandlers = createRepoHandlers({
+    workDir,
+    repoName,
+    branchName,
+    actualCategoryName,
+    discordToken,
+    applicationId,
+    botSettings,
+    worktreeBotManager
+  });
+
   const shellHandlers = createShellHandlers({
     shellManager
   });
@@ -384,14 +392,21 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
           // Split content into chunks if too large for Discord
           const maxLength = 4090 - "```\n\n```".length;
+          
+          // Determine if content should be formatted as plain text or JSON
+          // Agent responses (agent-response-*) and tool results (result-*) should be plain text
+          // Tool use content (tool-*) should be JSON
+          const isPlainText = expandId.startsWith('result-') || expandId.startsWith('agent-response-');
+          const codeBlockLang = isPlainText ? '' : 'json';
+          const codeBlock = codeBlockLang ? `\`\`\`${codeBlockLang}\n` : '```\n';
+          const codeBlockEnd = '\n```';
+          
           if (fullContent.length <= maxLength) {
             await ctx.update({
               embeds: [{
                 color: 0x0099ff,
-                title: '📖 Full Content',
-                description: expandId.startsWith('result-') ?
-                  `\`\`\`\n${fullContent}\n\`\`\`` :
-                  `\`\`\`json\n${fullContent}\n\`\`\``,
+                title: '📖 Full Response',
+                description: `${codeBlock}${fullContent}${codeBlockEnd}`,
                 timestamp: true
               }],
               components: [{
@@ -410,12 +425,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
             await ctx.update({
               embeds: [{
                 color: 0x0099ff,
-                title: '📖 Full Content (Large - Showing First Part)',
-                description: expandId.startsWith('result-') ?
-                  `\`\`\`\n${chunk}...\n\`\`\`` :
-                  `\`\`\`json\n${chunk}...\n\`\`\``,
+                title: '📖 Full Response (Large - Showing First Part)',
+                description: `${codeBlock}${chunk}...${codeBlockEnd}`,
                 fields: [
-                  { name: 'Note', value: 'Content is very large. This shows the first portion.', inline: false }
+                  { name: 'Note', value: `Content is very large (${fullContent.length} chars). This shows the first portion.`, inline: false }
                 ],
                 timestamp: true
               }],
@@ -627,6 +640,19 @@ export async function createClaudeCodeBot(config: BotConfig) {
             }]
           });
         }
+      }
+    }],
+    ['repo-sync', {
+      execute: async (ctx: InteractionContext) => {
+        const action = ctx.getString('action', true)!;
+        await repoHandlers.onRepoSync(ctx, action);
+      }
+    }],
+    ['repo', {
+      execute: async (ctx: InteractionContext) => {
+        const action = ctx.getString('action', true)!;
+        const repoName = ctx.getString('repo_name');
+        await repoHandlers.onRepo(ctx, action, repoName || undefined);
       }
     }],
     ['worktree-bots', {
@@ -983,6 +1009,24 @@ export async function createClaudeCodeBot(config: BotConfig) {
         });
       }
     }],
+    ['agents-status', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await utilsHandlers.onAgentsStatus(ctx);
+      }
+    }],
+    ['category-info', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await utilsHandlers.onCategoryInfo(ctx);
+      }
+    }],
+    ['repo-info', {
+      execute: async (ctx: InteractionContext) => {
+        await ctx.deferReply();
+        await utilsHandlers.onRepoInfo(ctx);
+      }
+    }],
     ['shutdown', {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
@@ -1321,6 +1365,51 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await agentHandlers.onAgent(ctx, action, agentName || undefined, message || undefined, contextFiles || undefined, includeSystemInfo || undefined);
       }
     }],
+    ['run', {
+      execute: async (ctx: InteractionContext) => {
+        // Don't defer here - handleSimpleCommand will defer via onAgent
+        await handleSimpleCommand(ctx, 'run', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
+    ['kill', {
+      execute: async (ctx: InteractionContext) => {
+        // Don't defer here - handleSimpleCommand will defer via onAgent
+        await handleSimpleCommand(ctx, 'kill', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
+    ['run-adv', {
+      execute: async (ctx: InteractionContext) => {
+        // Don't defer here - handleSimpleCommand will defer
+        await handleSimpleCommand(ctx, 'run-adv', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
     ['output-settings', {
       execute: async (ctx: InteractionContext) => {
         const action = ctx.getString('action', true)!;
@@ -1337,19 +1426,24 @@ export async function createClaudeCodeBot(config: BotConfig) {
   ]);
 
   // Create dependencies object
+  // Simplified interface: Only register /run, /kill, and /help
+  // Old commands are still available via handlers for power users, but not shown in Discord
   const dependencies: BotDependencies = {
     commands: [
-      ...claudeCommands,
-      ...enhancedClaudeCommands, // claude-templates already removed from source
-      ...additionalClaudeCommands,
-      ...advancedSettingsCommands,
-      ...unifiedSettingsCommands,
-      agentCommand,
-      ...gitCommands,
-      ...shellCommands,
-      ...utilsCommands,
-      ...systemCommands,
-      helpCommand,
+      ...simpleCommands, // /run and /kill
+      helpCommand, // /help
+      // Old commands commented out to simplify Discord interface
+      // They can still be accessed programmatically if needed
+      // ...claudeCommands,
+      // ...enhancedClaudeCommands,
+      // ...additionalClaudeCommands,
+      // ...advancedSettingsCommands,
+      // ...unifiedSettingsCommands,
+      // agentCommand,
+      // ...gitCommands,
+      // ...shellCommands,
+      // ...utilsCommands,
+      // ...systemCommands,
     ],
     cleanSessionId,
     botSettings

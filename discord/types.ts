@@ -25,6 +25,7 @@ export interface MessageContent {
 
 export interface InteractionContext {
   deferReply(): Promise<void>;
+  deferUpdate(): Promise<void>;
   editReply(content: MessageContent): Promise<void>;
   followUp(content: MessageContent & { ephemeral?: boolean }): Promise<void>;
   reply(content: MessageContent & { ephemeral?: boolean }): Promise<void>;
@@ -34,6 +35,12 @@ export interface InteractionContext {
   getBoolean(name: string, required?: boolean): boolean | null;
   // User information from the interaction
   user: { id: string; username: string };
+  // Channel information
+  channelId?: string | null;
+  channel?: any; // Discord.js Channel object
+  guild?: any; // Discord.js Guild object
+  // Channel project context (for multi-project routing)
+  channelContext?: import("../util/channel-context.ts").ChannelProjectContext;
 }
 
 export interface BotConfig {

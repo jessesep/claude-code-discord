@@ -15,6 +15,18 @@ export const utilsCommands = [
   new SlashCommandBuilder()
     .setName('shutdown')
     .setDescription('Shutdown the bot'),
+  
+  new SlashCommandBuilder()
+    .setName('agents-status')
+    .setDescription('Show status of all active agents'),
+  
+  new SlashCommandBuilder()
+    .setName('category-info')
+    .setDescription('Show category and repository information'),
+  
+  new SlashCommandBuilder()
+    .setName('repo-info')
+    .setDescription('Show repository information'),
 ];
 
 export { createUtilsHandlers, type UtilsHandlerDeps } from "./handler.ts";

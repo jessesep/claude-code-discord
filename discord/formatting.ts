@@ -1,3 +1,5 @@
+import { DISCORD_LIMITS } from "./utils.ts";
+
 // Enhanced formatting utilities for Discord messages
 export interface FormatOptions {
   maxLength?: number;
@@ -6,6 +8,7 @@ export interface FormatOptions {
   highlightLines?: number[];
   language?: string;
   wrapInCodeBlock?: boolean;
+  useEmbedLimit?: boolean; // If true, use embed description limit (4096), otherwise content limit (2000)
 }
 
 // Enhanced text truncation with context preservation
@@ -16,13 +19,21 @@ export function formatText(text: string, options: FormatOptions = {}): {
   truncatedLength: number;
 } {
   const {
-    maxLength = 4000,
-    truncateAt = 3800,
+    maxLength,
+    truncateAt,
     showLineNumbers = false,
     highlightLines = [],
     language = '',
-    wrapInCodeBlock = false
+    wrapInCodeBlock = false,
+    useEmbedLimit = true // Default to embed limit since most formatting is for embeds
   } = options;
+  
+  // Use appropriate limit based on context
+  const defaultMaxLength = useEmbedLimit ? DISCORD_LIMITS.EMBED_DESCRIPTION : DISCORD_LIMITS.CONTENT;
+  const defaultTruncateAt = useEmbedLimit ? DISCORD_LIMITS.EMBED_DESCRIPTION - 200 : DISCORD_LIMITS.CONTENT - 200;
+  
+  const finalMaxLength = maxLength ?? defaultMaxLength;
+  const finalTruncateAt = truncateAt ?? defaultTruncateAt;
 
   let processed = text;
   const originalLength = processed.length;
@@ -45,9 +56,9 @@ export function formatText(text: string, options: FormatOptions = {}): {
 
   // Truncate if necessary
   let wasTruncated = false;
-  if (processed.length > maxLength) {
+  if (processed.length > finalMaxLength) {
     wasTruncated = true;
-    processed = processed.substring(0, truncateAt) + '\n... (truncated)';
+    processed = processed.substring(0, finalTruncateAt) + '\n... (truncated)';
   }
 
   return {
@@ -143,7 +154,8 @@ export function formatShellOutput(
   const formatOptions: FormatOptions = {
     language: 'bash',
     wrapInCodeBlock: true,
-    maxLength: isError ? 3000 : 4000, // Shorter for errors to leave room for error context
+    useEmbedLimit: true,
+    maxLength: isError ? DISCORD_LIMITS.EMBED_DESCRIPTION - 1000 : DISCORD_LIMITS.EMBED_DESCRIPTION, // Shorter for errors to leave room for error context
     ...options
   };
 
@@ -207,7 +219,8 @@ export function formatGitOutput(
   const formatOptions: FormatOptions = {
     language,
     wrapInCodeBlock: true,
-    maxLength: isError ? 3000 : 4000,
+    useEmbedLimit: true,
+    maxLength: isError ? DISCORD_LIMITS.EMBED_DESCRIPTION - 1000 : DISCORD_LIMITS.EMBED_DESCRIPTION,
     ...options
   };
 
@@ -269,7 +282,8 @@ export function formatError(
   const formatOptions: FormatOptions = {
     language: 'text',
     wrapInCodeBlock: true,
-    maxLength: 3500, // Leave room for error embed formatting
+    useEmbedLimit: true,
+    maxLength: DISCORD_LIMITS.EMBED_DESCRIPTION - 600, // Leave room for error embed formatting
     ...options
   };
 
