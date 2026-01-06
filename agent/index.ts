@@ -160,7 +160,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-coder': {
     name: 'Antigravity Coder',
     description: 'Google Antigravity agent for autonomous coding tasks',
-    model: 'gemini-2.0-flash-thinking-exp',
+    model: 'gemini-2.0-flash',
     systemPrompt: 'You are an autonomous coding agent powered by Google Antigravity. You can plan, execute, and verify complex coding tasks.',
     temperature: 0.3,
     maxTokens: 30000,
@@ -173,7 +173,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-architect': {
     name: 'Antigravity Architect',
     description: 'High-level system design and planning agent',
-    model: 'gemini-1.5-pro',
+    model: 'gemini-2.0-flash',
     systemPrompt: 'You are a software architect agent. Analyze requirements, design systems, and create implementation plans using Antigravity tools.',
     temperature: 0.4,
     maxTokens: 30000,

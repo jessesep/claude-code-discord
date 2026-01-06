@@ -1,5 +1,4 @@
-
-import { GoogleGenerativeAI } from "npm:@google/generative-ai@0.1.3";
+import { GoogleGenerativeAI } from "npm:@google/generative-ai@^0.21.0";
 
 /**
  * Antigravity Client (Real Implementation)
