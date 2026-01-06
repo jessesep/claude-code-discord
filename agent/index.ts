@@ -626,6 +626,21 @@ export async function chatWithAgent(
   const safeMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   let enhancedPrompt = `${agent.systemPrompt}\n\n<user_query>${safeMessage}</user_query>`;
 
+  // Inject claude-mem context (if available)
+  try {
+    const { injectClaudeMemContext } = await import("../util/claude-mem-context.ts");
+    const workDir = deps?.workDir || Deno.cwd();
+    enhancedPrompt = await injectClaudeMemContext(
+      enhancedPrompt,
+      workDir,
+      activeAgentName,
+      message
+    );
+  } catch (error) {
+    // Silently fail if claude-mem is not available
+    console.debug("Claude-mem context injection skipped:", error);
+  }
+
   // Add context if requested
   if (includeSystemInfo) {
     const systemInfo = `System: ${Deno.build.os} ${Deno.build.arch}\nWorking Directory: ${deps?.workDir}`;
@@ -669,7 +684,21 @@ export async function chatWithAgent(
       const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
 
       // Build Cursor prompt combining system and user message
-      const fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+      let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+
+      // Inject claude-mem context for Cursor agents
+      try {
+        const { injectClaudeMemContext } = await import("../util/claude-mem-context.ts");
+        const workDir = deps?.workDir || Deno.cwd();
+        fullPrompt = await injectClaudeMemContext(
+          fullPrompt,
+          workDir,
+          activeAgentName,
+          message
+        );
+      } catch (error) {
+        console.debug("Claude-mem context injection skipped for Cursor:", error);
+      }
 
       // Call Cursor CLI with streaming
       result = await sendToCursorCLI(
@@ -708,6 +737,20 @@ export async function chatWithAgent(
 
       // Build Prompt
       let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+
+      // Inject claude-mem context for Antigravity agents
+      try {
+        const { injectClaudeMemContext } = await import("../util/claude-mem-context.ts");
+        const workDir = deps?.workDir || Deno.cwd();
+        fullPrompt = await injectClaudeMemContext(
+          fullPrompt,
+          workDir,
+          activeAgentName,
+          message
+        );
+      } catch (error) {
+        console.debug("Claude-mem context injection skipped for Antigravity:", error);
+      }
 
       if (contextFiles) {
         try {
