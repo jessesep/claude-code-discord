@@ -1,289 +1,185 @@
+
+import { GoogleGenerativeAI } from "npm:@google/generative-ai@0.1.3";
+
 /**
- * Antigravity CLI Client
- *
- * Spawns Antigravity Agent CLI processes for code editing and analysis tasks.
- * Provides streaming support and proper error handling.
+ * Antigravity Client (Real Implementation)
+ * 
+ * Uses Google's Generative AI SDK (Gemini) to power the "Antigravity" agent.
+ * This replaces the CLI-based approach which was limited to GUI interactions.
  */
 
 export interface AntigravityResponse {
   response: string;
   duration?: number;
   modelUsed?: string;
-  chatId?: string; // For session management
+  chatId?: string;
 }
 
 export interface AntigravityOptions {
-  model?: string; // e.g., "gemini-2.0-flash-thinking-exp"
-  workspace?: string; // Working directory path
-  force?: boolean; // Auto-approve all operations
-  sandbox?: "enabled" | "disabled"; // Sandbox mode
-  resume?: string; // Chat ID to resume
-  streamJson?: boolean; // Use stream-json format for real-time updates
-  commandPath?: string; // Path to the executable (for testing)
+  model?: string;
+  workspace?: string;
+  streamJson?: boolean;
+  force?: boolean;
+  sandbox?: "enabled" | "disabled";
 }
 
+// Environment variable for API Key
+const API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
+
 /**
- * Send a prompt to Antigravity CLI and get streamed response
- *
- * @param prompt - Task description for Antigravity
- * @param controller - AbortController for cancellation
- * @param options - Antigravity configuration options
- * @param onChunk - Optional callback for streaming chunks
- * @returns AntigravityResponse with full text and metadata
+ * Get Access Token from gcloud CLI
  */
+async function getGcloudToken(): Promise<string | null> {
+  try {
+    const cmd = new Deno.Command("gcloud", {
+      args: ["auth", "print-access-token"],
+      stdout: "piped",
+      stderr: "null"
+    });
+    const output = await cmd.output();
+    if (output.success) {
+      return new TextDecoder().decode(output.stdout).trim();
+    }
+  } catch {
+    // gcloud not found or failed
+  }
+  return null;
+}
+
 export async function sendToAntigravityCLI(
   prompt: string,
   controller: AbortController,
   options: AntigravityOptions = {},
   onChunk?: (text: string) => void
 ): Promise<AntigravityResponse> {
-  try {
-    // Build Antigravity CLI command arguments
-    // Using 'agy' as the default command
-    const command = options.commandPath || "agy";
+  const startTime = Date.now();
+  const modelName = options.model || "gemini-2.0-flash-thinking-exp"; // Default to capable model
 
-    const args: string[] = [
-      "agent",
-      "--print", // Non-interactive mode
-    ];
+  // 1. Try API Key Strategy (SDK)
+  if (API_KEY) {
+    try {
+      const genAI = new GoogleGenerativeAI(API_KEY);
+      const model = genAI.getGenerativeModel({ model: modelName });
 
-    // Add output format
-    if (options.streamJson) {
-      args.push("--output-format", "stream-json");
-      args.push("--stream-partial-output");
-    } else {
-      args.push("--output-format", "json");
-    }
+      let fullText = "";
 
-    // Add optional flags
-    if (options.model) {
-      args.push("--model", options.model);
-    }
-
-    if (options.workspace) {
-      args.push("--workspace", options.workspace);
-    }
-
-    if (options.force) {
-      args.push("--force");
-    }
-
-    if (options.sandbox) {
-      args.push("--sandbox", options.sandbox);
-    }
-
-    if (options.resume) {
-      args.push("--resume", options.resume);
-    }
-
-    // Add prompt as last argument
-    args.push(prompt);
-
-    // Using configured command
-    const cmd = new Deno.Command(command, {
-      args,
-      stdin: "null", // or "piped" if input is needed via stdin
-      stdout: "piped",
-      stderr: "piped",
-      signal: controller.signal,
-    });
-
-    const startTime = Date.now();
-    let fullResponse = "";
-    let errorOutput = "";
-    let chatId: string | undefined;
-
-    // Spawn the process
-    const process = cmd.spawn();
-
-    // Handle stdout streaming
-    const stdoutReader = process.stdout.getReader();
-    const decoder = new TextDecoder();
-
-    // Read stdout in chunks
-    const readStdout = async () => {
-      try {
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await stdoutReader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-
-          if (options.streamJson) {
-            // Handle stream-json format (line-delimited JSON objects)
-            buffer += chunk;
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-            for (const line of lines) {
-              if (line.trim()) {
-                try {
-                  const event = JSON.parse(line);
-
-                  // Extract text from event - adapting to common patterns
-                  // Antigravity might use different field names, but assuming similarity to Clause/Cursor
-                  if (event.type === "text" && event.content) {
-                    fullResponse += event.content;
-                    if (onChunk) {
-                      onChunk(event.content);
-                    }
-                  } else if (event.type === "content_block_delta" && event.delta?.text) {
-                    // Alternate format support
-                    fullResponse += event.delta.text;
-                    if (onChunk) {
-                      onChunk(event.delta.text);
-                    }
-                  }
-
-                  // Extract chat ID if available
-                  if (event.chatId) {
-                    chatId = event.chatId;
-                  }
-                } catch (e) {
-                  // Invalid JSON line, might be plain text error or info
-                  // If it's not JSON, we treat it as raw text if it looks like content
-                  // But usually we prefer to skip debug info
-                  // console.warn("Invalid JSON in stream:", line);
-
-                  // Optional: if line is not JSON, maybe treat as text content?
-                  // For now, logging to stderr to avoid polluting output
-                }
-              }
-            }
-          } else {
-            // Regular JSON or text output
-            fullResponse += chunk;
-
-            // Stream chunk to callback
-            if (onChunk) {
-              onChunk(chunk);
-            }
-          }
+      if (options.streamJson && onChunk) {
+        const result = await model.generateContentStream(prompt);
+        for await (const chunk of result.stream) {
+          if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+          const chunkText = chunk.text();
+          fullText += chunkText;
+          onChunk(chunkText);
         }
-
-        // Process remaining buffer for stream-json
-        if (options.streamJson && buffer.trim()) {
-          try {
-            const event = JSON.parse(buffer);
-            if (event.type === "text" && event.content) {
-              fullResponse += event.content;
-              if (onChunk) {
-                onChunk(event.content);
-              }
-            }
-            if (event.chatId) {
-              chatId = event.chatId;
-            }
-          } catch (e) {
-            // Ignore parse errors in final buffer
-          }
-        }
-      } catch (error) {
-        // Handle abort/cancellation gracefully
-        if (error instanceof Error && error.name === "AbortError") {
-          console.log("Antigravity CLI: Process cancelled by abort signal");
-        } else {
-          throw error;
-        }
-      } finally {
-        stdoutReader.releaseLock();
+      } else {
+        const result = await model.generateContent(prompt);
+        fullText = result.response.text();
       }
-    };
 
-    // Handle stderr
-    const stderrReader = process.stderr.getReader();
-    const readStderr = async () => {
-      try {
-        while (true) {
-          const { done, value } = await stderrReader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          errorOutput += chunk;
-        }
-      } catch (error) {
-        // Ignore abort errors on stderr
-        if (error instanceof Error && error.name !== "AbortError") {
-          console.error("Antigravity CLI stderr error:", error);
-        }
-      } finally {
-        stderrReader.releaseLock();
-      }
-    };
-
-    // Wait for both streams and process to complete
-    await Promise.all([readStdout(), readStderr()]);
-
-    const status = await process.status;
-    const duration = Date.now() - startTime;
-
-    // Check for cancellation
-    if (controller.signal.aborted) {
       return {
-        response: "Request was cancelled",
-        duration,
-        modelUsed: options.model,
-        chatId,
+        response: fullText,
+        duration: Date.now() - startTime,
+        modelUsed: modelName,
+        chatId: `genai-key-${Date.now()}`
       };
+    } catch (error) {
+      handleError(error, controller, startTime, modelName);
     }
-
-    // Check exit code
-    if (!status.success) {
-      // Exit code 143 = SIGTERM (normal cancellation)
-      if (status.code === 143) {
-        return {
-          response: "Request was cancelled",
-          duration,
-          modelUsed: options.model,
-          chatId,
-        };
-      }
-
-      // Other errors
-      throw new Error(
-        `Antigravity CLI exited with code ${status.code}\n` +
-        `stderr: ${errorOutput}\n` +
-        `stdout: ${fullResponse}`
-      );
-    }
-
-    // Parse JSON response if not using stream-json
-    let finalResponse = fullResponse;
-    if (!options.streamJson && fullResponse.trim()) {
-      try {
-        const parsed = JSON.parse(fullResponse);
-        // Extract response text from JSON structure
-        finalResponse = parsed.response || parsed.text || parsed.content || fullResponse;
-        if (parsed.chatId) {
-          chatId = parsed.chatId;
-        }
-      } catch (e) {
-        // If parsing fails, use raw output
-        console.warn("Could not parse Antigravity JSON response, using raw output");
-      }
-    }
-
-    return {
-      response: finalResponse || "No response received",
-      duration,
-      modelUsed: options.model,
-      chatId,
-    };
-  } catch (error) {
-    // Handle abort errors
-    if (
-      error instanceof Error &&
-      (error.name === "AbortError" || controller.signal.aborted)
-    ) {
-      return {
-        response: "Request was cancelled",
-        modelUsed: options.model,
-      };
-    }
-
-    // Re-throw other errors
-    throw error;
   }
+
+  // 2. Try gcloud OAuth Strategy (REST)
+  const token = await getGcloudToken();
+  if (token) {
+    try {
+      // Use Generative Language REST API with OAuth
+      // Note: model name needs 'models/' prefix for REST usually, SDK handles it.
+      // Endpoint: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+      // Check if model already has prefix
+      const safeModel = modelName.startsWith("models/") ? modelName : `models/${modelName}`;
+
+      // Streaming endpoint: streamGenerateContent
+      const method = options.streamJson ? "streamGenerateContent" : "generateContent";
+      const url = `https://generativelanguage.googleapis.com/v1beta/${safeModel}:${method}?alt=sse`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "x-goog-user-project": Deno.env.get("GOOGLE_CLOUD_PROJECT") || "" // Optional but helpful
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Gemini API Error (${response.status}): ${errText}`);
+      }
+
+      let fullText = "";
+
+      if (options.streamJson && onChunk) {
+        // Parse SSE stream
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No response body");
+
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+
+          // SSE parsing is complex (data: {...}), simplified here assuming standard Gemini SSE format
+          // Usually: 'data: ' + JSON
+          const lines = chunk.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const json = JSON.parse(line.substring(6));
+                // Extract text from candidates
+                const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (part) {
+                  fullText += part;
+                  onChunk(part);
+                }
+              } catch (e) {
+                // ignore incomplete json
+              }
+            }
+          }
+        }
+      } else {
+        const json = await response.json();
+        fullText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      }
+
+      return {
+        response: fullText,
+        duration: Date.now() - startTime,
+        modelUsed: modelName,
+        chatId: `genai-oauth-${Date.now()}`
+      };
+
+    } catch (error) {
+      handleError(error, controller, startTime, modelName);
+    }
+  }
+
+  throw new Error(
+    "Authentication failed. Please provide GEMINI_API_KEY environment variable OR install/configure 'gcloud' CLI with 'gcloud auth login'."
+  );
+}
+
+function handleError(error: unknown, controller: AbortController, startTime: number, modelName: string): never | AntigravityResponse {
+  if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+    return {
+      response: "Request was cancelled",
+      duration: Date.now() - startTime,
+      modelUsed: modelName
+    };
+  }
+  throw error;
 }

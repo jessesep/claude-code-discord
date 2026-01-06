@@ -15,7 +15,6 @@ export interface AgentConfig {
   workspace?: string; // For cursor: working directory
   force?: boolean; // For cursor: auto-approve operations
   sandbox?: 'enabled' | 'disabled'; // For cursor: sandbox mode
-  commandPath?: string; // Path to custom CLI executable (e.g. wrapper)
 }
 
 export interface AgentSession {
@@ -169,8 +168,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     riskLevel: 'high',
     client: 'antigravity',
     force: false,
-    sandbox: 'enabled',
-    commandPath: './scripts/antigravity-wrapper.sh' // Use mock wrapper for demo
+    sandbox: 'enabled'
   },
   'ag-architect': {
     name: 'Antigravity Architect',
@@ -181,8 +179,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     maxTokens: 30000,
     capabilities: ['system-design', 'planning', 'architecture'],
     riskLevel: 'medium',
-    client: 'antigravity',
-    commandPath: './scripts/antigravity-wrapper.sh' // Use mock wrapper for demo
+    client: 'antigravity'
   }
 };
 
@@ -539,7 +536,6 @@ async function chatWithAgent(
           force: agent.force,
           sandbox: agent.sandbox,
           streamJson: true,
-          commandPath: agent.commandPath,
         },
         async (chunk) => {
           currentChunk += chunk;
