@@ -16,7 +16,7 @@ export async function getGitInfo(workDir: string = Deno.cwd()): Promise<GitInfo>
     try {
       const { stdout: remoteUrl } = await exec("git config --get remote.origin.url", { cwd: workDir });
       if (remoteUrl) {
-        const match = remoteUrl.match(/\/([^\/]+?)(\.git)?$/);
+        const match = remoteUrl.trim().match(/\/([^\/]+?)(\.git)?$/);
         if (match) {
           repoName = match[1];
         }
