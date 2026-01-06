@@ -404,6 +404,65 @@ async function startAgentSession(ctx: any, agentName: string) {
   });
 }
 
+/**
+ * Run an agent task headlessly (without Discord context)
+ * Used by Swarm Orchestrator
+ */
+export async function runAgentTask(
+  agentId: string,
+  task: string,
+  onChunk?: (text: string) => void
+): Promise<string> {
+  const agent = PREDEFINED_AGENTS[agentId];
+  if (!agent) throw new Error(`Agent ${agentId} not found`);
+
+  const controller = new AbortController(); // No external control for now in headless
+  let resultText = "";
+
+  const clientType = agent.client || 'claude';
+
+  if (clientType === 'cursor') {
+    const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
+    const prompt = `${agent.systemPrompt}\n\nTask: ${task}`;
+    const result = await sendToCursorCLI(
+      prompt,
+      controller,
+      {
+        workspace: agent.workspace,
+        force: agent.force,
+        sandbox: agent.sandbox,
+        streamJson: true,
+      },
+      onChunk
+    );
+    resultText = result.response;
+  } else if (clientType === 'antigravity') {
+    const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+    const prompt = `${agent.systemPrompt}\n\nTask: ${task}`;
+    const result = await sendToAntigravityCLI(
+      prompt,
+      controller,
+      {
+        model: agent.model,
+        workspace: agent.workspace,
+        streamJson: true,
+        force: agent.force,
+        sandbox: agent.sandbox,
+      },
+      onChunk
+    );
+    resultText = result.response;
+  } else {
+    // Default Claude (Mock/Direct implementation needed if no CLI)
+    // For now, assuming we don't use basic Claude in swarm or reusing existing logic
+    // But existing runClaudeCLI depends on internal state.
+    // We'll skip Claude for headless swarm for now or implement direct client.
+    throw new Error("Claude client headless not yet supported");
+  }
+
+  return resultText;
+}
+
 async function chatWithAgent(
   ctx: any,
   message: string,
