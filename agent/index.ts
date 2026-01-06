@@ -1,5 +1,6 @@
 // Agent command implementation
-import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
+import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "npm:discord.js@14.14.1";
+import * as path from "https://deno.land/std/path/mod.ts";
 import { MANAGER_SYSTEM_PROMPT, parseManagerResponse, ManagerAction } from "./manager.ts";
 
 // Agent types and interfaces
@@ -33,6 +34,9 @@ export interface AgentSession {
   history: { role: 'user' | 'model'; content: string }[];
 }
 
+// Mandatory Context Read rule for all agents
+const MANDATORY_CONTEXT_RULE = `\n\n> **MANDATORY READ**: Your VERY FIRST action MUST be to use the \`view_file\` tool to read the root \`.agent-context.md\` and the \`.agent-context.md\` in your specific compartment (if it exists). This ensures you work with the latest local knowledge.`;
+
 // Predefined agent configurations
 export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-manager': {
@@ -51,7 +55,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Code Reviewer',
     description: 'Specialized in code review and quality analysis',
     model: 'claude-sonnet-4',
-    systemPrompt: 'You are an expert code reviewer. Focus on code quality, security, performance, and best practices. Provide detailed feedback with specific suggestions for improvement.',
+    systemPrompt: 'You are an expert code reviewer. Focus on code quality, security, performance, and best practices. Provide detailed feedback with specific suggestions for improvement.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.3,
     maxTokens: 4096,
     capabilities: ['code-review', 'security-analysis', 'performance-optimization'],
@@ -61,7 +65,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Software Architect',
     description: 'Focused on system design and architecture decisions',
     model: 'claude-sonnet-4',
-    systemPrompt: 'You are a senior software architect. Help design scalable, maintainable systems. Focus on architectural patterns, design principles, and technology choices.',
+    systemPrompt: 'You are a senior software architect. Help design scalable, maintainable systems. Focus on architectural patterns, design principles, and technology choices.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.5,
     maxTokens: 4096,
     capabilities: ['system-design', 'architecture-review', 'technology-selection'],
@@ -71,7 +75,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Debug Specialist',
     description: 'Expert at finding and fixing bugs',
     model: 'claude-sonnet-4',
-    systemPrompt: 'You are a debugging expert. Help identify root causes of issues, suggest debugging strategies, and provide step-by-step solutions.',
+    systemPrompt: 'You are a debugging expert. Help identify root causes of issues, suggest debugging strategies, and provide step-by-step solutions.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.2,
     maxTokens: 4096,
     capabilities: ['bug-analysis', 'debugging', 'troubleshooting'],
@@ -81,7 +85,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Security Analyst',
     description: 'Specialized in security analysis and vulnerability assessment',
     model: 'claude-sonnet-4',
-    systemPrompt: 'You are a cybersecurity expert. Focus on identifying security vulnerabilities, suggesting secure coding practices, and analyzing potential threats.',
+    systemPrompt: 'You are a cybersecurity expert. Focus on identifying security vulnerabilities, suggesting secure coding practices, and analyzing potential threats.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.1,
     maxTokens: 4096,
     capabilities: ['security-analysis', 'vulnerability-assessment', 'threat-modeling'],
@@ -91,7 +95,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Performance Engineer',
     description: 'Expert in performance optimization and profiling',
     model: 'claude-sonnet-4',
-    systemPrompt: 'You are a performance optimization expert. Help identify bottlenecks, suggest optimizations, and improve system performance.',
+    systemPrompt: 'You are a performance optimization expert. Help identify bottlenecks, suggest optimizations, and improve system performance.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.3,
     maxTokens: 4096,
     capabilities: ['performance-analysis', 'optimization', 'profiling'],
@@ -101,7 +105,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'DevOps Engineer',
     description: 'Specialized in deployment, CI/CD, and infrastructure',
     model: 'claude-sonnet-4',
-    systemPrompt: 'You are a DevOps engineer. Help with deployment strategies, CI/CD pipelines, infrastructure as code, and operational best practices.',
+    systemPrompt: 'You are a DevOps engineer. Help with deployment strategies, CI/CD pipelines, infrastructure as code, and operational best practices.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.4,
     maxTokens: 4096,
     capabilities: ['deployment', 'ci-cd', 'infrastructure', 'monitoring'],
@@ -111,7 +115,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'General Development Assistant',
     description: 'General-purpose development assistant',
     model: 'claude-sonnet-4',
-    systemPrompt: 'You are a helpful development assistant. Provide clear, accurate, and practical help with programming tasks, answer questions, and offer suggestions.',
+    systemPrompt: 'You are a helpful development assistant. Provide clear, accurate, and practical help with programming tasks, answer questions, and offer suggestions.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.7,
     maxTokens: 4096,
     capabilities: ['general-help', 'coding', 'explanation', 'guidance'],
@@ -123,7 +127,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Cursor Autonomous Coder',
     description: 'Cursor AI agent that can autonomously write and edit code',
     model: 'sonnet-4.5',
-    systemPrompt: 'You are an autonomous coding agent powered by Cursor. You can read, write, and modify code files. Be thorough, write clean code, and follow best practices.',
+    systemPrompt: 'You are an autonomous coding agent powered by Cursor. You can read, write, and modify code files. Be thorough, write clean code, and follow best practices.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.3,
     maxTokens: 8000,
     capabilities: ['file-editing', 'code-generation', 'refactoring', 'autonomous'],
@@ -136,7 +140,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Cursor Refactoring Specialist',
     description: 'Specialized in autonomous code refactoring using Cursor',
     model: 'sonnet-4.5',
-    systemPrompt: 'You are a refactoring specialist. Improve code structure, readability, and maintainability while preserving functionality. Always write tests to verify behavior.',
+    systemPrompt: 'You are a refactoring specialist. Improve code structure, readability, and maintainability while preserving functionality. Always write tests to verify behavior.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.2,
     maxTokens: 8000,
     capabilities: ['refactoring', 'code-improvement', 'file-editing'],
@@ -149,7 +153,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Cursor Debug Agent',
     description: 'Autonomous debugging agent using Cursor',
     model: 'sonnet-4.5-thinking',
-    systemPrompt: 'You are a debugging expert with autonomous code editing capabilities. Investigate issues, add logging, write tests, and fix bugs. Think step-by-step.',
+    systemPrompt: 'You are a debugging expert with autonomous code editing capabilities. Investigate issues, add logging, write tests, and fix bugs. Think step-by-step.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.1,
     maxTokens: 8000,
     capabilities: ['debugging', 'testing', 'file-editing', 'autonomous'],
@@ -162,7 +166,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Cursor Fast Agent',
     description: 'Quick code changes with auto-approval (use with caution)',
     model: 'sonnet-4.5',
-    systemPrompt: 'You are a fast coding agent. Make quick, targeted changes. Be efficient and accurate.',
+    systemPrompt: 'You are a fast coding agent. Make quick, targeted changes. Be efficient and accurate.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.3,
     maxTokens: 4096,
     capabilities: ['quick-edits', 'file-editing', 'autonomous'],
@@ -177,7 +181,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Antigravity Coder',
     description: 'Google Antigravity agent for autonomous coding tasks',
     model: 'gemini-2.0-flash',
-    systemPrompt: 'You are an autonomous coding agent powered by Google Antigravity. You can plan, execute, and verify complex coding tasks.',
+    systemPrompt: 'You are an autonomous coding agent powered by Google Antigravity. You can plan, execute, and verify complex coding tasks.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.3,
     maxTokens: 30000,
     capabilities: ['file-editing', 'planning', 'autonomous', 'browser-interaction'],
@@ -190,7 +194,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     name: 'Antigravity Architect',
     description: 'High-level system design and planning agent',
     model: 'gemini-2.0-flash',
-    systemPrompt: 'You are a software architect agent. Analyze requirements, design systems, and create implementation plans using Antigravity tools.',
+    systemPrompt: 'You are a software architect agent. Analyze requirements, design systems, and create implementation plans using Antigravity tools.' + MANDATORY_CONTEXT_RULE,
     temperature: 0.4,
     maxTokens: 30000,
     capabilities: ['system-design', 'planning', 'architecture'],
@@ -250,6 +254,7 @@ export interface AgentHandlerDeps {
 // In-memory storage for agent sessions (in production, would be persisted)
 let agentSessions: AgentSession[] = [];
 let currentUserAgent: Record<string, string> = {}; // userId -> agentName
+const pendingSwarmTasks = new Map<string, { subAgentName: string, task: string, managerConfig: AgentConfig }>();
 
 export function createAgentHandlers(deps: AgentHandlerDeps) {
   const { workDir, crashHandler, sendClaudeMessages, sessionManager } = deps;
@@ -338,6 +343,66 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
         await crashHandler.reportCrash('agent', error instanceof Error ? error : new Error(String(error)), 'agent-command');
         throw error;
       }
+    },
+    async handleButton(ctx: any, customId: string) {
+      const userId = ctx.user.id;
+
+      if (customId.startsWith('agent_spawn_approve:')) {
+        const subAgentName = customId.split(':')[1];
+        const pending = pendingSwarmTasks.get(userId);
+
+        if (!pending || pending.subAgentName !== subAgentName) {
+          await ctx.reply({ content: "No pending task found or session expired.", ephemeral: true });
+          return;
+        }
+
+        pendingSwarmTasks.delete(userId);
+        await ctx.update({
+          embeds: [{
+            color: 0x00ff00,
+            title: `✅ Spawn Approved`,
+            description: `Starting **${subAgentName}** to work on task...`,
+            timestamp: new Date().toISOString()
+          }],
+          components: []
+        });
+
+        let subAgentOutput = "";
+        try {
+          const progressMsg = await ctx.followUp({
+            embeds: [{
+              color: 0xffaa00,
+              title: `⚙️ Subagent Working: ${subAgentName}`,
+              description: "The agent is executing the task autonomously...",
+              timestamp: new Date().toISOString()
+            }]
+          });
+
+          subAgentOutput = await runAgentTask(subAgentName, pending.task);
+
+          const summaryPrompt = `You are the Manager. You spawned '${subAgentName}' to do this task: "${pending.task}".\n\nOutput:\n${subAgentOutput.substring(0, 40000)}\n\nProvide CONCISE summary.`;
+          const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+          const summaryResponse = await sendToAntigravityCLI(summaryPrompt, new AbortController(), { model: pending.managerConfig.model });
+          const summaryText = summaryResponse.response;
+
+          await progressMsg.edit({
+            embeds: [{
+              color: 0x00ff00,
+              title: '✅ Task Completed',
+              description: summaryText.substring(0, 4000),
+              timestamp: new Date().toISOString()
+            }]
+          });
+        } catch (err) {
+          await ctx.followUp({ content: `❌ Error: ${err}`, ephemeral: true });
+        }
+      } else if (customId.startsWith('agent_spawn_decline:')) {
+        pendingSwarmTasks.delete(userId);
+        await ctx.update({
+          embeds: [{ color: 0xff0000, title: '❌ Spawn Declined', timestamp: new Date().toISOString() }],
+          components: []
+        });
+      }
     }
   };
 }
@@ -382,6 +447,22 @@ async function startAgentSession(ctx: any, agentName: string) {
   }
 
   const userId = ctx.user.id;
+
+  // Security: RBAC for High-Risk Agents
+  const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
+  if (agent.riskLevel === 'high' && ownerId && userId !== ownerId) {
+    await ctx.editReply({
+      embeds: [{
+        color: 0xff0000,
+        title: '⛔ Access Denied',
+        description: `Agent **${agent.name}** is a high-risk agent and can only be used by the bot owner.`,
+        footer: { text: "Security policy: Restricted access enabled" },
+        timestamp: new Date().toISOString()
+      }]
+    });
+    return;
+  }
+
   const channelId = ctx.channelId || ctx.channel?.id;
   console.log(`[startSession] Creating session: userId=${userId}, channelId=${channelId}, agentName=${agentName}`);
   currentUserAgent[userId] = agentName;
@@ -619,22 +700,21 @@ export async function chatWithAgent(
 
           for (const file of files) {
             try {
-              // Resolve path relative to workDir if possible, otherwise CWD
-              const workDir = deps?.workDir || Deno.cwd();
-              // Simple resolution: if absolute use it, else join
-              let filePath = file;
-              if (!file.startsWith('/')) {
-                filePath = `${workDir}/${file}`;
+              const workspaceDir = path.resolve(deps?.workDir || Deno.cwd());
+              const targetPath = path.resolve(workspaceDir, file);
+
+              if (!targetPath.startsWith(workspaceDir)) {
+                fullPrompt += `\n--- File: ${file} (Access Denied) ---\n`;
+                continue;
               }
 
-              // Check if exists
-              const stat = await Deno.stat(filePath);
+              const stat = await Deno.stat(targetPath);
               if (stat.isFile) {
-                const content = await Deno.readTextFile(filePath);
+                const content = await Deno.readTextFile(targetPath);
                 fullPrompt += `\n--- File: ${file} ---\n${content}\n----------------\n`;
               }
             } catch (e) {
-              fullPrompt += `\n--- File: ${file} (Error reading: ${e.message}) ---\n`;
+              fullPrompt += `\n--- File: ${file} (Error: ${e.message}) ---\n`;
             }
           }
           fullPrompt += `\n=====================\n`;
@@ -1066,77 +1146,37 @@ export async function handleManagerInteraction(
         return;
       }
 
-      // Update UI to show delegation
-      await ctx.editReply({
-        embeds: [{
-          color: 0xffaa00, // Orange for working
-          title: `🚧 Manager Delegating`,
-          description: `Spawning **${subAgentConfig.name}**...`,
-          fields: [
-            { name: 'Task', value: subAgentTask }
-          ],
-          timestamp: new Date().toISOString()
-        }]
+      // --- HUMAN-IN-THE-LOOP (HITL) IMPLEMENTATION ---
+      const approveBtn = new ButtonBuilder()
+        .setCustomId(`agent_spawn_approve:${subAgentName}`)
+        .setLabel(`Approve ${subAgentConfig.name}`)
+        .setStyle(ButtonStyle.Success);
+
+      const declineBtn = new ButtonBuilder()
+        .setCustomId(`agent_spawn_decline:${subAgentName}`)
+        .setLabel('Decline')
+        .setStyle(ButtonStyle.Danger);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(approveBtn, declineBtn);
+
+      pendingSwarmTasks.set(userId, {
+        subAgentName,
+        task: subAgentTask,
+        managerConfig: agentConfig
       });
 
-      // Run Subagent Headlessly
-      // Trigger a "working" message if possible or just wait
-      let subAgentOutput = "";
-      try {
-        subAgentOutput = await runAgentTask(
-          subAgentName,
-          subAgentTask,
-          (chunk) => {
-            // Optional: We could stream this to a separate message or debug log
-            // For now, keep it silent to avoid "streaming block of text"
-          }
-        );
-      } catch (err) {
-        subAgentOutput = `Error running subagent: ${err}`;
-      }
-
-      // 4. Summarize Result
-      const summaryPrompt = `
-You are the Manager. You spawned '${subAgentName}' to do this task: "${subAgentTask}".
-
-Here is the Output from the subagent:
---------------------------------------------------
-${subAgentOutput.substring(0, 50000)} ... (truncated if essential)
---------------------------------------------------
-
-Based on this output, provide a CONCISE summary to the user.
-- Mention what files were edited or created.
-- Mention if it was successful.
-- Be brief and helpful.
-`;
-
-      // Call Manager again for summary
-      const summaryResponse = await sendToAntigravityCLI(
-        summaryPrompt,
-        new AbortController(),
-        { model: agentConfig.model }
-      );
-
-      const summaryText = summaryResponse.response;
-
-      if (sessionData && sessionData.session) {
-        sessionData.session.history.push({ role: 'model', content: summaryText });
-      }
-
-      // Final Success Embed
       await ctx.editReply({
         embeds: [{
-          color: 0x00ff00, // Green for success
-          title: '✅ Task Completed',
-          description: summaryText,
-          fields: [
-            { name: 'Agent', value: subAgentConfig.name, inline: true },
-            { name: 'Model', value: subAgentConfig.model, inline: true }
-          ],
+          color: 0xffaa00,
+          title: `🛡️ Approval Required: Subagent Delegation`,
+          description: `The Manager wants to delegate a task to **${subAgentConfig.name}**.`,
+          fields: [{ name: 'Task', value: `\`\`\`${subAgentTask}\`\`\`` }],
+          footer: { text: "Review the task above before approving." },
           timestamp: new Date().toISOString()
-        }]
+        }],
+        components: [row]
       });
-
+      return;
     }
   } catch (error) {
     console.error("Manager Error:", error);

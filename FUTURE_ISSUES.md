@@ -42,3 +42,13 @@ The following issues have been identified for future development to enhance the 
 - Extract `CoreAgentService` that knows nothing about Discord.
 - Keep `DiscordAgentService` as a wrapper that handles Embeds/Messages.
 - This will make the CLI and Swarm implementations much cleaner and lighter.
+
+## 6. Security Hardening (Critical)
+**Priority**: High
+**Description**: Audit identified several security vulnerabilities in the Agent/Swarm implementation.
+**Task**:
+- Resolve Path Traversal in `context_files` (#39).
+- Implement Human-in-the-Loop (HITL) for Swarm operations (#44).
+- Sanitize Prompt Delimiters to prevent injection (#41).
+- Restrict GCP/Gemini usage to authorized owners (#40).
+- Implement RBAC for high-risk agents (#42).
