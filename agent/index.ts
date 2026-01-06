@@ -3,6 +3,7 @@ import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } fro
 import * as path from "https://deno.land/std/path/mod.ts";
 import { MANAGER_SYSTEM_PROMPT, parseManagerResponse, parseGitHubIssueRequest, ManagerAction } from "./manager.ts";
 import { AgentRegistry } from "./registry.ts";
+import { DISCORD_LIMITS, splitText } from "../discord/utils.ts";
 
 // Agent types and interfaces
 export interface AgentConfig {
@@ -33,6 +34,9 @@ export interface AgentSession {
 
   status: 'active' | 'paused' | 'completed' | 'error';
   history: { role: 'user' | 'model'; content: string }[];
+  
+  // Cursor session ID for resuming conversations
+  cursorSessionId?: string;
 }
 
 // Context note for all agents (context is automatically injected, no tool needed)
@@ -43,7 +47,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-manager': {
     name: 'Gemini Manager',
     description: 'Main orchestrator agent that manages other agents and interacts with the user',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3-flash',
     systemPrompt: MANAGER_SYSTEM_PROMPT,
     temperature: 0.3,
     maxTokens: 10000,
@@ -127,7 +131,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'cursor-coder': {
     name: 'Cursor Autonomous Coder',
     description: 'Cursor AI agent that can autonomously write and edit code',
-    model: 'sonnet-4.5',
+    model: 'auto', // Let Cursor pick the best model
     systemPrompt: 'You are an autonomous coding agent powered by Cursor. You can read, write, and modify code files. Be thorough, write clean code, and follow best practices.' + CONTEXT_NOTE,
     temperature: 0.3,
     maxTokens: 8000,
@@ -181,7 +185,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-coder': {
     name: 'Antigravity Coder',
     description: 'Google Antigravity agent for autonomous coding tasks',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3-flash',
     systemPrompt: 'You are an autonomous coding agent powered by Google Antigravity. You can plan, execute, and verify complex coding tasks.' + CONTEXT_NOTE,
     temperature: 0.3,
     maxTokens: 30000,
@@ -194,13 +198,26 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-architect': {
     name: 'Antigravity Architect',
     description: 'High-level system design and planning agent',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3-flash',
     systemPrompt: 'You are a software architect agent. Analyze requirements, design systems, and create implementation plans using Antigravity tools.' + CONTEXT_NOTE,
     temperature: 0.4,
     maxTokens: 30000,
     capabilities: ['system-design', 'planning', 'architecture'],
     riskLevel: 'medium',
     client: 'antigravity'
+  },
+  'ag-coder-gemini': {
+    name: 'Gemini Coder',
+    description: 'Coding agent with dynamic Gemini model selection',
+    model: 'gemini-3-flash', // Can be overridden at runtime
+    systemPrompt: 'You are an autonomous coding agent powered by Google Gemini. You can plan, execute, and verify complex coding tasks.' + CONTEXT_NOTE,
+    temperature: 0.3,
+    maxTokens: 30000,
+    capabilities: ['file-editing', 'planning', 'autonomous', 'code-generation'],
+    riskLevel: 'high',
+    client: 'antigravity',
+    force: false,
+    sandbox: 'enabled'
   }
 };
 
@@ -401,7 +418,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             embeds: [{
               color: 0x00ff00,
               title: '✅ Task Completed',
-              description: summaryText.substring(0, 4000),
+              description: summaryText.substring(0, DISCORD_LIMITS.EMBED_DESCRIPTION),
               timestamp: new Date().toISOString()
             }]
           });
@@ -624,7 +641,7 @@ export async function chatWithAgent(
   if (agent.client === 'antigravity') {
     try {
       const { getBestAvailableModel } = await import("../util/model-tester.ts");
-      const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      const fallbackModels = ['gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       agent.model = getBestAvailableModel(agent.model, fallbackModels);
     } catch (error) {
       console.warn('[Agent] Could not get tested model, using configured model:', error);
@@ -968,21 +985,35 @@ export async function chatWithAgent(
       // Import Cursor CLI client
       const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
 
-      // Build Cursor prompt combining system and user message
-      let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+      // Check for existing Cursor session to resume
+      const existingSession = agentSessions.find(
+        s => s.userId === userId && s.channelId === channelId && s.status === 'active' && s.cursorSessionId
+      );
+      const resumeSessionId = existingSession?.cursorSessionId;
+      
+      if (resumeSessionId) {
+        console.log(`[Cursor] Resuming session: ${resumeSessionId}`);
+      }
 
-      // Inject claude-mem context for Cursor agents
-      try {
-        const { injectClaudeMemContext } = await import("../util/claude-mem-context.ts");
-        const workDir = deps?.workDir || Deno.cwd();
-        fullPrompt = await injectClaudeMemContext(
-          fullPrompt,
-          workDir,
-          activeAgentName,
-          message
-        );
-      } catch (error) {
-        console.debug("Claude-mem context injection skipped for Cursor:", error);
+      // Build Cursor prompt - if resuming, just send the message; otherwise include system prompt
+      let fullPrompt = resumeSessionId 
+        ? message  // Just the new message when resuming
+        : `${agent.systemPrompt}\n\nTask: ${message}`;
+
+      // Inject claude-mem context for Cursor agents (only on first message)
+      if (!resumeSessionId) {
+        try {
+          const { injectClaudeMemContext } = await import("../util/claude-mem-context.ts");
+          const workDir = deps?.workDir || Deno.cwd();
+          fullPrompt = await injectClaudeMemContext(
+            fullPrompt,
+            workDir,
+            activeAgentName,
+            message
+          );
+        } catch (error) {
+          console.debug("Claude-mem context injection skipped for Cursor:", error);
+        }
       }
 
       // Call Cursor CLI with streaming
@@ -995,6 +1026,7 @@ export async function chatWithAgent(
           force: agent.force,
           sandbox: agent.sandbox,
           streamJson: true, // Enable streaming for Discord updates
+          resume: resumeSessionId, // Resume existing session if available
         },
         async (chunk) => {
           currentChunk += chunk;
@@ -1016,6 +1048,31 @@ export async function chatWithAgent(
           }
         }
       );
+      
+      // Save the Cursor session ID for future resumption
+      if (result.chatId) {
+        const currentSession = agentSessions.find(
+          s => s.userId === userId && s.channelId === channelId && s.status === 'active'
+        );
+        if (currentSession) {
+          currentSession.cursorSessionId = result.chatId;
+          console.log(`[Cursor] Saved session ID: ${result.chatId}`);
+        }
+        
+        // Sync to conversation file
+        try {
+          const { setCursorSessionId, addMessage } = await import("../util/conversation-sync.ts");
+          await setCursorSessionId(userId, channelId, activeAgentName, result.chatId);
+          // Save user message
+          await addMessage(userId, channelId, activeAgentName, 'user', message, 'discord');
+          // Save assistant response
+          if (result.response) {
+            await addMessage(userId, channelId, activeAgentName, 'assistant', result.response, 'cursor');
+          }
+        } catch (syncError) {
+          console.debug("[ConversationSync] Sync failed:", syncError);
+        }
+      }
     } else if (clientType === 'antigravity') {
       // Import Antigravity CLI client
       const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
@@ -1234,9 +1291,27 @@ export async function chatWithAgent(
     if (sessionData && sessionData.session && result.response) {
       sessionData.session.history.push({ role: 'model', content: result.response });
     }
+    
+    // Sync conversation to file (for all agent types)
+    try {
+      const { addMessage } = await import("../util/conversation-sync.ts");
+      // Save user message (if not already saved by Cursor handler)
+      if (clientType !== 'cursor') {
+        await addMessage(userId, channelId, activeAgentName, 'user', message, 'discord');
+      }
+      // Save assistant response (if not already saved by Cursor handler)
+      if (result.response && clientType !== 'cursor') {
+        const source = clientType === 'antigravity' ? 'antigravity' : 'discord';
+        await addMessage(userId, channelId, activeAgentName, 'assistant', result.response, source as any);
+      }
+      console.log(`[ConversationSync] Synced to data/conversations/`);
+    } catch (syncError) {
+      console.debug("[ConversationSync] Sync failed:", syncError);
+    }
 
     // Truncate response if too long and add expand button
-    const MAX_DESCRIPTION_LENGTH = 2000; // Discord embed description limit is ~4096, but we'll use 2000 for safety
+    // Use embed description limit since we're using embeds
+    const MAX_DESCRIPTION_LENGTH = DISCORD_LIMITS.EMBED_DESCRIPTION - 200; // Leave room for other embed fields
     // fullResponse already declared above for GitHub issue check
     let displayResponse = fullResponse;
     let isTruncated = false;
@@ -1281,27 +1356,26 @@ export async function chatWithAgent(
     };
 
     // Add expand button if truncated
-    const components: any[] = [];
+    let componentRows: any[] | undefined = undefined;
     if (isTruncated) {
       const expandId = `agent-response-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       // Store full content for expansion
       const { expandableContent } = await import("../claude/discord-sender.ts");
       expandableContent.set(expandId, fullResponse);
       
-      components.push({
-        type: 'actionRow',
-        components: [{
-          type: 'button',
-          customId: `expand:${expandId}`,
-          label: '📖 Show Full Response',
-          style: 'secondary'
-        }]
-      });
+      // Use Discord.js builders for components
+      const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import("npm:discord.js@14.14.1");
+      const button = new ButtonBuilder()
+        .setCustomId(`expand:${expandId}`)
+        .setLabel('📖 Show Full Response')
+        .setStyle(ButtonStyle.Secondary);
+      const row = new ActionRowBuilder().addComponents(button);
+      componentRows = [row];
     }
 
     await ctx.editReply({
       embeds: [embedData],
-      components: components.length > 0 ? components : undefined
+      components: componentRows
     });
 
   } catch (error) {
@@ -1522,7 +1596,7 @@ export async function handleManagerInteraction(
   if (agentConfig.client === 'antigravity') {
     try {
       const { getBestAvailableModel } = await import("../util/model-tester.ts");
-      const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      const fallbackModels = ['gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       agentConfig.model = getBestAvailableModel(agentConfig.model, fallbackModels);
     } catch (error) {
       console.warn('[Manager] Could not get tested model, using configured model:', error);
@@ -1657,8 +1731,38 @@ export async function handleManagerInteraction(
     const action = parseManagerResponse(fullResponse);
 
     if (!action) {
-      // Fallback
-      await ctx.editReply({ content: fullResponse });
+      // Fallback - use embeds to handle long content properly
+      const chunks = splitText(fullResponse, DISCORD_LIMITS.EMBED_DESCRIPTION, true);
+      if (chunks.length === 1) {
+        await ctx.editReply({ 
+          embeds: [{
+            color: 0x0099ff,
+            title: 'Manager Response',
+            description: chunks[0],
+            timestamp: new Date().toISOString()
+          }]
+        });
+      } else {
+        // Send first chunk as edit, rest as follow-ups
+        await ctx.editReply({ 
+          embeds: [{
+            color: 0x0099ff,
+            title: `Manager Response (1/${chunks.length})`,
+            description: chunks[0],
+            timestamp: new Date().toISOString()
+          }]
+        });
+        for (let i = 1; i < chunks.length; i++) {
+          await ctx.followUp({
+            embeds: [{
+              color: 0x0099ff,
+              title: `Manager Response (${i + 1}/${chunks.length})`,
+              description: chunks[i],
+              timestamp: new Date().toISOString()
+            }]
+          });
+        }
+      }
       return;
     }
 
@@ -1844,7 +1948,49 @@ export const killCommand = new SlashCommandBuilder()
   .setName('kill')
   .setDescription('Stop the current active agent session');
 
-export const simpleCommands = [runCommand, killCommand];
+export const syncCommand = new SlashCommandBuilder()
+  .setName('sync')
+  .setDescription('Open the current conversation in an IDE (Cursor, VS Code, etc.)');
+
+export const runAdvCommand = new SlashCommandBuilder()
+  .setName('run-adv')
+  .setDescription('Advanced agent runner with provider, role, and model selection');
+
+export const simpleCommands = [runCommand, killCommand, syncCommand, runAdvCommand];
+
+// Role definitions with agents
+export interface RoleDefinition {
+  name: string;
+  description: string;
+  agents: Array<{ id: string; name: string; description: string }>;
+}
+
+export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
+  builder: {
+    name: 'Builder',
+    description: 'Agents specialized in building and creating code',
+    agents: [
+      { id: 'cursor-coder', name: 'Cursor Coder', description: 'Autonomous code building with Cursor' },
+      { id: 'ag-coder', name: 'Antigravity Coder', description: 'Code building with Antigravity/Gemini' }
+    ]
+  },
+  tester: {
+    name: 'Tester',
+    description: 'Agents specialized in testing and quality assurance',
+    agents: [
+      { id: 'code-reviewer', name: 'Code Reviewer', description: 'Code review and quality analysis' },
+      { id: 'debugger', name: 'Debug Specialist', description: 'Bug finding and fixing' }
+    ]
+  },
+  investigator: {
+    name: 'Investigator',
+    description: 'Agents specialized in investigation and analysis',
+    agents: [
+      { id: 'security-expert', name: 'Security Analyst', description: 'Security analysis and vulnerability assessment' },
+      { id: 'architect', name: 'Software Architect', description: 'System design and architecture analysis' }
+    ]
+  }
+};
 
 export async function handleSimpleCommand(ctx: any, commandName: string, deps: AgentHandlerDeps) {
   // Map simple commands to agent actions
@@ -1854,16 +2000,127 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
     // Show provider/model selection menu
     await ctx.deferReply({ ephemeral: false });
     
-    // Get available providers and models
-    const availableAgents = [
-      { name: 'ag-manager', label: 'Manager Agent (Gemini 2.0 Flash)', description: 'Helper agent that orchestrates tasks - Fast and efficient', model: 'gemini-2.0-flash' },
-      { name: 'ag-manager', label: 'Manager Agent (Gemini 3 Flash)', description: 'Latest Gemini 3 Flash model - Most advanced', model: 'gemini-3-flash' },
-      { name: 'ag-manager', label: 'Manager Agent (Gemini 3 Pro)', description: 'Gemini 3 Pro - Best for complex reasoning', model: 'gemini-3-pro' },
-      { name: 'ag-coder', label: 'Coder Agent (Gemini 2.0 Flash)', description: 'Autonomous coding agent - Fast implementation', model: 'gemini-2.0-flash' },
-      { name: 'ag-coder', label: 'Coder Agent (Gemini 3 Flash)', description: 'Latest coding agent - Advanced capabilities', model: 'gemini-3-flash' },
-      { name: 'ag-architect', label: 'Architect Agent (Gemini 2.0 Flash)', description: 'System design and planning - Fast analysis', model: 'gemini-2.0-flash' },
-      { name: 'ag-architect', label: 'Architect Agent (Gemini 3 Pro)', description: 'Advanced architecture - Complex system design', model: 'gemini-3-pro' },
-    ];
+    // Get available models dynamically from API
+    const { getModelsForAgents } = await import("../util/list-models.ts");
+    const { manager: managerModels, coder: coderModels, architect: architectModels } = await getModelsForAgents();
+    
+    // Get webhook configurations
+    const { SettingsPersistence } = await import("../util/settings-persistence.ts");
+    const settings = SettingsPersistence.getInstance().getSettings();
+    const enabledWebhooks = (settings.webhooks || []).filter((w: any) => w.enabled);
+    
+    // Build available agents list from API results
+    const availableAgents: Array<{ name: string; label: string; description: string; model: string; type: 'agent' | 'webhook' }> = [];
+    
+    // Track added model+agent combos to prevent duplicates
+    const addedOptions = new Set<string>();
+    
+    // === DIRECT AGENT OPTIONS (Cursor & Antigravity) ===
+    // These are always available, regardless of webhooks
+    
+    // Cursor Coder Agent (direct)
+    availableAgents.push({
+      name: 'cursor-coder',
+      label: '💻 Cursor Coder Agent',
+      description: 'Direct Cursor agent for coding tasks',
+      model: 'auto', // Use 'auto' to let Cursor pick the best model
+      type: 'agent'
+    });
+    addedOptions.add('agent:cursor-coder:auto');
+    
+    // Antigravity Coder Agent (direct)
+    availableAgents.push({
+      name: 'ag-coder',
+      label: '🚀 Antigravity Coder Agent',
+      description: 'Direct Antigravity agent for coding',
+      model: 'gemini-3-flash', // Use Gemini model for Antigravity
+      type: 'agent'
+    });
+    addedOptions.add('agent:ag-coder:gemini-3-flash');
+    
+    // === GEMINI MODEL OPTIONS ===
+    // Manager agent - pick ONE best model to avoid duplicates
+    if (managerModels.length > 0) {
+      const model = managerModels[0]; // Best manager model
+      const key = `agent:ag-manager:${model.name}`;
+      if (!addedOptions.has(key)) {
+        availableAgents.push({
+          name: 'ag-manager',
+          label: `🤖 Manager Agent (${model.displayName})`,
+          description: 'Orchestrates tasks - Fast and efficient',
+          model: model.name,
+          type: 'agent'
+        });
+        addedOptions.add(key);
+      }
+    }
+    
+    // Coder agent with Gemini - pick best model that's different
+    const coderGeminiModel = coderModels.find(m => !addedOptions.has(`agent:ag-coder-gemini:${m.name}`));
+    if (coderGeminiModel) {
+      const key = `agent:ag-coder-gemini:${coderGeminiModel.name}`;
+      availableAgents.push({
+        name: 'ag-coder-gemini',
+        label: `💻 Gemini Coder (${coderGeminiModel.displayName})`,
+        description: 'Gemini-powered coding agent',
+        model: coderGeminiModel.name,
+        type: 'agent'
+      });
+      addedOptions.add(key);
+    }
+    
+    // Architect agent - pick best model
+    if (architectModels.length > 0) {
+      const model = architectModels[0];
+      const key = `agent:ag-architect:${model.name}`;
+      if (!addedOptions.has(key)) {
+        availableAgents.push({
+          name: 'ag-architect',
+          label: `🏗️ Architect Agent (${model.displayName})`,
+          description: 'System design and planning',
+          model: model.name,
+          type: 'agent'
+        });
+        addedOptions.add(key);
+      }
+    }
+    
+    // === WEBHOOK OPTIONS ===
+    // Add ALL enabled webhooks with appropriate icons
+    for (const webhook of enabledWebhooks) {
+      const webhookName = webhook.name.toLowerCase();
+      let icon = '🔗';
+      let modelType = 'webhook';
+      
+      if (webhookName.includes('cursor')) {
+        icon = '💻';
+        modelType = 'cursor';
+      } else if (webhookName.includes('antigravity') || webhookName.includes('gemini') || webhookName.includes('ag')) {
+        icon = '🚀';
+        modelType = 'antigravity';
+      }
+      
+      const key = `webhook:webhook:${webhook.id}:${webhook.id}`;
+      if (!addedOptions.has(key)) {
+        availableAgents.push({
+          name: `webhook:${webhook.id}`,
+          label: `${icon} Webhook: ${webhook.name}`,
+          description: `Start agent via ${webhook.name} webhook`,
+          model: modelType,
+          type: 'webhook'
+        });
+        addedOptions.add(key);
+      }
+    }
+    
+    // Fallback if no agents available
+    if (availableAgents.length === 0) {
+      availableAgents.push(
+        { name: 'cursor-coder', label: '💻 Cursor Coder Agent', description: 'Direct Cursor agent', model: 'auto', type: 'agent' },
+        { name: 'ag-coder', label: '🚀 Antigravity Coder Agent', description: 'Direct Antigravity agent', model: 'gemini-3-flash', type: 'agent' },
+        { name: 'ag-manager', label: '🤖 Manager Agent (Default)', description: 'Helper agent', model: 'gemini-3-flash', type: 'agent' }
+      );
+    }
     
     // Create select menu for provider/model selection using Discord.js components
     const { StringSelectMenuBuilder, ActionRowBuilder } = await import("npm:discord.js@14.14.1");
@@ -1875,7 +2132,7 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
         availableAgents.map(agent => ({
           label: String(agent.label).substring(0, 100), // Discord limit - ensure string
           description: String(agent.description).substring(0, 100), // Discord limit - ensure string
-          value: String(`${agent.name}:${agent.model}`) // Ensure string
+          value: String(`${agent.type}:${agent.name}:${agent.model}`) // Include type: agent or webhook
         }))
       );
     
@@ -1887,9 +2144,9 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
         title: '🚀 Start Helper Agent',
         description: 'Choose which agent and model you want to use:',
         fields: [
-          { name: '🤖 Manager Agent', value: 'Orchestrates tasks and delegates to specialized agents', inline: false },
-          { name: '💻 Coder Agent', value: 'Autonomous coding and implementation', inline: false },
-          { name: '🏗️ Architect Agent', value: 'System design and planning', inline: false }
+          { name: '💻 Cursor / Antigravity', value: 'Direct integration with Cursor IDE or Antigravity agents', inline: false },
+          { name: '🤖 Gemini Agents', value: 'Manager, Coder, and Architect agents powered by Gemini', inline: false },
+          { name: '🔗 Webhooks', value: enabledWebhooks.length > 0 ? `${enabledWebhooks.length} webhook(s) configured` : 'No webhooks configured', inline: false }
         ],
         footer: { text: 'Select an option below to start' },
         timestamp: true
@@ -1900,5 +2157,199 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
     return;
   } else if (commandName === 'kill') {
     return await handlers.onAgent(ctx, 'end');
+  } else if (commandName === 'sync') {
+    // Open conversation in IDE
+    await ctx.deferReply({ ephemeral: true });
+    
+    const userId = ctx.user.id;
+    const channelId = ctx.channelId || ctx.channel?.id;
+    
+    // Check for active session
+    const sessionData = getActiveSession(userId, channelId);
+    
+    // Load conversation file
+    const { loadConversation, exportToMarkdown } = await import("../util/conversation-sync.ts");
+    const conversation = await loadConversation(userId, channelId, sessionData?.agentName || 'unknown');
+    
+    if (conversation.messages.length === 0) {
+      await ctx.editReply({
+        embeds: [{
+          color: 0xffaa00,
+          title: '⚠️ No Conversation Found',
+          description: 'Start a conversation with `/run` first, then use `/sync` to open it in your IDE.',
+          timestamp: new Date().toISOString()
+        }]
+      });
+      return;
+    }
+    
+    // Export to markdown and get path
+    const mdPath = await exportToMarkdown(conversation);
+    const absolutePath = `${Deno.cwd()}/${mdPath}`;
+    
+    // Detect available IDEs
+    const ideOptions: Array<{ name: string; command: string; available: boolean }> = [];
+    
+    // Check for Cursor
+    try {
+      const cursorCheck = new Deno.Command("which", { args: ["cursor"], stdout: "null", stderr: "null" });
+      const cursorResult = await cursorCheck.output();
+      ideOptions.push({ name: "Cursor", command: `cursor "${absolutePath}"`, available: cursorResult.success });
+    } catch { ideOptions.push({ name: "Cursor", command: "", available: false }); }
+    
+    // Check for VS Code
+    try {
+      const codeCheck = new Deno.Command("which", { args: ["code"], stdout: "null", stderr: "null" });
+      const codeResult = await codeCheck.output();
+      ideOptions.push({ name: "VS Code", command: `code "${absolutePath}"`, available: codeResult.success });
+    } catch { ideOptions.push({ name: "VS Code", command: "", available: false }); }
+    
+    // Check for Zed
+    try {
+      const zedCheck = new Deno.Command("which", { args: ["zed"], stdout: "null", stderr: "null" });
+      const zedResult = await zedCheck.output();
+      ideOptions.push({ name: "Zed", command: `zed "${absolutePath}"`, available: zedResult.success });
+    } catch { ideOptions.push({ name: "Zed", command: "", available: false }); }
+    
+    // Check for Windsurf
+    try {
+      const windsurfCheck = new Deno.Command("which", { args: ["windsurf"], stdout: "null", stderr: "null" });
+      const windsurfResult = await windsurfCheck.output();
+      ideOptions.push({ name: "Windsurf", command: `windsurf "${absolutePath}"`, available: windsurfResult.success });
+    } catch { ideOptions.push({ name: "Windsurf", command: "", available: false }); }
+    
+    const availableIDEs = ideOptions.filter(ide => ide.available);
+    
+    if (availableIDEs.length === 0) {
+      await ctx.editReply({
+        embeds: [{
+          color: 0xff0000,
+          title: '❌ No Compatible IDEs Found',
+          description: 'No compatible IDEs detected. Install Cursor, VS Code, Zed, or Windsurf.',
+          fields: [
+            { name: 'Conversation File', value: `\`${mdPath}\``, inline: false }
+          ],
+          timestamp: new Date().toISOString()
+        }]
+      });
+      return;
+    }
+    
+    // Build select menu for IDE selection
+    const { StringSelectMenuBuilder, ActionRowBuilder } = await import("npm:discord.js@14.14.1");
+    
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId('select-ide-sync')
+      .setPlaceholder('Choose an IDE to open the conversation...')
+      .addOptions(
+        availableIDEs.map(ide => ({
+          label: `📝 Open in ${ide.name}`,
+          description: `Open conversation file in ${ide.name}`,
+          value: `ide:${ide.name.toLowerCase()}:${absolutePath}`
+        }))
+      );
+    
+    const row = new ActionRowBuilder<typeof StringSelectMenuBuilder>().addComponents(selectMenu);
+    
+    // Include resume command if Cursor session exists
+    const resumeInfo = conversation.cursorSessionId 
+      ? `\n\n**Resume in CLI:**\n\`\`\`bash\ncursor agent --resume ${conversation.cursorSessionId} "continue"\n\`\`\``
+      : '';
+    
+    await ctx.editReply({
+      embeds: [{
+        color: 0x5865F2,
+        title: '🔄 Sync Conversation to IDE',
+        description: `**${conversation.messages.length} messages** in this conversation.\n\nSelect an IDE below to open the conversation file.${resumeInfo}`,
+        fields: [
+          { name: 'Agent', value: conversation.agentName, inline: true },
+          { name: 'File', value: `\`${mdPath}\``, inline: true },
+          { name: 'Available IDEs', value: availableIDEs.map(i => i.name).join(', '), inline: false }
+        ],
+        timestamp: new Date().toISOString()
+      }],
+      components: [row]
+    });
+    
+    return;
+  } else if (commandName === 'run-adv') {
+    // Advanced run command with multi-step selection
+    await ctx.deferReply({ ephemeral: false });
+    
+    // Step 1: Provider selection
+    const { StringSelectMenuBuilder, ActionRowBuilder, ButtonBuilder } = await import("npm:discord.js@14.14.1");
+    
+    const providerMenu = new StringSelectMenuBuilder()
+      .setCustomId('run-adv-provider')
+      .setPlaceholder('Select a provider...')
+      .addOptions([
+        { label: '💻 Cursor', description: 'Cursor IDE integration', value: 'cursor' },
+        { label: '🤖 Claude CLI', description: 'Anthropic Claude CLI', value: 'claude-cli' },
+        { label: '🚀 Gemini API', description: 'Google Gemini API', value: 'gemini-api' },
+        { label: '⚡ Antigravity', description: 'Google Antigravity platform', value: 'antigravity' },
+        { label: '🦙 Ollama', description: 'Local Ollama LLM server', value: 'ollama' }
+      ]);
+    
+    const providerRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(providerMenu);
+    
+    await ctx.editReply({
+      embeds: [{
+        color: 0x5865F2,
+        title: '🚀 Advanced Agent Runner',
+        description: '**Step 1 of 3: Select Provider**\n\nChoose which provider you want to use:',
+        fields: [
+          { name: '💻 Cursor', value: 'Direct integration with Cursor IDE', inline: true },
+          { name: '🤖 Claude CLI', value: 'Anthropic Claude via CLI', inline: true },
+          { name: '🚀 Gemini API', value: 'Google Gemini API', inline: true },
+          { name: '⚡ Antigravity', value: 'Google Antigravity platform', inline: true },
+          { name: '🦙 Ollama', value: 'Local Ollama LLM server', inline: true }
+        ],
+        footer: { text: 'Select a provider to continue' },
+        timestamp: true
+      }],
+      components: [providerRow]
+    });
+    
+    return;
   }
+}
+
+// API Export Functions - Expose agent data for dashboard
+export function getAgentsForAPI() {
+  return Object.entries(PREDEFINED_AGENTS).map(([id, agent]) => ({
+    id,
+    name: agent.name,
+    description: agent.description,
+    model: agent.model,
+    capabilities: agent.capabilities,
+    riskLevel: agent.riskLevel,
+    client: agent.client || 'claude',
+    isManager: agent.isManager || false
+  }));
+}
+
+export function getSessionsForAPI() {
+  const activeSessions = agentSessions.filter(s => s.status === 'active');
+  const totalCost = agentSessions.reduce((acc, s) => acc + s.totalCost, 0);
+  const totalMessages = agentSessions.reduce((acc, s) => acc + s.messageCount, 0);
+
+  return {
+    sessions: activeSessions.map(s => ({
+      id: s.id,
+      agentName: s.agentName,
+      userId: s.userId,
+      channelId: s.channelId,
+      startTime: s.startTime.toISOString(),
+      messageCount: s.messageCount,
+      totalCost: s.totalCost,
+      lastActivity: s.lastActivity.toISOString(),
+      status: s.status,
+      task: (s as any).task || undefined
+    })),
+    stats: {
+      activeSessions: activeSessions.length,
+      totalCost: parseFloat(totalCost.toFixed(6)),
+      totalMessages
+    }
+  };
 }

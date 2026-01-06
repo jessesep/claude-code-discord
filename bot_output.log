@@ -5,36 +5,71 @@ The bot will show setup instructions when needed.
 ✅ Environment variables loaded
 Starting Discord bot...
 
-[0m[32mDownload[0m https://registry.npmjs.org/hono
-[0m[32mDownload[0m https://registry.npmjs.org/hono/-/hono-4.0.0.tgz
 Signal handlers registered for Unix (SIGINT, SIGTERM)
-No settings file found, creating new one.
-Settings saved to ./data/settings.json
+Settings loaded from ./data/settings.json
 Starting Web Server on port 8000...
 Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
-Registering slash commands...
-Slash commands registered
+Bot has started. Press Ctrl+C to stop.
 Bot logged in: Master-Remote#8819
 Category: claude-code-discord
 Branch: main
 Working directory: /Users/jessesep/repos/claude-code-discord
 Checking category "claude-code-discord"...
-Creating category "claude-code-discord"...
-Bot has started. Press Ctrl+C to stop.
-Created category "claude-code-discord"
-Creating channel "main"...
-Created channel "main"
-Using channel "main" (ID: 1458057566054645800)
-Settings saved to ./data/settings.json
-[Webhook] Triggered Test Hook (test-hook) {}
-[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458057566054645800
-[MessageCreate] Message content: "Heya"
-[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458057566054645800
-[getActiveSession] Total sessions: 0
-[getActiveSession] No active session found
-[MessageCreate] Active session: none
-[MessageCreate] Is mention: false
-[MessageCreate] Skipping - no active session and no @mention
+Using channel "main" (ID: 1458093359162986620)
+Clearing global commands...
+Clearing old guild commands for guild 1457712106399862786...
+Registering new slash commands for guild 1457712106399862786...
+Commands to register: run, kill, help
+✅ Successfully registered 3 guild commands
+[InteractionCreate] Received interaction: 2, isCommand: true
+[InteractionCreate] Received interaction: 2, isCommand: true
+Error executing command run: DiscordAPIError[10062]: Unknown interaction
+    at handleErrors (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/rest/2.6.0/dist/index.js:762:13)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async BurstHandler.runRequest (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/rest/2.6.0/dist/index.js:866:23)
+    at async _REST.request (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/rest/2.6.0/dist/index.js:1307:22)
+    at async ChatInputCommandInteraction.deferReply (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/discord.js/14.14.1/src/structures/interfaces/InteractionResponses.js:69:5)
+    at async Object.deferReply (file:///Users/jessesep/repos/claude-code-discord/discord/bot.ts:205:11)
+    at async handleSimpleCommand (file:///Users/jessesep/repos/claude-code-discord/agent/index.ts:1855:5)
+    at async Object.execute (file:///Users/jessesep/repos/claude-code-discord/index.ts:1291:9)
+    at async handleCommand (file:///Users/jessesep/repos/claude-code-discord/discord/bot.ts:290:7)
+    at async Client.<anonymous> (file:///Users/jessesep/repos/claude-code-discord/discord/bot.ts:963:7) {
+  requestBody: { files: [90mundefined[39m, json: { type: [33m5[39m, data: { flags: [90mundefined[39m } } },
+  rawError: { message: [32m"Unknown interaction"[39m, code: [33m10062[39m },
+  code: [33m10062[39m,
+  status: [33m404[39m,
+  method: [32m"POST"[39m,
+  url: [32m"https://discord.com/api/v10/interactions/1458151230348984404/aW50ZXJhY3Rpb246MTQ1ODE1MTIzMDM0ODk4NDQwNDpqeGxid1I0VXRSa2JFQ0taMWZXaE12S0dleWZGbU9SUkFWbTRrYjlZYlNPNUZZOWgwMDVZVTJUc3FnQWkzVGlqYUZOUXJBR25rTjhtTEp0Z0tCZWlkTlEwcENFYUhCcmpaNEUzVU5CQ3BFTnNINFVEQk1ocUgwNXNEeVE0Q3FGMg/callback"[39m
+}
+[InteractionCreate] Received interaction: 3, isCommand: false
+[Registry] Overwriting existing agent: cursor-coder
+[Registry] Registered agent: cursor-coder (Cursor Autonomous Coder)
+[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458093359162986620
+[MessageCreate] Message content: "he"
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458093359162986620
+[getActiveSession] Total sessions: [33m1[39m
+[getActiveSession] Session 0: userId=367705631014256641, channelId=1458093359162986620, status=active, agent=cursor-coder
+[getActiveSession] Found session! agentName=cursor-coder
+[MessageCreate] Active session: cursor-coder
+[MessageCreate] Is mention: [33mfalse[39m
+[MessageHandler] Received message (session: cursor-coder): "he..."
+[MessageHandler] Executing agent command...
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458093359162986620
+[getActiveSession] Total sessions: [33m1[39m
+[getActiveSession] Session 0: userId=367705631014256641, channelId=1458093359162986620, status=active, agent=cursor-coder
+[getActiveSession] Found session! agentName=cursor-coder
+Claude-mem API returned 404: Not Found
+Claude-mem API returned 404: Not Found
+[Agent] Error calling cursor: Error: Cursor CLI exited with code 1
+stderr: Cannot use this model: cursor. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+
+stdout: 
+    at sendToCursorCLI (file:///Users/jessesep/repos/claude-code-discord/claude/cursor-client.ts:230:13)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async chatWithAgent (file:///Users/jessesep/repos/claude-code-discord/agent/index.ts:989:16)
+    at async Object.onAgent (file:///Users/jessesep/repos/claude-code-discord/agent/index.ts:300:13)
+    at async Object.execute (file:///Users/jessesep/repos/claude-code-discord/index.ts:1285:9)
+    at async Client.<anonymous> (file:///Users/jessesep/repos/claude-code-discord/discord/bot.ts:946:7)
 Received SIGTERM, initiating graceful shutdown...
 
 SIGTERM signal received. Stopping bot...

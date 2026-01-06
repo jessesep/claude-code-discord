@@ -1,8 +1,9 @@
 # Handoff: Fix GitHub Issue Creation
 
 **Priority:** High  
-**Status:** Ready for Agent  
-**Date:** 2026-01-06
+**Status:** ✅ COMPLETED  
+**Date:** 2026-01-06  
+**Completed:** 2026-01-06
 
 ## Problem Statement
 
@@ -111,9 +112,65 @@ Agents should be able to create GitHub issues when requested by:
 - Issue appears in the GitHub repository
 - Agent reports success with issue number
 
+## Solution Implemented
+
+**Approach:** Option 2 - Direct Function Call in Agent Handler
+
+### Changes Made:
+
+1. **Parser Function Created** (`agent/manager.ts`):
+   - Added `parseGitHubIssueRequest()` function to detect GitHub issue creation requests in agent responses
+   - Parses JSON blocks with `create_github_issue` action format
+   - Returns structured action object with title, body, and labels
+
+2. **Manager System Prompt Updated** (`agent/manager.ts`):
+   - Added clear instructions for GitHub issue creation using JSON action format
+   - Format: `{"action": "create_github_issue", "title": "...", "body": "...", "labels": [...]}`
+   - Updated `ManagerAction` interface to include `create_github_issue` action type
+
+3. **Agent Response Interception** (`agent/index.ts`):
+   - Added GitHub issue creation interception in `chatWithAgent()` function
+   - Checks agent responses for GitHub issue creation requests before displaying
+   - Executes `createGitHubIssueWithCLI()` when request is detected
+   - Returns success/error messages to user via Discord embeds
+   - Handles both success and error cases with appropriate user feedback
+
+4. **Manager Handler Updated** (`agent/index.ts`):
+   - Added GitHub issue creation handling in `handleManagerInteraction()`
+   - Manager can now create issues directly when it outputs the action format
+   - Provides consistent error handling and user feedback
+
+5. **MCP Client Updated** (`util/mcp-client.ts`):
+   - Updated fallback tools info to include the JSON action format
+   - Provides clear instructions for agents on how to create issues
+
+### How It Works:
+
+1. User asks agent (e.g., Manager) to create a GitHub issue
+2. Agent outputs a JSON block with `create_github_issue` action
+3. System intercepts the response and parses the JSON
+4. System calls `createGitHubIssueWithCLI()` utility function
+5. System displays result (success with issue number or error) to user
+6. Response is saved to conversation history
+
+### Usage Example:
+
+When an agent wants to create an issue, it outputs:
+```json
+{
+  "action": "create_github_issue",
+  "title": "Fix bug in authentication",
+  "body": "Users cannot log in with OAuth",
+  "labels": ["bug", "authentication"]
+}
+```
+
+The system automatically executes this and reports the result.
+
 ## Notes
 
 - GitHub CLI (`gh`) must be installed and authenticated
-- The utility function exists and should work if called correctly
-- The issue is likely in the integration between agents and the utility function
-- Check recent bot logs for actual error messages when issue creation is attempted
+- The utility function exists and works correctly
+- Agents can now create issues by using the JSON action format
+- Works for both Manager agent and other agents (interception in `chatWithAgent`)
+- Error messages provide helpful troubleshooting information

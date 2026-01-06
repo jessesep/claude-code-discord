@@ -174,14 +174,28 @@ cursor agent "edit a file" --print
 
 ## 📝 Conclusion
 
-**Claude-mem IS partially working with Cursor hooks:**
+**Claude-mem IS working with Cursor hooks:**
 - ✅ Session initialization works (`beforeSubmitPrompt`)
 - ✅ User prompts are being stored
-- ❌ Observations are NOT being stored (file edits, shell commands, MCP tools)
+- ✅ Hooks are firing and processing (`afterFileEdit`, etc.)
+- ✅ Observations are being queued and processed
+- ⚠️ **BUT observations are not appearing in database after processing**
 
-**The issue is likely:**
-- Cursor hooks for `afterFileEdit`, `beforeShellExecution`, and `beforeMCPExecution` may not be firing
-- OR these hooks only fire during Cursor **agent** sessions, not regular IDE usage
-- OR there's a session ID mismatch preventing observations from being saved
+**The issue:**
+- Observations are successfully:
+  1. Received by adapter script
+  2. Sent to save-hook.js
+  3. Queued via API
+  4. Claimed and processed by worker
+- **BUT** they're not being saved to the `observations` table
 
-**Recommendation:** Test with an actual Cursor agent session to verify if hooks fire during agent execution.
+**Root Cause:**
+- Queue processing is working (logs show ENQUEUED → CLAIMED → processed)
+- But observations are not being persisted to database
+- Likely a database constraint, transaction issue, or silent error during insert
+
+**Recommendation:** 
+1. Check for database constraint violations in logs
+2. Verify database permissions
+3. Check if observations require specific session state
+4. Review worker code for observation persistence logic

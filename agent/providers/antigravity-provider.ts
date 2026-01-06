@@ -18,11 +18,12 @@ export class AntigravityProvider implements AgentProvider {
   readonly providerName = 'Google Antigravity (Gemini)';
   readonly providerType = ProviderType.API;
   readonly supportedModels = [
+    'gemini-3-flash',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-thinking-exp',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
     'gemini-1.5-pro',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-thinking-exp',
     'gemini-exp-1206',
   ];
 
@@ -62,7 +63,7 @@ export class AntigravityProvider implements AgentProvider {
 
     // Build Antigravity options
     const antigravityOptions = {
-      model: options.model || 'gemini-2.0-flash-thinking-exp',
+      model: options.model || 'gemini-3-flash',
       workspace: options.workspace,
       streamJson: options.streaming !== false,
       force: options.force,

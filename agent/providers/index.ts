@@ -11,6 +11,7 @@ import { ClaudeCliProvider } from './claude-cli-provider.ts';
 import { CursorProvider } from './cursor-provider.ts';
 import { AntigravityProvider } from './antigravity-provider.ts';
 import { AnthropicApiProvider } from './anthropic-api-provider.ts';
+import { OllamaProvider } from './ollama-provider.ts';
 import {
   createContinueProvider,
   createCodeiumProvider,
@@ -29,6 +30,7 @@ export async function initializeProviders(): Promise<void> {
   AgentProviderRegistry.register(new CursorProvider());
   AgentProviderRegistry.register(new AntigravityProvider());
   AgentProviderRegistry.register(new AnthropicApiProvider());
+  AgentProviderRegistry.register(new OllamaProvider());
 
   // VS Code extension providers
   AgentProviderRegistry.register(createContinueProvider());
@@ -101,6 +103,7 @@ export {
   CursorProvider,
   AntigravityProvider,
   AnthropicApiProvider,
+  OllamaProvider,
   createContinueProvider,
   createCodeiumProvider,
   createAiderProvider,

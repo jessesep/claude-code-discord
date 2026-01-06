@@ -87,12 +87,19 @@ export async function getMCPToolsInfo(): Promise<string> {
     
     // Add fallback tools info
     info += '\nFallback Tools (available if MCP is not configured):\n';
-    info += '- GitHub Issue Creation: Use the GitHub issue creation utility function from util/github-issues.ts\n';
-    info += '  This uses the GitHub CLI (gh) to create issues directly.\n';
-    info += '  Function: createGitHubIssueWithCLI({ title, body, labels? })\n';
+    info += '- GitHub Issue Creation: Use the GitHub issue creation action format:\n';
+    info += '  ```json\n';
+    info += '  {\n';
+    info += '    "action": "create_github_issue",\n';
+    info += '    "title": "Issue title",\n';
+    info += '    "body": "Issue description",\n';
+    info += '    "labels": ["bug", "enhancement"]  // Optional\n';
+    info += '  }\n';
+    info += '  ```\n';
+    info += '  The system will automatically execute this and create the issue using GitHub CLI (gh).\n';
     
     info += '\nTo use an MCP tool, ask the system to call it with the appropriate parameters.\n';
-    info += 'If MCP is not available, use the fallback utility functions instead of generating scripts.\n';
+    info += 'If MCP is not available, use the action format above instead of generating scripts.\n';
     info += '=== END TOOLS ===\n';
     
     return info;

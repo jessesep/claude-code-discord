@@ -60,6 +60,17 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Determine category name (use repository name if not specified)
   const actualCategoryName = categoryName || repoName;
 
+  // Initialize conversation sync system (for /sync command and conversation persistence)
+  try {
+    const { initializeConversationSync } = await import("./util/conversation-sync.ts");
+    const syncResult = await initializeConversationSync();
+    if (!syncResult.success) {
+      console.warn("[Startup] Conversation sync initialization failed:", syncResult.error);
+    }
+  } catch (error) {
+    console.warn("[Startup] Could not initialize conversation sync:", error);
+  }
+
   // Claude Code session management
   let claudeController: AbortController | null = null;
   // deno-lint-ignore no-unused-vars
@@ -343,14 +354,21 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
           // Split content into chunks if too large for Discord
           const maxLength = 4090 - "```\n\n```".length;
+          
+          // Determine if content should be formatted as plain text or JSON
+          // Agent responses (agent-response-*) and tool results (result-*) should be plain text
+          // Tool use content (tool-*) should be JSON
+          const isPlainText = expandId.startsWith('result-') || expandId.startsWith('agent-response-');
+          const codeBlockLang = isPlainText ? '' : 'json';
+          const codeBlock = codeBlockLang ? `\`\`\`${codeBlockLang}\n` : '```\n';
+          const codeBlockEnd = '\n```';
+          
           if (fullContent.length <= maxLength) {
             await ctx.update({
               embeds: [{
                 color: 0x0099ff,
-                title: '📖 Full Content',
-                description: expandId.startsWith('result-') ?
-                  `\`\`\`\n${fullContent}\n\`\`\`` :
-                  `\`\`\`json\n${fullContent}\n\`\`\``,
+                title: '📖 Full Response',
+                description: `${codeBlock}${fullContent}${codeBlockEnd}`,
                 timestamp: true
               }],
               components: [{
@@ -369,12 +387,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
             await ctx.update({
               embeds: [{
                 color: 0x0099ff,
-                title: '📖 Full Content (Large - Showing First Part)',
-                description: expandId.startsWith('result-') ?
-                  `\`\`\`\n${chunk}...\n\`\`\`` :
-                  `\`\`\`json\n${chunk}...\n\`\`\``,
+                title: '📖 Full Response (Large - Showing First Part)',
+                description: `${codeBlock}${chunk}...${codeBlockEnd}`,
                 fields: [
-                  { name: 'Note', value: 'Content is very large. This shows the first portion.', inline: false }
+                  { name: 'Note', value: `Content is very large (${fullContent.length} chars). This shows the first portion.`, inline: false }
                 ],
                 timestamp: true
               }],
@@ -1299,6 +1315,21 @@ export async function createClaudeCodeBot(config: BotConfig) {
       execute: async (ctx: InteractionContext) => {
         // Don't defer here - handleSimpleCommand will defer via onAgent
         await handleSimpleCommand(ctx, 'kill', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
+    ['run-adv', {
+      execute: async (ctx: InteractionContext) => {
+        // Don't defer here - handleSimpleCommand will defer
+        await handleSimpleCommand(ctx, 'run-adv', {
           workDir,
           crashHandler,
           sendClaudeMessages: async (messages) => {

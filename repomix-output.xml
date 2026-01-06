@@ -1,0 +1,1368 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+components/
+  AgentMonitor.tsx
+  Dashboard.tsx
+  MemoryExplorer.tsx
+  SettingsManager.tsx
+  Sidebar.tsx
+  Terminal.tsx
+  WebhookManager.tsx
+services/
+  geminiService.ts
+.gitignore
+App.tsx
+constants.ts
+index.html
+index.tsx
+metadata.json
+package.json
+README.md
+tsconfig.json
+types.ts
+vite.config.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="components/AgentMonitor.tsx">
+import React from 'react';
+import { Agent, Session } from '../types';
+
+interface AgentMonitorProps {
+  agents: Agent[];
+  sessions: Session[];
+}
+
+const AgentMonitor: React.FC<AgentMonitorProps> = ({ agents, sessions }) => {
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case 'high': return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+      case 'medium': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+      case 'low': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+      default: return 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20';
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold tracking-tight">Agent Lifecycle</h2>
+        <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 shadow-lg shadow-indigo-500/20">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Register New Agent
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {agents.map(agent => {
+          const activeSess = sessions.find(s => s.agentName === agent.id && s.status === 'active');
+          
+          return (
+            <div key={agent.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-indigo-500/5 transition-all">
+              <div className="p-6 flex flex-col h-full">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg bg-zinc-800 ${activeSess ? 'ring-2 ring-green-500/50' : ''}`}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg">{agent.name}</h4>
+                      <p className="text-xs text-zinc-500 mono uppercase tracking-wider">{agent.id} • {agent.client}</p>
+                    </div>
+                  </div>
+                  <div className={`px-2 py-0.5 border rounded text-[10px] font-black uppercase ${getRiskColor(agent.riskLevel)}`}>
+                    {agent.riskLevel} Risk
+                  </div>
+                </div>
+
+                <p className="text-sm text-zinc-400 mb-6 flex-grow">{agent.description}</p>
+
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {agent.capabilities.map((cap, i) => (
+                    <span key={i} className="px-2 py-1 bg-zinc-800/50 border border-zinc-700/50 rounded-md text-[10px] text-zinc-300 font-medium">
+                      {cap}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="pt-6 border-t border-zinc-800 flex items-center justify-between">
+                  <div className="flex -space-x-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="w-7 h-7 rounded-full bg-zinc-800 border-2 border-zinc-900 flex items-center justify-center text-[10px] font-bold">
+                        {String.fromCharCode(64 + i)}
+                      </div>
+                    ))}
+                    <div className="w-7 h-7 rounded-full bg-indigo-600 border-2 border-zinc-900 flex items-center justify-center text-[10px] font-bold">
+                      +12
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button className="p-2 text-zinc-500 hover:text-white transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                    <button className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold transition-all">
+                      View Logs
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default AgentMonitor;
+</file>
+
+<file path="components/Dashboard.tsx">
+import React from 'react';
+import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Session, BotSettings, Webhook } from '../types';
+import { MOCK_WEBHOOKS } from '../constants';
+
+interface DashboardProps {
+  sessions: Session[];
+  logs: string[];
+  settings: BotSettings;
+}
+
+const data = [
+  { time: '10:00', cost: 0.05 },
+  { time: '11:00', cost: 0.12 },
+  { time: '12:00', cost: 0.08 },
+  { time: '13:00', cost: 0.25 },
+  { time: '14:00', cost: 0.15 },
+  { time: '15:00', cost: 0.32 },
+  { time: '16:00', cost: 0.28 },
+];
+
+const Dashboard: React.FC<DashboardProps> = ({ sessions, logs, settings }) => {
+  const activeSessions = sessions.filter(s => s.status === 'active').length;
+  const totalCost = sessions.reduce((acc, s) => acc + s.totalCost, 0).toFixed(3);
+  const activeWebhooks = MOCK_WEBHOOKS.filter(w => w.status === 'active').length;
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Top Level Stats - Integrated Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: 'Active Agents', value: activeSessions, trend: 'All Systems Nominal', color: 'indigo' },
+          { label: 'Cloud Spend', value: `$${totalCost}`, trend: settings.defaultModel.split('-')[1].toUpperCase(), color: 'emerald' },
+          { label: 'Webhooks Live', value: `${activeWebhooks}/${MOCK_WEBHOOKS.length}`, trend: 'Connectivity: 100%', color: 'amber' },
+          { label: 'Security Level', value: settings.operationMode.toUpperCase(), trend: 'Shields Up', color: 'rose' },
+        ].map((stat, i) => (
+          <div key={i} className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl shadow-sm hover:border-zinc-700 transition-all hover:scale-[1.02]">
+            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">{stat.label}</p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <h3 className="text-3xl font-bold tracking-tighter">{stat.value}</h3>
+              <span className={`text-[10px] font-black text-${stat.color}-500 uppercase tracking-tight`}>{stat.trend}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Chart Section */}
+        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl p-8 flex flex-col">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-lg font-bold">Network Throughput & Cost</h3>
+              <p className="text-xs text-zinc-500">Real-time inference tracking across all sub-agents</p>
+            </div>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-zinc-800 rounded-md text-[10px] font-bold text-zinc-400 uppercase">Live Metrics</span>
+            </div>
+          </div>
+          <div className="h-[280px] w-full mt-auto">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data}>
+                <defs>
+                  <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="time" stroke="#3f3f46" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '12px', fontSize: '12px' }}
+                  itemStyle={{ color: '#818cf8' }}
+                />
+                <Area type="monotone" dataKey="cost" stroke="#6366f1" fillOpacity={1} fill="url(#colorCost)" strokeWidth={3} dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#09090b' }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Global Config & Webhook Quick-View (The "ONE Dashboard" aspect) */}
+        <div className="space-y-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+               <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+               Global Config Sync
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-zinc-800/50">
+                <span className="text-xs text-zinc-500">Thinking Mode</span>
+                <span className="text-xs font-bold text-indigo-400">{settings.thinkingMode.toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-zinc-800/50">
+                <span className="text-xs text-zinc-500">Default Model</span>
+                <span className="text-xs font-bold text-zinc-300">{settings.defaultModel.split('-')[1]}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-xs text-zinc-500">Proxy Status</span>
+                <span className={`text-[10px] font-black ${settings.proxyEnabled ? 'text-emerald-500' : 'text-zinc-600'}`}>
+                  {settings.proxyEnabled ? 'ACTIVE' : 'DISABLED'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+               <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+               Outbound Webhooks
+            </h3>
+            <div className="space-y-3">
+              {MOCK_WEBHOOKS.slice(0, 2).map(wh => (
+                <div key={wh.id} className="flex items-center justify-between group">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full ${wh.status === 'active' ? 'bg-green-500' : 'bg-zinc-700'}`}></div>
+                    <span className="text-xs text-zinc-300 group-hover:text-white transition-colors cursor-default">{wh.name}</span>
+                  </div>
+                  <span className="text-[10px] mono text-zinc-600">{wh.lastPing || 'Offline'}</span>
+                </div>
+              ))}
+            </div>
+            <button className="w-full mt-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-[10px] font-bold text-zinc-400 uppercase tracking-widest transition-colors">
+              Manage Endpoints
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+         {/* Live Events Feed */}
+         <div className="lg:col-span-1 bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">System LogStream</h3>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {logs.map((log, i) => (
+                <div key={i} className="flex gap-3 text-[11px] leading-relaxed border-l-2 border-zinc-800 pl-3 hover:border-indigo-500 transition-colors">
+                  <span className="text-zinc-600 shrink-0 mono">15:22</span>
+                  <span className="text-zinc-300 mono break-all">{log}</span>
+                </div>
+              ))}
+            </div>
+         </div>
+
+         {/* Active Task Management */}
+         <div className="lg:col-span-2 bg-zinc-950 border border-zinc-800 rounded-2xl p-8">
+            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+              Live Agent Execution
+              <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-500 text-[10px] font-black rounded uppercase">Process Pool</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {sessions.map(session => (
+                <div key={session.id} className="group p-5 bg-zinc-900 border border-zinc-800 rounded-2xl hover:border-indigo-500/50 transition-all cursor-pointer relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-3">
+                     <div className={`w-2 h-2 rounded-full ${session.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`}></div>
+                  </div>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center font-black text-indigo-400 text-xl shadow-inner">
+                      {session.agentName[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-zinc-100">{session.task || 'Awaiting Instructions'}</h4>
+                      <p className="text-[10px] text-zinc-500 mono uppercase">{session.agentName} ID: {session.id}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-zinc-800/50">
+                    <div className="flex gap-3">
+                      <div className="text-center">
+                        <p className="text-[9px] font-bold text-zinc-600 uppercase">Msg</p>
+                        <p className="text-xs font-bold">{session.messageCount}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[9px] font-bold text-zinc-600 uppercase">Cost</p>
+                        <p className="text-xs font-bold">${session.totalCost.toFixed(3)}</p>
+                      </div>
+                    </div>
+                    <button className="px-3 py-1.5 bg-zinc-800 hover:bg-indigo-600 rounded-lg text-[10px] font-bold transition-all uppercase">
+                      Inspect
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+</file>
+
+<file path="components/MemoryExplorer.tsx">
+import React, { useState } from 'react';
+
+const MemoryExplorer: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const mockMemories = [
+    { id: 1, title: 'Auth Architecture', content: 'Decided to use standard JWT instead of session-cookies for cross-platform bot access.', date: '2026-01-05', type: 'decision' },
+    { id: 2, title: 'Bugfix #102', content: 'Resolved race condition in worker-service process spawning using PID file locking.', date: '2026-01-06', type: 'fix' },
+    { id: 3, title: 'Feature: Natural Chat', content: 'Implemented getActiveSession hook to route messages without slash commands.', date: '2026-01-04', type: 'feature' },
+    { id: 4, title: 'Git Duplication Error', content: 'Found remote URLs were causing category duplication. Added .trim() to fix.', date: '2026-01-06', type: 'discovery' },
+  ];
+
+  return (
+    <div className="space-y-8 animate-in zoom-in-95 duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Memory Browser</h2>
+          <p className="text-sm text-zinc-500">Explorer persistent system knowledge from <code>claude-mem</code>.</p>
+        </div>
+        <div className="relative w-full md:w-80">
+          <input
+            type="text"
+            placeholder="Search decisions, facts, bugs..."
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-10 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <svg className="absolute left-3 top-3 w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {mockMemories.map(mem => (
+          <div key={mem.id} className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl hover:border-indigo-500/50 transition-all cursor-pointer group">
+            <div className="flex justify-between items-start mb-4">
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
+                mem.type === 'fix' ? 'bg-emerald-500/10 text-emerald-500' :
+                mem.type === 'decision' ? 'bg-indigo-500/10 text-indigo-500' :
+                'bg-amber-500/10 text-amber-500'
+              }`}>
+                {mem.type}
+              </span>
+              <span className="text-[10px] text-zinc-600 font-bold">{mem.date}</span>
+            </div>
+            <h4 className="font-bold text-zinc-100 mb-2 group-hover:text-indigo-400 transition-colors">{mem.title}</h4>
+            <p className="text-sm text-zinc-400 leading-relaxed">{mem.content}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-zinc-950/50 border border-dashed border-zinc-800 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+        <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-600"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <h5 className="font-semibold text-zinc-300">More Memories Found</h5>
+        <p className="text-sm text-zinc-500 mb-6 max-w-xs">There are 1,402 other compressed observations in the current project SQLite vault.</p>
+        <button className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold transition-all">
+          Load Deep History
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default MemoryExplorer;
+</file>
+
+<file path="components/SettingsManager.tsx">
+import React, { useState } from 'react';
+import { BotSettings } from '../types';
+
+interface SettingsManagerProps {
+  settings: BotSettings;
+  onUpdate: (settings: BotSettings) => void;
+}
+
+const SettingsManager: React.FC<SettingsManagerProps> = ({ settings, onUpdate }) => {
+  const [envVars, setEnvVars] = useState([
+    { key: 'DISCORD_TOKEN', value: '************************', type: 'secret' },
+    { key: 'GEMINI_API_KEY', value: '************************', type: 'secret' },
+    { key: 'MAX_SUB_AGENTS', value: '5', type: 'config' }
+  ]);
+
+  const handleChange = (field: keyof BotSettings, value: any) => {
+    onUpdate({ ...settings, [field]: value });
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
+      <div className="border-b border-zinc-800 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black tracking-tighter mb-2 italic uppercase">System Core Configuration</h2>
+          <p className="text-zinc-500 text-sm font-medium tracking-wide">Orchestration layer and global environment parameters.</p>
+        </div>
+        <div className="flex gap-2">
+           <button className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-bold text-zinc-400 hover:text-white transition-all uppercase tracking-widest">
+             Export Backup
+           </button>
+           <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-500/20 transition-all uppercase tracking-widest">
+             Push to Production
+           </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="xl:col-span-2 space-y-8">
+          {/* Section: Model Defaults */}
+          <section className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 space-y-8 shadow-sm">
+            <div className="flex items-center gap-3 border-b border-zinc-800 pb-6">
+              <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86 1.558l-.666.666a2 2 0 01-.776.418l-1.483.296a2 2 0 01-.776-.418l-.666-.666a6 6 0 00-3.86-1.558l-2.387.477a2 2 0 00-1.022.547l-.547 1.022a2 2 0 00.547 2.628l1.455 1.164a2 2 0 001.25.438h6.416a2 2 0 001.25-.438l1.455-1.164a2 2 0 00.547-2.628l-.547-1.022zM12 9V4m0 0L9 7m3-3l3 3" /></svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold tracking-tight">Intelligence Defaults</h3>
+                <p className="text-xs text-zinc-500 font-medium">Affects all inference calls unless overridden by agents.</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-black text-zinc-500 uppercase tracking-widest">Temperature</label>
+                  <span className="text-xs font-bold mono text-indigo-400">{settings.temperature}</span>
+                </div>
+                <input 
+                  type="range" min="0" max="1" step="0.05" 
+                  value={settings.temperature}
+                  onChange={(e) => handleChange('temperature', parseFloat(e.target.value))}
+                  className="w-full accent-indigo-500 h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-zinc-600 font-black uppercase tracking-tighter">
+                  <span>Deterministic</span>
+                  <span>Hallucinogenic</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-xs font-black text-zinc-500 uppercase tracking-widest">Thinking Mode</label>
+                <div className="flex flex-wrap gap-2">
+                  {['none', 'think', 'think-hard', 'ultrathink'].map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => handleChange('thinkingMode', mode)}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black border transition-all uppercase tracking-widest ${
+                        settings.thinkingMode === mode 
+                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/20' 
+                          : 'bg-zinc-950 text-zinc-600 border-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="text-xs font-black text-zinc-500 uppercase tracking-widest">Primary Model Engine</label>
+                <select 
+                  value={settings.defaultModel}
+                  onChange={(e) => handleChange('defaultModel', e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all appearance-none text-zinc-300"
+                >
+                  <option value="gemini-3-flash-preview">Gemini 3 Flash (Optimized)</option>
+                  <option value="gemini-3-pro-preview">Gemini 3 Pro (Heavy Logic)</option>
+                  <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Coding)</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-black text-zinc-500 uppercase tracking-widest">Retry Strategy</label>
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="number"
+                    value={settings.retryAttempts}
+                    onChange={(e) => handleChange('retryAttempts', parseInt(e.target.value))}
+                    className="w-20 bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3.5 text-sm outline-none focus:border-indigo-500 font-bold"
+                  />
+                  <span className="text-xs text-zinc-500 font-medium italic">Max attempts with Exponential Backoff</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Section: Environment Variables (Config for All) */}
+          <section className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 space-y-6">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
+               <h3 className="text-xl font-bold tracking-tight">System Environment</h3>
+               <button className="text-xs font-bold text-indigo-400 hover:underline uppercase tracking-widest">+ Add Secret</button>
+            </div>
+            <div className="space-y-3">
+              {envVars.map((v, i) => (
+                <div key={i} className="flex items-center justify-between p-4 bg-zinc-950/50 rounded-2xl border border-zinc-800 group hover:border-zinc-700 transition-colors">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">{v.type}</span>
+                    <span className="text-sm font-bold text-zinc-300 mono">{v.key}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs text-zinc-500 mono">{v.value}</span>
+                    <button className="p-2 text-zinc-700 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        {/* Sidebar Controls */}
+        <div className="space-y-8">
+          <div className="bg-indigo-600/5 border border-indigo-500/20 rounded-3xl p-8 space-y-6 shadow-xl shadow-indigo-500/5">
+            <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">Network & Gateway</h3>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-2xl border border-zinc-800">
+                <span className="text-xs font-bold text-zinc-400">Global Proxy</span>
+                <button 
+                  onClick={() => handleChange('proxyEnabled', !settings.proxyEnabled)}
+                  className={`w-11 h-6 rounded-full relative transition-all duration-300 ${settings.proxyEnabled ? 'bg-indigo-600' : 'bg-zinc-800'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${settings.proxyEnabled ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+              {settings.proxyEnabled && (
+                <div className="space-y-2 animate-in slide-in-from-top-2">
+                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest pl-1">Endpoint URL</label>
+                  <input 
+                    type="text" 
+                    placeholder="https://proxy.io:8080"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs mono text-indigo-400 outline-none focus:border-indigo-500/50"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 space-y-6">
+            <h3 className="text-sm font-black text-zinc-500 uppercase tracking-[0.2em]">Usage Quotas</h3>
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[10px] font-black uppercase text-zinc-500">
+                  <span>Inference Budget</span>
+                  <span className="text-zinc-300">$12.40 / $50.00</span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="w-1/4 h-full bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Max Session Tokens</label>
+                <input 
+                  type="number"
+                  value={settings.maxTokensPerSession}
+                  onChange={(e) => handleChange('maxTokensPerSession', parseInt(e.target.value))}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-bold mono text-zinc-400 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-rose-500/5 border border-rose-500/10 rounded-3xl p-8 group hover:border-rose-500/30 transition-colors">
+            <h3 className="text-lg font-black text-rose-500 mb-2 italic uppercase tracking-tighter">Emergency Protocol</h3>
+            <p className="text-xs text-zinc-600 mb-6 font-medium leading-relaxed">
+              Disconnects all active agents, clears the prompt cache, and shuts down the Discord gateway immediately.
+            </p>
+            <button className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-[10px] font-black tracking-[0.3em] uppercase shadow-lg shadow-rose-500/20 active:scale-95 transition-all">
+              Initiate Purge
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SettingsManager;
+</file>
+
+<file path="components/Sidebar.tsx">
+import React from 'react';
+
+interface SidebarProps {
+  activeTab: string;
+  setActiveTab: (tab: any) => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
+  const items = [
+    { id: 'dash', label: 'Dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
+    { id: 'agents', label: 'Agents', icon: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z M12 6v6l4 2' },
+    { id: 'webhooks', label: 'Webhooks', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
+    { id: 'term', label: 'Console', icon: 'M4 17l6-6-6-6 M12 19h8' },
+    { id: 'mem', label: 'Memory', icon: 'M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3m18 0v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8m18 0H3' },
+    { id: 'settings', label: 'Config', icon: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' },
+  ];
+
+  return (
+    <aside className="w-64 border-r border-zinc-800 bg-zinc-950 flex flex-col">
+      <div className="p-8 flex items-center gap-3">
+        <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
+          A
+        </div>
+        <span className="font-bold tracking-tighter text-lg">ANTIGRAVITY</span>
+      </div>
+
+      <nav className="flex-1 px-4 space-y-2">
+        {items.map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+              activeTab === item.id 
+                ? 'bg-zinc-900 text-white border border-zinc-800' 
+                : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900/50'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon}></path>
+            </svg>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="p-6 border-t border-zinc-800">
+        <div className="flex items-center gap-3 px-2 py-3 bg-zinc-900/40 rounded-xl border border-zinc-800/50">
+          <div className="w-10 h-10 rounded-full bg-zinc-700 flex-shrink-0 flex items-center justify-center border-2 border-zinc-800">
+            <span className="text-xs font-bold">MR</span>
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-xs font-medium text-white truncate">Master-Remote#8819</p>
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Bot Owner</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+export default Sidebar;
+</file>
+
+<file path="components/Terminal.tsx">
+import React, { useState, useRef, useEffect } from 'react';
+
+interface TerminalProps {
+  onCommand: (cmd: string) => void;
+}
+
+const Terminal: React.FC<TerminalProps> = ({ onCommand }) => {
+  const [input, setInput] = useState('');
+  const [history, setHistory] = useState<string[]>([
+    "Antigravity System Shell v1.0.4",
+    "Type 'help' for available commands.",
+    ""
+  ]);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [history]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const cmd = input.trim().toLowerCase();
+    let response = "";
+
+    if (cmd === 'help') {
+      response = "Available commands: git status, agent list, sys info, clear, shutdown";
+    } else if (cmd === 'clear') {
+      setHistory(["Terminal cleared.", ""]);
+      setInput('');
+      return;
+    } else if (cmd === 'sys info') {
+      response = "OS: Linux (Deno v1.40.0) | CPU: 8 Cores | RAM: 1.2GB/16GB Used";
+    } else {
+      response = `Executing command: ${cmd}... done.`;
+    }
+
+    setHistory(prev => [...prev, `> ${input}`, response, ""]);
+    onCommand(input);
+    setInput('');
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-black border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="h-10 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-rose-500/20 border border-rose-500/50"></div>
+          <div className="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/50"></div>
+          <div className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/50"></div>
+          <span className="text-[10px] text-zinc-500 font-bold ml-2 tracking-widest uppercase">System Console</span>
+        </div>
+        <div className="text-[10px] text-zinc-600 mono">localhost:37777</div>
+      </div>
+
+      <div className="flex-1 p-6 overflow-y-auto mono text-sm space-y-1 selection:bg-indigo-500/30">
+        {history.map((line, i) => (
+          <div key={i} className={line.startsWith('>') ? 'text-indigo-400 font-bold' : 'text-zinc-400'}>
+            {line}
+          </div>
+        ))}
+        <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+          <span className="text-indigo-500 font-bold">~</span>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className="flex-1 bg-transparent border-none outline-none text-indigo-400 caret-indigo-500"
+            autoFocus
+            spellCheck={false}
+          />
+        </form>
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="p-4 bg-zinc-900/50 border-t border-zinc-800 flex items-center justify-between">
+        <p className="text-[10px] text-zinc-500">Security Gate: <span className="text-emerald-500 font-bold">ACTIVE</span></p>
+        <div className="flex gap-4">
+           <button className="text-[10px] text-zinc-400 hover:text-white underline uppercase tracking-widest font-bold">Export Logs</button>
+           <button className="text-[10px] text-zinc-400 hover:text-white underline uppercase tracking-widest font-bold">Reset Pipe</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Terminal;
+</file>
+
+<file path="components/WebhookManager.tsx">
+import React, { useState } from 'react';
+import { Webhook } from '../types';
+import { MOCK_WEBHOOKS } from '../constants';
+
+const WebhookManager: React.FC = () => {
+  const [webhooks, setWebhooks] = useState<Webhook[]>(MOCK_WEBHOOKS);
+  const [isAdding, setIsAdding] = useState(false);
+
+  const toggleStatus = (id: string) => {
+    setWebhooks(prev => prev.map(wh => 
+      wh.id === id ? { ...wh, status: wh.status === 'active' ? 'inactive' : 'active' } : wh
+    ));
+  };
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'discord': return 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M17 8l-5-5-5 5 M12 3v12';
+      case 'slack': return 'M8 14H5a2 2 0 1 0 2 2V8H5a2 2 0 1 0-2 2h3';
+      default: return 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101';
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-500 pb-20">
+      <div className="flex justify-between items-center border-b border-zinc-800 pb-8">
+        <div>
+          <h2 className="text-3xl font-black tracking-tighter italic uppercase">Event Integration Gateway</h2>
+          <p className="text-sm text-zinc-500 font-medium">Broadcast system triggers to 3rd party listeners.</p>
+        </div>
+        <button 
+          onClick={() => setIsAdding(!isAdding)}
+          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-3 uppercase tracking-widest"
+        >
+          {isAdding ? 'Cancel' : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              New Endpoint
+            </>
+          )}
+        </button>
+      </div>
+
+      {isAdding && (
+        <div className="bg-zinc-900 border-2 border-indigo-500/30 rounded-3xl p-8 animate-in slide-in-from-top-4 duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Target Name</label>
+              <input type="text" placeholder="e.g. Monitoring Hub" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-indigo-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Webhook URL</label>
+              <input type="text" placeholder="https://..." className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-indigo-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Platform</label>
+              <select className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs outline-none focus:border-indigo-500">
+                <option>Discord</option>
+                <option>Slack</option>
+                <option>Generic HTTP</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+               <button className="w-full py-3 bg-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-500/20">Create Pipeline</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        {webhooks.map(wh => (
+          <div key={wh.id} className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-8 hover:border-zinc-600 transition-all group relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 flex gap-2">
+               <button className="p-2 text-zinc-700 hover:text-white transition-colors bg-zinc-950 rounded-lg border border-zinc-800">
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+               </button>
+            </div>
+            
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-6 mb-8">
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner ${wh.status === 'active' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-zinc-800 text-zinc-500 border border-zinc-700'}`}>
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={getIcon(wh.type)} />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-black text-xl text-zinc-100 uppercase tracking-tighter italic">{wh.name}</h3>
+                    <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${wh.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-zinc-800 text-zinc-600'}`}>
+                      {wh.status}
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-500 mono mt-1">{wh.url.replace(/(.{15}).*(.{10})/, "$1...$2")}</p>
+                </div>
+              </div>
+
+              <div className="space-y-6 flex-grow">
+                <div>
+                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-3 block">Subscribed Events</label>
+                  <div className="flex flex-wrap gap-2">
+                    {wh.events.map(event => (
+                      <span key={event} className="px-3 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-[9px] font-bold text-zinc-400 uppercase tracking-wider group-hover:border-zinc-700 transition-colors">
+                        {event}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-zinc-950/50 rounded-2xl border border-zinc-800/50">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Latency</p>
+                    <p className="text-sm font-bold mono text-emerald-500">{wh.lastPing || '-- ms'}</p>
+                  </div>
+                  <div className="p-4 bg-zinc-950/50 rounded-2xl border border-zinc-800/50">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">24h Success</p>
+                    <p className="text-sm font-bold mono text-zinc-300">100%</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-8 mt-4 border-t border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                   <button 
+                    onClick={() => toggleStatus(wh.id)}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${wh.status === 'active' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-green-500/10 text-green-500 border border-green-500/20'}`}
+                  >
+                    {wh.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                  </button>
+                </div>
+                <button className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[10px] font-black text-zinc-300 flex items-center gap-2 uppercase tracking-widest transition-all">
+                  Test Connectivity
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Global Delivery Log */}
+      <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] p-10 mt-12">
+        <div className="flex justify-between items-center mb-10">
+           <h3 className="text-sm font-black text-zinc-500 uppercase tracking-[0.3em]">Integration Log Pipeline</h3>
+           <span className="text-[10px] font-bold text-zinc-600 uppercase">Retention: 30 Days</span>
+        </div>
+        <div className="space-y-3">
+          {[
+            { id: 1, event: 'CRITICAL_ERROR', target: 'Discord Main', status: '200 OK', time: '2m ago' },
+            { id: 2, event: 'SESSION_START', target: 'Slack Dev', status: '403 Forbidden', time: '14m ago' },
+            { id: 3, event: 'AGENT_SHUTDOWN', target: 'Discord Main', status: '200 OK', time: '1h ago' },
+            { id: 4, event: 'MEMORY_OVERFLOW', target: 'Discord Main', status: '200 OK', time: '4h ago' },
+          ].map(log => (
+            <div key={log.id} className="flex items-center justify-between p-4 bg-zinc-900/30 rounded-2xl border border-zinc-800/50 hover:bg-zinc-900/50 transition-colors text-xs">
+              <div className="flex items-center gap-4">
+                <div className={`w-2 h-2 rounded-full shadow-sm ${log.status.includes('200') ? 'bg-green-500 shadow-green-500/50' : 'bg-rose-500 shadow-rose-500/50'}`} />
+                <span className="text-zinc-200 font-bold mono uppercase tracking-tight">{log.event}</span>
+                <span className="text-zinc-700 text-lg">→</span>
+                <span className="text-zinc-400 font-medium italic">{log.target}</span>
+              </div>
+              <div className="flex gap-8 items-center">
+                <span className={`font-black tracking-widest ${log.status.includes('200') ? 'text-green-500/60' : 'text-rose-500/60'}`}>{log.status}</span>
+                <span className="text-zinc-600 font-bold mono text-[10px] w-16 text-right">{log.time}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default WebhookManager;
+</file>
+
+<file path="services/geminiService.ts">
+import { GoogleGenAI } from "@google/genai";
+
+export class GeminiService {
+  private ai: any;
+
+  constructor() {
+    const apiKey = process.env.API_KEY;
+    if (apiKey) {
+      this.ai = new GoogleGenAI({ apiKey });
+    }
+  }
+
+  async analyzeLogs(logs: string) {
+    if (!this.ai) return "API Key not configured for diagnostics.";
+    
+    try {
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Analyze these system logs from our Discord AI bot for critical errors, resource leaks, or security threats:\n\n${logs}`,
+        config: {
+          systemInstruction: "You are a senior DevOps engineer. Provide a concise JSON-formatted summary of issues found.",
+          responseMimeType: "application/json"
+        }
+      });
+      return response.text;
+    } catch (error) {
+      console.error("Gemini diagnosis failed:", error);
+      return null;
+    }
+  }
+
+  async optimizePrompt(prompt: string) {
+    if (!this.ai) return prompt;
+    
+    try {
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Refine this agent prompt for maximum clarity and safety: ${prompt}`
+      });
+      return response.text;
+    } catch (error) {
+      return prompt;
+    }
+  }
+}
+
+export const gemini = new GeminiService();
+</file>
+
+<file path=".gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+<file path="App.tsx">
+import React, { useState, useEffect } from 'react';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import AgentMonitor from './components/AgentMonitor';
+import WebhookManager from './components/WebhookManager';
+import Terminal from './components/Terminal';
+import MemoryExplorer from './components/MemoryExplorer';
+import SettingsManager from './components/SettingsManager';
+import { INITIAL_AGENTS, INITIAL_SETTINGS, MOCK_SESSIONS } from './constants';
+import { Agent, Session, BotSettings } from './types';
+
+const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'dash' | 'agents' | 'webhooks' | 'term' | 'mem' | 'settings'>('dash');
+  const [agents] = useState<Agent[]>(INITIAL_AGENTS);
+  const [sessions, setSessions] = useState<Session[]>(MOCK_SESSIONS);
+  const [settings, setSettings] = useState<BotSettings>(INITIAL_SETTINGS);
+  const [logs, setLogs] = useState<string[]>(["[System] Bot initialized on branch main", "[Auth] Cursor CLI verified", "[Webhook] Discord Main: OK"]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSessions(prev => prev.map(s => s.id === 'sess_9823' ? {
+        ...s, 
+        messageCount: s.messageCount + (Math.random() > 0.8 ? 1 : 0),
+        lastActivity: new Date().toISOString()
+      } : s));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const addLog = (msg: string) => {
+    setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dash': return <Dashboard sessions={sessions} logs={logs} settings={settings} />;
+      case 'agents': return <AgentMonitor agents={agents} sessions={sessions} />;
+      case 'webhooks': return <WebhookManager />;
+      case 'term': return <Terminal onCommand={(cmd) => addLog(`Shell Execute: ${cmd}`)} />;
+      case 'mem': return <MemoryExplorer />;
+      case 'settings': return <SettingsManager settings={settings} onUpdate={setSettings} />;
+      default: return <Dashboard sessions={sessions} logs={logs} settings={settings} />;
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-[#09090b] overflow-hidden">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-8 bg-zinc-950/50 backdrop-blur-md sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
+            <h1 className="text-sm font-semibold tracking-wider text-zinc-400 uppercase">
+              {activeTab === 'dash' ? 'Overview' : activeTab.toUpperCase()}
+            </h1>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-xs text-zinc-400 mono">
+              Branch: main
+            </div>
+            <button className="p-2 text-zinc-400 hover:text-white transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <section className="flex-1 overflow-y-auto p-8">
+          {renderContent()}
+        </section>
+      </main>
+    </div>
+  );
+};
+
+export default App;
+</file>
+
+<file path="index.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity Agent Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #09090b;
+            color: #fafafa;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0"
+  }
+}
+</script>
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>
+</file>
+
+<file path="index.tsx">
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const rootElement = document.getElementById('root');
+if (!rootElement) throw new Error("Could not find root element to mount to");
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+</file>
+
+<file path="metadata.json">
+{
+  "name": "Antigravity Control Center",
+  "description": "A high-performance management dashboard for the Claude-Code-Discord agent system, featuring real-time monitoring, security validation, and Gemini-powered system analysis.",
+  "requestFramePermissions": []
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "antigravity-control-center",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "@google/genai": "^1.34.0",
+    "recharts": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
+</file>
+
+<file path="README.md">
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/drive/1LUcaFg0OOjyl3Ip_T355gVkakcxVoH2F
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
+}
+</file>
+
+<file path="types.ts">
+export type RiskLevel = 'low' | 'medium' | 'high';
+
+export interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  model: string;
+  capabilities: string[];
+  riskLevel: RiskLevel;
+  client: 'claude' | 'cursor' | 'antigravity';
+  isManager?: boolean;
+}
+
+export interface Session {
+  id: string;
+  agentName: string;
+  userId: string;
+  channelId: string;
+  startTime: string;
+  messageCount: number;
+  totalCost: number;
+  lastActivity: string;
+  status: 'active' | 'paused' | 'completed' | 'error';
+  task?: string;
+}
+
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  type: 'discord' | 'slack' | 'generic';
+  events: string[];
+  status: 'active' | 'inactive';
+  lastPing?: string;
+}
+
+export interface BotSettings {
+  // UI & Discord
+  mentionEnabled: boolean;
+  mentionUserId: string | null;
+  defaultModel: string;
+  
+  // Intelligence Config
+  thinkingMode: 'none' | 'think' | 'think-hard' | 'ultrathink';
+  operationMode: 'normal' | 'plan' | 'auto-accept' | 'danger';
+  temperature: number;
+  topP: number;
+  
+  // Resource Config
+  maxOutputLength: number;
+  maxTokensPerSession: number;
+  retryAttempts: number;
+  
+  // Connectivity
+  proxyEnabled: boolean;
+  proxyUrl?: string;
+}
+
+export interface SystemStat {
+  cpu: number;
+  memory: string;
+  uptime: string;
+  activeProcesses: number;
+}
+</file>
+
+<file path="vite.config.ts">
+import path from 'path';
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, '.', '');
+    return {
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+      },
+      plugins: [react()],
+      define: {
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+      },
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, '.'),
+        }
+      }
+    };
+});
+</file>
+
+</files>

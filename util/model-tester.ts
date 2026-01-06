@@ -94,6 +94,7 @@ export async function testAllModels(authorized: boolean = false): Promise<ModelT
   
   // Add common Gemini models to test
   const commonModels = [
+    'gemini-3-flash',
     'gemini-2.0-flash',
     'gemini-2.0-flash-thinking-exp',
     'gemini-1.5-flash',

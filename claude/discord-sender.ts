@@ -1,4 +1,4 @@
-import { splitText } from "../discord/utils.ts";
+import { splitText, DISCORD_LIMITS } from "../discord/utils.ts";
 import type { ClaudeMessage } from "./types.ts";
 import type { MessageContent, EmbedData, ComponentData } from "../discord/types.ts";
 
@@ -124,7 +124,8 @@ export function createClaudeSender(sender: DiscordSender) {
   for (const msg of messages) {
     switch (msg.type) {
       case 'text': {
-        const chunks = splitText(msg.content, 4000);
+        // Use embed description limit since we're using embeds
+        const chunks = splitText(msg.content, DISCORD_LIMITS.EMBED_DESCRIPTION, true);
         for (let i = 0; i < chunks.length; i++) {
           await sender.sendMessage({
             embeds: [{
@@ -290,7 +291,8 @@ export function createClaudeSender(sender: DiscordSender) {
       }
       
       case 'thinking': {
-        const chunks = splitText(msg.content, 4000);
+        // Use embed description limit since we're using embeds
+        const chunks = splitText(msg.content, DISCORD_LIMITS.EMBED_DESCRIPTION, true);
         for (let i = 0; i < chunks.length; i++) {
           await sender.sendMessage({
             embeds: [{
@@ -359,9 +361,10 @@ export function createClaudeSender(sender: DiscordSender) {
       
       case 'other': {
         const jsonStr = JSON.stringify(msg.metadata || msg.content, null, 2);
-        // Account for code block markers when splitting
-        const maxChunkLength = 4096 - "```json\n\n```".length - 50; // 50 chars safety margin
-        const chunks = splitText(jsonStr, maxChunkLength);
+        // Account for code block markers when splitting (```json\n\n``` = 11 chars)
+        // Use embed description limit minus code block overhead
+        const maxChunkLength = DISCORD_LIMITS.EMBED_DESCRIPTION - 20; // Safety margin for code block markers
+        const chunks = splitText(jsonStr, maxChunkLength, true);
         for (let i = 0; i < chunks.length; i++) {
           await sender.sendMessage({
             embeds: [{

@@ -25,6 +25,7 @@ export interface MessageContent {
 
 export interface InteractionContext {
   deferReply(): Promise<void>;
+  deferUpdate(): Promise<void>;
   editReply(content: MessageContent): Promise<void>;
   followUp(content: MessageContent & { ephemeral?: boolean }): Promise<void>;
   reply(content: MessageContent & { ephemeral?: boolean }): Promise<void>;

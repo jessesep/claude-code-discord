@@ -1,57 +1,11 @@
-Signal handlers registered for Unix (SIGINT, SIGTERM)
-Registering slash commands...
-Slash commands registered
-Bot logged in: Master-Remote#8819
-Category: claude-code-discord
-Branch: main
-Working directory: /Users/jessesep/repos/claude-code-discord
-Checking category "claude-code-discord"...
-Using channel "main" (ID: 1457890654729404621)
-Bot has started. Press Ctrl+C to stop.
-Error polling connection: error shutting down connection
-Received SIGTERM, initiating graceful shutdown...
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
 
-SIGTERM signal received. Stopping bot...
-Killing 0 worktree bot processes...
-Error during shutdown: DiscordAPIError[10003]: Unknown Channel
-    at handleErrors (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/rest/2.6.0/dist/index.js:762:13)
-    at eventLoopTick (ext:core/01_core.js:187:7)
-    at async SequentialHandler.runRequest (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/rest/2.6.0/dist/index.js:1163:23)
-    at async SequentialHandler.queueRequest (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/rest/2.6.0/dist/index.js:994:14)
-    at async _REST.request (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/rest/2.6.0/dist/index.js:1307:22)
-    at async TextChannel.send (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/discord.js/14.14.1/src/structures/interfaces/TextBasedChannel.js:155:15)
-    at async Object.sendMessage (file:///Users/jessesep/repos/claude-code-discord/index.ts:1709:9)
-    at async sendClaudeMessages (file:///Users/jessesep/repos/claude-code-discord/claude/discord-sender.ts:356:9)
-    at async handleSignal (file:///Users/jessesep/repos/claude-code-discord/index.ts:1735:9) {
-  requestBody: {
-    files: [],
-    json: {
-      content: undefined,
-      tts: false,
-      nonce: undefined,
-      embeds: [
-        {
-          color: 16711680,
-          title: "🛑 Shutdown",
-          description: "Bot stopped by signal SIGTERM",
-          fields: [Array],
-          timestamp: "2026-01-06T11:26:47.014Z"
-        }
-      ],
-      components: undefined,
-      username: undefined,
-      avatar_url: undefined,
-      allowed_mentions: undefined,
-      flags: undefined,
-      message_reference: undefined,
-      attachments: undefined,
-      sticker_ids: undefined,
-      thread_name: undefined
-    }
-  },
-  rawError: { message: "Unknown Channel", code: 10003 },
-  code: 10003,
-  status: 404,
-  method: "POST",
-  url: "https://discord.com/api/v10/channels/1457890654729404621/messages"
-}
+✅ Environment variables loaded
+Starting Discord bot...
+
+[0m[1m[31merror[0m: Uncaught SyntaxError: Identifier 'fullResponse' has already been declared
+    const fullResponse = result.response || '';
+[0m[31m          ^[0m
+    at [0m[1m[3m<anonymous>[0m ([0m[2m[38;5;245mfile:///Users/jessesep/repos/claude-code-discord/[0m[0m[36magent/index.ts[0m:[0m[33m1237[0m:[0m[33m11[0m)
