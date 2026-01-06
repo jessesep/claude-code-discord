@@ -472,12 +472,19 @@ export async function createDiscordBot(
       console.log('Clearing global commands...');
       await rest.put(Routes.applicationCommands(applicationId), { body: [] });
       
-      console.log(`Registering slash commands for guild ${guild.id}...`);
+      console.log(`Clearing old guild commands for guild ${guild.id}...`);
+      await rest.put(
+        Routes.applicationGuildCommands(applicationId, guild.id),
+        { body: [] },
+      );
+      
+      console.log(`Registering new slash commands for guild ${guild.id}...`);
+      console.log(`Commands to register: ${commandsData.map(c => c.name).join(', ')}`);
       await rest.put(
         Routes.applicationGuildCommands(applicationId, guild.id),
         { body: commandsData },
       );
-      console.log('Guild slash commands registered');
+      console.log(`✅ Successfully registered ${commandsData.length} guild commands`);
     } catch (error) {
       console.error('Failed to register slash commands:', error);
     }
