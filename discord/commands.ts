@@ -1,6 +1,6 @@
 
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { PREDEFINED_AGENTS, chatWithAgent, getActiveSession, endAgentSession, startAgentSession } from "../agent/index.ts";
+import { PREDEFINED_AGENTS, chatWithAgent, getActiveSession, clearAgentSession, setAgentSession } from "../agent/index.ts";
 import { InteractionContext } from "./types.ts";
 
 export async function getAgentCommand() {
@@ -31,6 +31,11 @@ export async function getAgentCommand() {
                 .setDescription("Specific agent to target")
                 .setRequired(false)
                 .addChoices(...agentNames)
+        )
+        .addBooleanOption(option =>
+            option.setName("include_git_context")
+                .setDescription("Include git status and diff in the context")
+                .setRequired(false)
         );
 
     return {
@@ -77,13 +82,13 @@ export async function getAgentCommand() {
                     await ctx.reply({ content: "Please specify an `agent_name` to start.", ephemeral: true });
                     return;
                 }
-                startAgentSession(userId, channelId, agentName);
+                setAgentSession(userId, channelId, agentName);
                 await ctx.reply({ content: `✅ Started session with **${PREDEFINED_AGENTS[agentName].name}**. You can now chat normally!`, ephemeral: false });
                 return;
             }
 
             if (action === "end") {
-                endAgentSession(userId, channelId);
+                clearAgentSession(userId, channelId);
                 await ctx.reply({ content: "🛑 Session ended.", ephemeral: false });
                 return;
             }
@@ -116,7 +121,15 @@ export async function getAgentCommand() {
                     }
                 };
 
-                await chatWithAgent(ctx, message, agentName || undefined, undefined, false, deps);
+                const includeGit = ctx.getBoolean("include_git_context") || false;
+                // Note: chatWithAgent signature needs update to accept includeGit
+                // Passing as last arg or part of options if we refactor, but for now append to arg list
+                // chatWithAgent(ctx, message, agentName, contextFiles, includeSystemInfo, deps, includeGit)
+                // But chatWithAgent def in agent/index.ts is: (ctx, message, agentName, contextFiles, includeSystemInfo, deps)
+                // We need to update agent/index.ts first or safely pass it.
+                // Let's pass it as a property of deps for now if strictness allows in 'any' cast, OR update signature.
+                // Updating signature is cleaner. 
+                await chatWithAgent(ctx, message, agentName || undefined, undefined, false, { ...deps, includeGit });
                 return;
             }
         }

@@ -14,7 +14,7 @@ if (import.meta.main) {
         Deno.exit(1);
     }
 
-    const applicationId = Deno.env.get("DISCORD_APPLICATION_ID") || "";
+    const applicationId = Deno.env.get("DISCORD_APPLICATION_ID") || Deno.env.get("APPLICATION_ID") || "";
     const workDir = Deno.cwd();
 
     const config = {

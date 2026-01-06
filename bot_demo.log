@@ -1,0 +1,22 @@
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
+Registering slash commands...
+Slash commands registered
+Bot has started. Press Ctrl+C to stop.
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458057566054645800)
+NotFound: No such file or directory (os error 2): open './dashboard/favicon.ico'
+Settings saved to ./data/settings.json

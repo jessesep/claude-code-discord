@@ -6,7 +6,7 @@ export interface UnifiedBotSettings {
   // Basic bot settings (formerly /settings)
   mentionEnabled: boolean;
   mentionUserId: string | null;
-  
+
   // Claude Code settings (formerly /claude-settings)
   defaultModel: string;
   defaultTemperature: number;
@@ -14,45 +14,57 @@ export interface UnifiedBotSettings {
   defaultSystemPrompt: string | null;
   autoIncludeSystemInfo: boolean;
   autoIncludeGitContext: boolean;
-  
+
   // New: Thinking mode settings
   thinkingMode: 'none' | 'think' | 'think-hard' | 'ultrathink';
-  
+
   // New: Mode settings
   operationMode: 'normal' | 'plan' | 'auto-accept' | 'danger';
-  
+
   // Output settings
   codeHighlighting: boolean;
   autoPageLongOutput: boolean;
   maxOutputLength: number;
   timestampFormat: 'relative' | 'absolute' | 'both';
-  
+
   // Session settings
   autoSaveConversations: boolean;
   sessionTimeout: number; // in minutes
   maxSessionsPerUser: number;
-  
+
   // System monitoring settings
   defaultProcessLimit: number;
   defaultLogLines: number;
   showSystemWarnings: boolean;
-  
+
   // Developer settings
   enableDebugMode: boolean;
   verboseErrorReporting: boolean;
   enablePerformanceMetrics: boolean;
-  
+
   // Proxy settings (new)
   proxyEnabled: boolean;
   proxyUrl: string | null;
   noProxyDomains: string[];
+
+  // Webhook settings (new)
+  webhooks: WebhookConfig[];
+  apiKey: string | null; // For API access
+}
+
+export interface WebhookConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  secret: string | null; // Optional secret to validate signature
+  actions: string[]; // List of actions this webhook triggers
 }
 
 export const UNIFIED_DEFAULT_SETTINGS: UnifiedBotSettings = {
   // Basic bot settings
   mentionEnabled: false,
   mentionUserId: null,
-  
+
   // Claude settings
   defaultModel: 'claude-sonnet-4',
   defaultTemperature: 0.7,
@@ -60,36 +72,40 @@ export const UNIFIED_DEFAULT_SETTINGS: UnifiedBotSettings = {
   defaultSystemPrompt: null,
   autoIncludeSystemInfo: false,
   autoIncludeGitContext: true,
-  
+
   // New modes
   thinkingMode: 'none',
   operationMode: 'normal',
-  
+
   // Output
   codeHighlighting: true,
   autoPageLongOutput: true,
   maxOutputLength: 4000,
   timestampFormat: 'relative',
-  
+
   // Sessions
   autoSaveConversations: true,
   sessionTimeout: 60, // 1 hour
   maxSessionsPerUser: 10,
-  
+
   // System monitoring
   defaultProcessLimit: 20,
   defaultLogLines: 50,
   showSystemWarnings: true,
-  
+
   // Developer
   enableDebugMode: false,
   verboseErrorReporting: false,
   enablePerformanceMetrics: false,
-  
+
   // Proxy
   proxyEnabled: false,
   proxyUrl: null,
-  noProxyDomains: ['localhost', '127.0.0.1', '::1']
+  noProxyDomains: ['localhost', '127.0.0.1', '::1'],
+
+  // Webhooks
+  webhooks: [],
+  apiKey: null
 };
 
 // Thinking mode options

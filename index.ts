@@ -1,7 +1,7 @@
 #!/usr/bin/env -S deno run --allow-all
 
-import { 
-  createDiscordBot, 
+import {
+  createDiscordBot,
   type BotConfig,
   type InteractionContext,
   type CommandHandlers,
@@ -14,10 +14,10 @@ import { getGitInfo } from "./git/index.ts";
 
 import { createClaudeHandlers, claudeCommands, cleanSessionId, createClaudeSender, expandableContent, type DiscordSender, ClaudeMessage, enhancedClaudeCommands, createEnhancedClaudeHandlers, ClaudeSessionManager } from "./claude/index.ts";
 import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
-import { 
-  advancedSettingsCommands, 
-  createAdvancedSettingsHandlers, 
-  DEFAULT_SETTINGS, 
+import {
+  advancedSettingsCommands,
+  createAdvancedSettingsHandlers,
+  DEFAULT_SETTINGS,
   type AdvancedBotSettings,
   unifiedSettingsCommands,
   createUnifiedSettingsHandlers,
@@ -32,16 +32,18 @@ import { helpCommand, createHelpHandlers } from "./help/index.ts";
 import { agentCommand, createAgentHandlers } from "./agent/index.ts";
 import { ProcessCrashHandler, setupGlobalErrorHandlers, ProcessHealthMonitor } from "./process/index.ts";
 import { handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "./discord/index.ts";
+import { SettingsPersistence } from "./util/settings-persistence.ts";
+import { WebServer } from "./server/index.ts";
 
 
 
 // Parse command line arguments
 function parseArgs(args: string[]): { category?: string; userId?: string } {
   const result: { category?: string; userId?: string } = {};
-  
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     if (arg === '--category' && i + 1 < args.length) {
       result.category = args[i + 1];
       i++; // Skip next argument
@@ -61,7 +63,7 @@ function parseArgs(args: string[]): { category?: string; userId?: string } {
       }
     }
   }
-  
+
   return result;
 }
 
@@ -72,19 +74,19 @@ export { sendToClaudeCode } from "./claude/index.ts";
 // Create Claude Code Discord Bot
 export async function createClaudeCodeBot(config: BotConfig) {
   const { discordToken, applicationId, workDir, repoName, branchName, categoryName, defaultMentionUserId } = config;
-  
+
   // Determine category name (use repository name if not specified)
   const actualCategoryName = categoryName || repoName;
-  
+
   // Claude Code session management
   let claudeController: AbortController | null = null;
   // deno-lint-ignore no-unused-vars
   let claudeSessionId: string | undefined;
-  
+
   // Message history for navigation (like terminal history)
   const messageHistory: string[] = [];
   let currentHistoryIndex = -1;
-  
+
   // Helper functions for message history
   function addToHistory(message: string) {
     // Don't add duplicate consecutive messages
@@ -97,22 +99,22 @@ export async function createClaudeCodeBot(config: BotConfig) {
     }
     currentHistoryIndex = -1; // Reset to latest
   }
-  
+
   function getPreviousMessage(): string | null {
     if (messageHistory.length === 0) return null;
-    
+
     if (currentHistoryIndex === -1) {
       currentHistoryIndex = messageHistory.length - 1;
     } else if (currentHistoryIndex > 0) {
       currentHistoryIndex--;
     }
-    
+
     return messageHistory[currentHistoryIndex] || null;
   }
-  
+
   function getNextMessage(): string | null {
     if (messageHistory.length === 0 || currentHistoryIndex === -1) return null;
-    
+
     if (currentHistoryIndex < messageHistory.length - 1) {
       currentHistoryIndex++;
       return messageHistory[currentHistoryIndex];
@@ -121,13 +123,13 @@ export async function createClaudeCodeBot(config: BotConfig) {
       return null; // No next message, at the end
     }
   }
-  
+
   // Create shell manager
   const shellManager = new ShellManager(workDir);
-  
+
   // Create worktree bot manager
   const worktreeBotManager = new WorktreeBotManager();
-  
+
   // Create crash handler and health monitor
   const crashHandler = new ProcessCrashHandler({
     maxRetries: 3,
@@ -136,18 +138,18 @@ export async function createClaudeCodeBot(config: BotConfig) {
     logCrashes: true,
     notifyOnCrash: true
   });
-  
+
   const healthMonitor = new ProcessHealthMonitor(crashHandler);
-  
+
   // Setup global error handlers
   setupGlobalErrorHandlers(crashHandler);
-  
+
   // Create Claude session manager
   const claudeSessionManager = new ClaudeSessionManager();
-  
+
   // Set up crash handler dependencies
   crashHandler.setManagers(shellManager, worktreeBotManager);
-  
+
   // Setup periodic cleanup tasks
   const cleanupInterval = setInterval(() => {
     try {
@@ -158,19 +160,32 @@ export async function createClaudeCodeBot(config: BotConfig) {
       console.error('Error during periodic cleanup:', error);
     }
   }, 3600000); // Clean up every hour
-  
+
   // Setup crash notification
   crashHandler.setNotificationCallback(async (report) => {
     // Notification will be sent through Discord when bot is ready
     console.warn(`Process crash: ${report.processType} ${report.processId || ''} - ${report.error.message}`);
   });
-  
+
+  // Initialize Settings Persistence
+  const settingsPersistence = SettingsPersistence.getInstance();
+  const loadedSettings = await settingsPersistence.load();
+
   // Initialize unified bot settings (new system)
+  // Merge defaults with loaded settings, but prioritize command-line defaults if needed
   const unifiedSettings: UnifiedBotSettings = {
-    ...UNIFIED_DEFAULT_SETTINGS,
-    mentionEnabled: !!defaultMentionUserId,
-    mentionUserId: defaultMentionUserId || null,
+    ...loadedSettings,
+    mentionEnabled: !!defaultMentionUserId || loadedSettings.mentionEnabled,
+    mentionUserId: defaultMentionUserId || loadedSettings.mentionUserId,
   };
+
+  // Start Web Server
+  try {
+    const webServer = new WebServer(8000); // Default port 8000
+    webServer.start();
+  } catch (error) {
+    console.error("Failed to start Web Server:", error);
+  }
 
   // Initialize advanced bot settings (legacy compatibility)
   const advancedSettings: AdvancedBotSettings = {
@@ -188,6 +203,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Function to update settings (unified and legacy)
   const updateUnifiedSettings = (newSettings: Partial<UnifiedBotSettings>) => {
     Object.assign(unifiedSettings, newSettings);
+    // Persist changes
+    settingsPersistence.save(unifiedSettings).catch(err => console.error("Failed to save settings:", err));
+
+    // Update legacy settings for backward compatibility
     // Update legacy settings for backward compatibility
     botSettings.mentionEnabled = unifiedSettings.mentionEnabled;
     botSettings.mentionUserId = unifiedSettings.mentionUserId;
@@ -201,14 +220,14 @@ export async function createClaudeCodeBot(config: BotConfig) {
     botSettings.mentionEnabled = advancedSettings.mentionEnabled;
     botSettings.mentionUserId = advancedSettings.mentionUserId;
   };
-  
+
   // Create Discord bot first
   // deno-lint-ignore no-explicit-any prefer-const
   let bot: any;
-  
+
   // We'll create the Claude sender after bot initialization
   let claudeSender: ((messages: ClaudeMessage[]) => Promise<void>) | null = null;
-  
+
   // Create handlers with dependencies (sendClaudeMessages will be updated after bot creation)
   const claudeHandlers = createClaudeHandlers({
     workDir,
@@ -221,7 +240,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
     }
   });
-  
+
   const gitHandlers = createGitHandlers({
     workDir,
     actualCategoryName,
@@ -230,11 +249,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
     botSettings,
     worktreeBotManager
   });
-  
+
   const shellHandlers = createShellHandlers({
     shellManager
   });
-  
+
   const utilsHandlers = createUtilsHandlers({
     workDir,
     repoName,
@@ -312,7 +331,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     },
     sessionManager: claudeSessionManager
   });
-  
+
   // Command handlers implementation
   const handlers: CommandHandlers = new Map([
     ['claude', {
@@ -326,7 +345,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         if (customId.startsWith('expand:')) {
           const expandId = customId.substring(7);
           const fullContent = expandableContent.get(expandId);
-          
+
           if (!fullContent) {
             await ctx.update({
               embeds: [{
@@ -339,7 +358,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
             });
             return;
           }
-          
+
           // Split content into chunks if too large for Discord
           const maxLength = 4090 - "```\n\n```".length;
           if (fullContent.length <= maxLength) {
@@ -347,8 +366,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
               embeds: [{
                 color: 0x0099ff,
                 title: '📖 Full Content',
-                description: expandId.startsWith('result-') ? 
-                  `\`\`\`\n${fullContent}\n\`\`\`` : 
+                description: expandId.startsWith('result-') ?
+                  `\`\`\`\n${fullContent}\n\`\`\`` :
                   `\`\`\`json\n${fullContent}\n\`\`\``,
                 timestamp: true
               }],
@@ -369,8 +388,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
               embeds: [{
                 color: 0x0099ff,
                 title: '📖 Full Content (Large - Showing First Part)',
-                description: expandId.startsWith('result-') ? 
-                  `\`\`\`\n${chunk}...\n\`\`\`` : 
+                description: expandId.startsWith('result-') ?
+                  `\`\`\`\n${chunk}...\n\`\`\`` :
                   `\`\`\`json\n${chunk}...\n\`\`\``,
                 fields: [
                   { name: 'Note', value: 'Content is very large. This shows the first portion.', inline: false }
@@ -419,7 +438,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         try {
           const result = await gitHandlers.onGit(ctx, command);
           const formatted = formatGitOutput(command, result);
-          
+
           const { embed } = createFormattedEmbed(
             formatted.isError ? '❌ Git Command Error' : '✅ Git Command Result',
             formatted.formatted,
@@ -436,7 +455,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
           );
 
           await ctx.editReply({ embeds: [embed] });
-          
+
           // Report crash for monitoring
           await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'git', `Command: ${command}`);
         }
@@ -449,10 +468,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const ref = ctx.getString('ref');
         try {
           const result = await gitHandlers.onWorktree(ctx, branch, ref || undefined);
-          
+
           // Check if the result contains an error
           const isError = result.result.startsWith('Execution error:') || result.result.startsWith('Error:') || result.result.includes('fatal:');
-          
+
           if (!isError || result.isExisting === true) {
             // Worktree created successfully, start bot process
             await ctx.editReply({
@@ -468,11 +487,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
                 timestamp: true
               }]
             });
-            
+
             // Start bot process for the worktree
             try {
               await gitHandlers.onWorktreeBot(ctx, result.fullPath, branch);
-              
+
               // Update with success
               await ctx.editReply({
                 embeds: [{
@@ -591,13 +610,13 @@ export async function createClaudeCodeBot(config: BotConfig) {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
         const status = gitHandlers.onWorktreeBots(ctx);
-        
+
         const fields = status.bots.map(bot => ({
           name: `${bot.branch} (${bot.category})`,
           value: `Path: \`${bot.workDir}\`\nUptime: ${bot.uptime}\nStarted: ${new Date(bot.startTime).toLocaleString()}`,
           inline: false
         }));
-        
+
         await ctx.editReply({
           embeds: [{
             color: 0x00ffff,
@@ -648,14 +667,14 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const input = ctx.getString('input');
         try {
           const executionResult = await shellHandlers.onShell(ctx, command, input || undefined);
-          
+
           let isCompleted = false;
-          
+
           // Handle completion asynchronously
           executionResult.onComplete(async (exitCode, output) => {
             if (isCompleted) return;
             isCompleted = true;
-            
+
             const formatted = formatShellOutput(command, output, exitCode);
             const { embed } = createFormattedEmbed(
               exitCode === 0 ? '✅ Shell Command Complete' : '❌ Shell Command Failed',
@@ -671,17 +690,17 @@ export async function createClaudeCodeBot(config: BotConfig) {
             ];
 
             await ctx.editReply({ embeds: [embed] });
-            
+
             // Report crash if command failed
             if (exitCode !== 0) {
               await crashHandler.reportCrash('shell', new Error(`Process exited with code ${exitCode}`), executionResult.processId, `Command: ${command}`);
             }
           });
-          
+
           executionResult.onError(async (error) => {
             if (isCompleted) return;
             isCompleted = true;
-            
+
             await ctx.editReply({
               embeds: [{
                 color: 0xff0000,
@@ -695,7 +714,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
               }]
             });
           });
-          
+
           // Show initial running status and wait a bit to see if it completes quickly
           await ctx.editReply({
             embeds: [{
@@ -709,7 +728,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
               timestamp: true
             }]
           });
-          
+
           // Wait a short time for quick commands
           setTimeout(async () => {
             if (!isCompleted) {
@@ -752,7 +771,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const input = ctx.getString('text', true)!;
         try {
           const result = await shellHandlers.onShellInput(ctx, processId, input);
-          
+
           if (result.success) {
             await ctx.editReply({
               embeds: [{
@@ -766,7 +785,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
                 timestamp: true
               }]
             });
-            
+
             // Wait a moment for output to be generated, then show new output
             // Use longer timeout for Python3 due to buffering behavior
             const waitTime = input.toLowerCase().includes('python') ? 2000 : 1000;
@@ -854,7 +873,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
           value: `\`${proc.command}\`\nStarted: ${proc.startTime.toLocaleTimeString()}`,
           inline: false
         }));
-        
+
         await ctx.editReply({
           embeds: [{
             color: 0x00ffff,
@@ -905,7 +924,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const gitStatusInfo = await gitHandlers.getStatus();
         const runningCount = shellHandlers.onShellList(ctx).size;
         const worktreeStatus = gitHandlers.onWorktreeBots(ctx);
-        
+
         await ctx.editReply({
           embeds: [{
             color: 0x00ffff,
@@ -952,28 +971,28 @@ export async function createClaudeCodeBot(config: BotConfig) {
             timestamp: true
           }]
         });
-        
+
         // Stop all processes
         shellHandlers.killAllProcesses();
-        
+
         // Kill all worktree bots
         gitHandlers.killAllWorktreeBots();
-        
+
         // Cancel Claude Code session
         if (claudeController) {
           claudeController.abort();
         }
-        
+
         // Clean up monitoring and crash handlers
         healthMonitor.stopAll();
         crashHandler.cleanup();
-        
+
         // Clean up pagination states
         cleanupPaginationStates();
-        
+
         // Clear periodic cleanup
         clearInterval(cleanupInterval);
-        
+
         // Wait a bit before exiting
         setTimeout(() => {
           Deno.exit(0);
@@ -995,7 +1014,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const includeGitContext = ctx.getBoolean('include_git_context');
         const contextFiles = ctx.getString('context_files');
         const sessionId = ctx.getString('session_id');
-        
+
         await enhancedClaudeHandlers.onClaudeEnhanced(
           ctx, prompt, model || undefined, template || undefined,
           includeSystemInfo || undefined, includeGitContext || undefined,
@@ -1293,7 +1312,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
     }]
   ]);
-  
+
   // Create dependencies object
   const dependencies: BotDependencies = {
     commands: [
@@ -1328,7 +1347,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         }]
       });
     }],
-    
+
     // Copy session ID button
     ['copy-session', async (ctx: InteractionContext) => {
       const sessionId = claudeSessionId;
@@ -1341,11 +1360,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
         }]
       });
     }],
-    
+
     // Jump to previous message button
     ['jump-previous', async (ctx: InteractionContext) => {
       const previousMessage = getPreviousMessage();
-      
+
       if (!previousMessage) {
         await ctx.update({
           embeds: [{
@@ -1360,11 +1379,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
         });
         return;
       }
-      
+
       // Show the previous message with navigation options
       const historyPosition = currentHistoryIndex + 1;
       const totalMessages = messageHistory.length;
-      
+
       await ctx.update({
         embeds: [{
           color: 0x0099ff,
@@ -1409,7 +1428,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         ]
       });
     }],
-    
+
     // Continue button with session ID
     ['continue', async (ctx: InteractionContext) => {
       const sessionId = claudeSessionId;
@@ -1424,7 +1443,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         });
         return;
       }
-      
+
       await ctx.update({
         embeds: [{
           color: 0xffff00,
@@ -1437,11 +1456,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
         }]
       });
     }],
-    
+
     // History navigation buttons
     ['history-previous', async (ctx: InteractionContext) => {
       const olderMessage = getPreviousMessage();
-      
+
       if (!olderMessage) {
         await ctx.update({
           embeds: [{
@@ -1454,10 +1473,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
         });
         return;
       }
-      
+
       const historyPosition = currentHistoryIndex + 1;
       const totalMessages = messageHistory.length;
-      
+
       await ctx.update({
         embeds: [{
           color: 0x0099ff,
@@ -1502,10 +1521,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
         ]
       });
     }],
-    
+
     ['history-next', async (ctx: InteractionContext) => {
       const newerMessage = getNextMessage();
-      
+
       if (!newerMessage) {
         await ctx.update({
           embeds: [{
@@ -1518,10 +1537,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
         });
         return;
       }
-      
+
       const historyPosition = currentHistoryIndex + 1;
       const totalMessages = messageHistory.length;
-      
+
       await ctx.update({
         embeds: [{
           color: 0x0099ff,
@@ -1566,7 +1585,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         ]
       });
     }],
-    
+
     ['history-use', async (ctx: InteractionContext) => {
       const currentMessage = messageHistory[currentHistoryIndex];
       if (!currentMessage) {
@@ -1581,7 +1600,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         });
         return;
       }
-      
+
       await ctx.update({
         embeds: [{
           color: 0x00ff00,
@@ -1594,13 +1613,13 @@ export async function createClaudeCodeBot(config: BotConfig) {
         }],
         components: []
       });
-      
+
       // Add the reused message to history again (as it's being sent again)
       addToHistory(currentMessage);
       // Execute the Claude command with the selected message
       await claudeHandlers.onClaude(ctx, currentMessage);
     }],
-    
+
     ['history-close', async (ctx: InteractionContext) => {
       await ctx.update({
         embeds: [{
@@ -1612,7 +1631,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         components: []
       });
     }],
-    
+
     // Collapse content button
     ['collapse-content', async (ctx: InteractionContext) => {
       await ctx.update({
@@ -1625,7 +1644,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         components: []
       });
     }],
-    
+
     ['workflow:git-status', async (ctx: InteractionContext) => {
       await ctx.deferReply();
       try {
@@ -1654,22 +1673,22 @@ export async function createClaudeCodeBot(config: BotConfig) {
       }
     }]
   ]);
-  
+
   bot = await createDiscordBot(config, handlers, buttonHandlers, dependencies, crashHandler);
-  
+
   // Create Discord sender for Claude messages
   const discordSender: DiscordSender = {
     async sendMessage(content) {
       const channel = bot.getChannel();
       if (channel) {
         const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import("npm:discord.js@14.14.1");
-        
+
         // Convert MessageContent to Discord format
         // deno-lint-ignore no-explicit-any
         const payload: any = {};
-        
+
         if (content.content) payload.content = content.content;
-        
+
         if (content.embeds) {
           payload.embeds = content.embeds.map(e => {
             const embed = new EmbedBuilder();
@@ -1682,7 +1701,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
             return embed;
           });
         }
-        
+
         if (content.components) {
           payload.components = content.components.map(row => {
             // deno-lint-ignore no-explicit-any
@@ -1691,7 +1710,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
               const button = new ButtonBuilder()
                 .setCustomId(comp.customId)
                 .setLabel(comp.label);
-              
+
               switch (comp.style) {
                 case 'primary': button.setStyle(ButtonStyle.Primary); break;
                 case 'secondary': button.setStyle(ButtonStyle.Secondary); break;
@@ -1699,37 +1718,37 @@ export async function createClaudeCodeBot(config: BotConfig) {
                 case 'danger': button.setStyle(ButtonStyle.Danger); break;
                 case 'link': button.setStyle(ButtonStyle.Link); break;
               }
-              
+
               actionRow.addComponents(button);
             });
             return actionRow;
           });
         }
-        
+
         await channel.send(payload);
       }
     }
   };
-  
+
   // Create Claude sender function
   claudeSender = createClaudeSender(discordSender);
-  
+
   // Signal handlers
   const handleSignal = async (signal: string) => {
     console.log(`\n${signal} signal received. Stopping bot...`);
-    
+
     try {
       // Stop all processes
       shellHandlers.killAllProcesses();
-      
+
       // Kill all worktree bots
       gitHandlers.killAllWorktreeBots();
-      
+
       // Cancel Claude Code session
       if (claudeController) {
         claudeController.abort();
       }
-      
+
       // Send shutdown message
       if (claudeSender) {
         await claudeSender([{
@@ -1744,7 +1763,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
           }
         }]);
       }
-      
+
       setTimeout(() => {
         bot.client.destroy();
         Deno.exit(0);
@@ -1754,14 +1773,14 @@ export async function createClaudeCodeBot(config: BotConfig) {
       Deno.exit(1);
     }
   };
-  
+
   // Cross-platform signal handling
   const platform = Deno.build.os;
-  
+
   try {
     // SIGINT (Ctrl+C) works on all platforms
     Deno.addSignalListener("SIGINT", () => handleSignal("SIGINT"));
-    
+
     if (platform === "windows") {
       // Windows-specific signals
       try {
@@ -1780,7 +1799,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
   } catch (error) {
     console.warn('Signal handler registration error:', error.message);
   }
-  
+
   return bot;
 }
 
@@ -1792,20 +1811,20 @@ if (import.meta.main) {
     const applicationId = Deno.env.get("APPLICATION_ID");
     const envCategoryName = Deno.env.get("CATEGORY_NAME");
     const envMentionUserId = Deno.env.get("DEFAULT_MENTION_USER_ID");
-    
+
     if (!discordToken || !applicationId) {
       console.error("Error: DISCORD_TOKEN and APPLICATION_ID environment variables are required");
       Deno.exit(1);
     }
-    
+
     // Parse command line arguments
     const args = parseArgs(Deno.args);
     const categoryName = args.category || envCategoryName;
     const defaultMentionUserId = args.userId || envMentionUserId;
-    
+
     // Get Git information
     const gitInfo = await getGitInfo();
-    
+
     // Create and start bot
     await createClaudeCodeBot({
       discordToken,
@@ -1816,7 +1835,7 @@ if (import.meta.main) {
       categoryName,
       defaultMentionUserId,
     });
-    
+
     console.log("Bot has started. Press Ctrl+C to stop.");
   } catch (error) {
     console.error("Failed to start bot:", error);

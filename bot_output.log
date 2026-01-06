@@ -1,0 +1,41 @@
+Loading environment variables from .env file...
+⚠️  Warning: ANTHROPIC_API_KEY is not set
+The bot will show setup instructions when needed.
+
+✅ Environment variables loaded
+Starting Discord bot...
+
+[0m[32mDownload[0m https://registry.npmjs.org/hono
+[0m[32mDownload[0m https://registry.npmjs.org/hono/-/hono-4.0.0.tgz
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+No settings file found, creating new one.
+Settings saved to ./data/settings.json
+Starting Web Server on port 8000...
+Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
+Registering slash commands...
+Slash commands registered
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Creating category "claude-code-discord"...
+Bot has started. Press Ctrl+C to stop.
+Created category "claude-code-discord"
+Creating channel "main"...
+Created channel "main"
+Using channel "main" (ID: 1458057566054645800)
+Settings saved to ./data/settings.json
+[Webhook] Triggered Test Hook (test-hook) {}
+[MessageCreate] Received message from jessesep (367705631014256641) in channel 1458057566054645800
+[MessageCreate] Message content: "Heya"
+[getActiveSession] Looking for session: userId=367705631014256641, channelId=1458057566054645800
+[getActiveSession] Total sessions: 0
+[getActiveSession] No active session found
+[MessageCreate] Active session: none
+[MessageCreate] Is mention: false
+[MessageCreate] Skipping - no active session and no @mention
+Received SIGTERM, initiating graceful shutdown...
+
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...

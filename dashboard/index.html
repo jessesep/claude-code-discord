@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Bot Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #1f6feb;
+            --danger: #da3633;
+            --success: #238636;
+            --border: #30363d;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        #sidebar {
+            width: 250px;
+            background-color: var(--card-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+
+        .nav-item {
+            padding: 10px 15px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background 0.2s;
+            color: var(--text-secondary);
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background-color: #21262d;
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            border-left: 3px solid var(--accent);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background-color: #0d1117;
+            color: var(--text-primary);
+            box-sizing: border-box;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2ea043;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+        
+        .section {
+            display: none;
+        }
+        
+        .section.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .status-badge {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-ok { background-color: var(--success); }
+        .status-error { background-color: var(--danger); }
+
+        /* Webhook Interactions */
+        .webhook-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #21262d;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2 style="display: flex; align-items: center;">
+            <span class="status-badge status-ok" id="connection-status"></span>
+            Claude Bot
+        </h2>
+        <div class="nav-item active" onclick="showSection('general')">General Settings</div>
+        <div class="nav-item" onclick="showSection('webhooks')">Webhooks</div>
+        <div class="nav-item" onclick="showSection('mcp')">MCP Servers</div>
+        <div class="nav-item" onclick="showSection('proxy')">Proxy & Tunnels</div>
+        
+        <div style="margin-top: auto; font-size: 0.8em; color: var(--text-secondary);">
+            v1.0.0 Modular
+        </div>
+    </div>
+
+    <div id="content">
+        <!-- General Section -->
+        <div id="general" class="section active">
+            <h1>General Settings</h1>
+            <div class="card">
+                <h3>Bot Identification</h3>
+                <div class="form-group">
+                    <label>Mention User ID</label>
+                    <input type="text" id="mentionUserId" placeholder="User ID to mention">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="mentionEnabled"> Enable Mentions
+                    </label>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Claude Configuration</h3>
+                <div class="form-group">
+                    <label>Default Model</label>
+                    <select id="defaultModel">
+                        <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                        <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                        <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Temperature (0.0 - 1.0)</label>
+                    <input type="number" id="defaultTemperature" min="0" max="1" step="0.1">
+                </div>
+            </div>
+            
+            <button class="btn-primary" onclick="saveSettings()">Save Changes</button>
+        </div>
+
+        <!-- Webhooks Section -->
+        <div id="webhooks" class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>Webhooks</h1>
+                <button class="btn-primary" onclick="createNewWebhook()">+ New Webhook</button>
+            </div>
+            <div class="card">
+                <p class="text-secondary">Configure inbound webhooks to trigger bot actions.</p>
+                <div id="webhook-list">
+                    <!-- Webhooks will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- MCP Section -->
+        <div id="mcp" class="section">
+            <h1>MCP Servers</h1>
+            <div class="card">
+                <p>Manage Model Context Protocol servers.</p>
+                <div class="form-group">
+                    <label>Add New Server URL</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" placeholder="http://localhost:3000/mcp">
+                        <button class="btn-primary">Connect</button>
+                    </div>
+                </div>
+                <!-- Server list would go here -->
+            </div>
+        </div>
+
+         <!-- Proxy Section -->
+         <div id="proxy" class="section">
+            <h1>Proxy & Tunnels</h1>
+            <div class="card">
+                <h3>Proxy Configuration</h3>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="proxyEnabled"> Enable Proxy
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Proxy URL</label>
+                    <input type="text" id="proxyUrl" placeholder="http://proxy:8080">
+                </div>
+                 <div class="form-group">
+                    <label>No Proxy Domains</label>
+                    <input type="text" id="noProxyDomains" placeholder="localhost, 127.0.0.1">
+                </div>
+                <button class="btn-primary" onclick="saveSettings()">Save Proxy Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSettings = {};
+
+        // Navigation
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        // API Interaction
+        async function fetchSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                currentSettings = data;
+                renderSettings();
+                document.getElementById('connection-status').classList.remove('status-error');
+                document.getElementById('connection-status').classList.add('status-ok');
+            } catch (e) {
+                console.error("Failed to fetch settings", e);
+                document.getElementById('connection-status').classList.add('status-error');
+                document.getElementById('connection-status').classList.remove('status-ok');
+            }
+        }
+
+        function renderSettings() {
+            // General
+            document.getElementById('mentionUserId').value = currentSettings.mentionUserId || '';
+            document.getElementById('mentionEnabled').checked = currentSettings.mentionEnabled;
+            document.getElementById('defaultModel').value = currentSettings.defaultModel || 'claude-3-sonnet-20240229';
+            document.getElementById('defaultTemperature').value = currentSettings.defaultTemperature;
+
+            // Proxy
+            document.getElementById('proxyEnabled').checked = currentSettings.proxyEnabled;
+            document.getElementById('proxyUrl').value = currentSettings.proxyUrl || '';
+            document.getElementById('noProxyDomains').value = (currentSettings.noProxyDomains || []).join(', ');
+
+            // Webhooks
+            renderWebhooks();
+        }
+
+        function renderWebhooks() {
+            const list = document.getElementById('webhook-list');
+            list.innerHTML = '';
+            
+            if (!currentSettings.webhooks || currentSettings.webhooks.length === 0) {
+                list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">No webhooks configurd</div>';
+                return;
+            }
+
+            currentSettings.webhooks.forEach(hook => {
+                const item = document.createElement('div');
+                item.className = 'webhook-item';
+                item.innerHTML = `
+                    <div>
+                        <strong>${hook.name}</strong><br>
+                        <small style="color: grey">/api/webhooks/${hook.id}</small>
+                    </div>
+                    <div>
+                         <span style="color: ${hook.enabled ? 'var(--success)' : 'grey'}">●</span>
+                         <button onclick="deleteWebhook('${hook.id}')" style="margin-left: 10px; background: transparent; color: var(--danger); border: 1px solid var(--danger);">Delete</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        async function saveSettings() {
+            // Harvest values
+            const newSettings = {
+                ...currentSettings,
+                mentionUserId: document.getElementById('mentionUserId').value,
+                mentionEnabled: document.getElementById('mentionEnabled').checked,
+                defaultModel: document.getElementById('defaultModel').value,
+                defaultTemperature: parseFloat(document.getElementById('defaultTemperature').value),
+                
+                proxyEnabled: document.getElementById('proxyEnabled').checked,
+                proxyUrl: document.getElementById('proxyUrl').value,
+                noProxyDomains: document.getElementById('noProxyDomains').value.split(',').map(s => s.trim()).filter(Boolean)
+            };
+
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newSettings)
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    currentSettings = data.settings;
+                    renderSettings();
+                    alert('Settings saved successfully!');
+                } else {
+                    alert('Failed to save settings.');
+                }
+            } catch (e) {
+                alert('Error saving settings: ' + e.message);
+            }
+        }
+
+        async function createNewWebhook() {
+            const name = prompt("Enter Webhook Name:");
+            if (!name) return;
+            
+            const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+            const newHook = {
+                id,
+                name,
+                enabled: true,
+                secret: null,
+                actions: []
+            };
+
+            const newWebhooks = [...(currentSettings.webhooks || []), newHook];
+            
+            // Save immediately to persist
+             try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...currentSettings, webhooks: newWebhooks })
+                });
+                if(res.ok) {
+                    const data = await res.json();
+                    currentSettings = data.settings;
+                    renderWebhooks();
+                }
+            } catch(e) {
+                alert("Failed to create webhook");
+            }
+        }
+
+        async function deleteWebhook(id) {
+             if(!confirm("Are you sure?")) return;
+             
+             const newWebhooks = currentSettings.webhooks.filter(w => w.id !== id);
+              try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...currentSettings, webhooks: newWebhooks })
+                });
+                if(res.ok) {
+                    const data = await res.json();
+                    currentSettings = data.settings;
+                    renderWebhooks();
+                }
+            } catch(e) {
+                alert("Failed to delete webhook");
+            }
+        }
+
+        // Initial Load
+        fetchSettings();
+    </script>
+</body>
+</html>
