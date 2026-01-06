@@ -648,9 +648,32 @@ export async function chatWithAgent(
   }
   // ---------------------------
 
+  // Get active session and add message to history
+  const channelId = ctx.channelId || ctx.channel?.id;
+  const sessionData = getActiveSession(userId, channelId || '');
+  
+  if (sessionData && sessionData.session) {
+    // Add user message to history
+    sessionData.session.history.push({ role: 'user', content: message });
+    sessionData.session.messageCount++;
+    sessionData.session.lastActivity = new Date();
+  }
+
+  // Build conversation history string
+  let historyPrompt = "";
+  if (sessionData && sessionData.session && sessionData.session.history.length > 0) {
+    historyPrompt = "<conversation_history>\n";
+    for (const msg of sessionData.session.history) {
+      const role = msg.role === 'user' ? 'user' : 'assistant';
+      const safeContent = msg.content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      historyPrompt += `  <entry role="${role}">${safeContent}</entry>\n`;
+    }
+    historyPrompt += "</conversation_history>\n";
+  }
+
   // Build the enhanced prompt with agent's system prompt
   const safeMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  let enhancedPrompt = `${agent.systemPrompt}\n\n<user_query>${safeMessage}</user_query>`;
+  let enhancedPrompt = `${agent.systemPrompt}\n\n${historyPrompt ? `=== CONVERSATION HISTORY ===\n${historyPrompt}=== END HISTORY ===\n\n` : ''}<user_query>${safeMessage}</user_query>`;
 
   // Inject .agent-context.md files into prompt (since Gemini doesn't have tool access)
   let contextContent = "";
@@ -791,8 +814,8 @@ export async function chatWithAgent(
       // Import Antigravity CLI client
       const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
 
-      // Build Prompt
-      let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
+      // Build Prompt with history
+      let fullPrompt = enhancedPrompt;
 
       // Inject claude-mem context for Antigravity agents
       try {
@@ -943,6 +966,11 @@ export async function chatWithAgent(
         timestamp: new Date().toISOString()
       }];
       await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+    }
+
+    // Save response to session history
+    if (sessionData && sessionData.session && result.response) {
+      sessionData.session.history.push({ role: 'model', content: result.response });
     }
 
     // Send completion message
