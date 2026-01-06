@@ -34,6 +34,7 @@ import { ProcessCrashHandler, setupGlobalErrorHandlers, ProcessHealthMonitor } f
 import { handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "./discord/index.ts";
 import { SettingsPersistence } from "./util/settings-persistence.ts";
 import { WebServer } from "./server/index.ts";
+import { OSCManager } from "./osc/index.ts";
 
 
 
@@ -331,6 +332,23 @@ export async function createClaudeCodeBot(config: BotConfig) {
     },
     sessionManager: claudeSessionManager
   });
+
+  // Start OSC Server
+  try {
+    const oscManager = new OSCManager(
+      { port: 9000 },
+      { 
+        gitHandlers, 
+        claudeHandlers, 
+        agentHandlers, 
+        shellHandlers, 
+        utilsHandlers 
+      }
+    );
+    oscManager.start();
+  } catch (error) {
+    console.error("Failed to start OSC Server:", error);
+  }
 
   // Command handlers implementation
   const handlers: CommandHandlers = new Map([
