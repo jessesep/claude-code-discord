@@ -489,7 +489,7 @@ export async function createDiscordBot(
       console.error('Failed to register slash commands:', error);
     }
       
-      // Send startup message first
+      // Send startup message
       await myChannel.send(convertMessageContent({
         embeds: [{
           color: 0x00ff00,
@@ -507,40 +507,11 @@ export async function createDiscordBot(
         console.error('[Startup] Failed to send startup message:', err);
       });
       
-      // Test models on startup (async, don't block startup message)
-      try {
-        const { testAllModels, formatModelTestResults } = await import("../util/model-tester.ts");
-        const ownerId = Deno.env.get("OWNER_ID") || Deno.env.get("DEFAULT_MENTION_USER_ID");
-        const isAuthorized = !!ownerId;
-        
-        console.log('[Startup] Testing all configured models...');
-        const testResults = await testAllModels(isAuthorized);
-        
-        // Send test results to Discord
-        const testMessage = formatModelTestResults(testResults);
-        await myChannel.send(convertMessageContent({
-          embeds: [{
-            color: testResults.failedModels.length > 0 ? 0xffaa00 : 0x00ff00,
-            title: '🧪 Model Test Results',
-            description: testMessage,
-            timestamp: new Date().toISOString()
-          }]
-        })).catch(err => {
-          console.error('[Startup] Failed to send model test results:', err);
-        });
-      } catch (error) {
-        console.error('[Startup] Model testing failed:', error);
-        await myChannel.send(convertMessageContent({
-          embeds: [{
-            color: 0xff0000,
-            title: '⚠️ Model Test Failed',
-            description: `Failed to test models: ${error instanceof Error ? error.message : String(error)}`,
-            timestamp: new Date().toISOString()
-          }]
-        })).catch(() => {});
-      }
+      // Model testing disabled for now - can be re-enabled later
+      // TODO: Re-enable model testing once stable
     } catch (error) {
       console.error('Channel creation/retrieval error:', error);
+      console.error('Full error details:', error instanceof Error ? error.stack : error);
     }
   });
   
