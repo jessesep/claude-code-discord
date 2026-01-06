@@ -2,7 +2,7 @@ import OSC from "npm:osc-js";
 
 export interface OSCConfig {
   port: number;
-  remoteHost?: string;
+  remoteHosts?: string[];
   remotePort?: number;
 }
 
@@ -17,13 +17,13 @@ export interface OSCDependencies {
 export class OSCManager {
   private osc: any;
   private port: number;
-  private remoteHost: string;
+  private remoteHosts: string[];
   private remotePort: number;
   private deps: OSCDependencies;
 
   constructor(config: OSCConfig, deps: OSCDependencies = {}) {
     this.port = config.port;
-    this.remoteHost = config.remoteHost || '127.0.0.1';
+    this.remoteHosts = config.remoteHosts || ['127.0.0.1'];
     this.remotePort = config.remotePort || 9001;
     this.deps = deps;
     
@@ -192,18 +192,20 @@ export class OSCManager {
     try {
       await this.osc.open();
       console.log(`[OSC] Server listening on port ${this.port}`);
-      console.log(`[OSC] Feedback target: ${this.remoteHost}:${this.remotePort}`);
+      console.log(`[OSC] Feedback targets: ${this.remoteHosts.join(', ')} on port ${this.remotePort}`);
     } catch (error) {
       console.error('[OSC] Failed to start server:', error);
     }
   }
 
   public send(address: string, args: any[] = []) {
-    try {
-      const message = new OSC.Message(address, ...args);
-      this.osc.send(message, { host: this.remoteHost, port: this.remotePort });
-    } catch (error) {
-      // Phone might be offline
+    for (const host of this.remoteHosts) {
+      try {
+        const message = new OSC.Message(address, ...args);
+        this.osc.send(message, { host, port: this.remotePort });
+      } catch (error) {
+        // Target might be offline
+      }
     }
   }
 }
