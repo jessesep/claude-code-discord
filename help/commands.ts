@@ -800,6 +800,47 @@ export const COMMAND_HELP = {
       "Displays how category names include repository information",
       "Useful for confirming bot context and repository details"
     ]
+  },
+  "repo-sync": {
+    title: "🔄 Repository Sync",
+    description: "Scan and sync available Git repositories",
+    usage: "/repo-sync action: [scan/list/clear]",
+    examples: [
+      "/repo-sync action: scan",
+      "/repo-sync action: list",
+      "/repo-sync action: clear"
+    ],
+    parameters: [
+      { name: "action", description: "Action to perform: scan (find repos), list (show found repos), clear (clear cache)", required: true }
+    ],
+    notes: [
+      "scan: Scans the base directory and subdirectories (up to 2 levels deep) for Git repositories",
+      "list: Shows all repositories that have been scanned and cached",
+      "clear: Clears the repository cache",
+      "Repositories are cached in memory for quick access"
+    ]
+  },
+  "repo": {
+    title: "📂 Repository Management",
+    description: "Load and switch between repositories",
+    usage: "/repo action: [load/current/list] repo_name: [optional]",
+    examples: [
+      "/repo action: load",
+      "/repo action: load repo_name: my-project",
+      "/repo action: current",
+      "/repo action: list"
+    ],
+    parameters: [
+      { name: "action", description: "Action: load (switch repo), current (show active), list (show available)", required: true },
+      { name: "repo_name", description: "Repository name (optional for load - shows dropdown if omitted)", required: false }
+    ],
+    notes: [
+      "load: Switches to a repository. Shows dropdown menu if repo_name not provided",
+      "current: Shows the currently active repository",
+      "list: Lists all available repositories",
+      "When a repo is loaded, new worktree bots will be spawned from that repository's path",
+      "The dropdown menu allows easy selection from available repositories"
+    ]
   }
 };
 

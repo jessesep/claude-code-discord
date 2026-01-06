@@ -319,6 +319,39 @@ export async function createDiscordBot(
     const customId = interaction.customId;
     const values = interaction.values;
     
+    // Handle repo selection
+    if (customId === 'repo-select-load' && values && values.length > 0) {
+      await ctx.deferUpdate();
+      try {
+        // Create repo handlers on the fly
+        const { createRepoHandlers } = await import("../repo/index.ts");
+        const { WorktreeBotManager } = await import("../git/index.ts");
+        const worktreeBotManager = new WorktreeBotManager();
+        
+        const repoHandlers = createRepoHandlers({
+          workDir,
+          repoName,
+          branchName,
+          actualCategoryName,
+          discordToken,
+          applicationId,
+          botSettings,
+          worktreeBotManager
+        });
+        await repoHandlers.handleRepoSelect(ctx, values[0]);
+      } catch (error) {
+        await ctx.editReply({
+          embeds: [{
+            color: 0xff0000,
+            title: '❌ Error Loading Repository',
+            description: `Failed to load repository: ${error instanceof Error ? error.message : String(error)}`,
+            timestamp: new Date().toISOString()
+          }]
+        });
+      }
+      return;
+    }
+    
     // Handle agent/model selection
     if (customId === 'select-agent-model' && values && values.length > 0) {
       // Defer update immediately to prevent interaction timeout (3 second limit)
@@ -535,9 +568,11 @@ export async function createDiscordBot(
         .setCustomId(`run-adv-role:${provider}`)
         .setPlaceholder('Select a role...')
         .addOptions([
-          { label: '🔨 Builder', description: 'Build and create code', value: 'builder' },
-          { label: '🧪 Tester', description: 'Test and ensure quality', value: 'tester' },
-          { label: '🔍 Investigator', description: 'Investigate and analyze', value: 'investigator' }
+          { label: '🔨 Builder', description: 'Build and create code, implement features', value: 'builder' },
+          { label: '🧪 Tester', description: 'Test code, ensure quality, find bugs', value: 'tester' },
+          { label: '🔍 Investigator', description: 'Investigate issues, analyze systems', value: 'investigator' },
+          { label: '🏗️ Architect', description: 'Design systems, plan architecture', value: 'architect' },
+          { label: '👁️ Reviewer', description: 'Review code, provide feedback', value: 'reviewer' }
         ]);
       
       const roleRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(roleMenu);
@@ -554,13 +589,15 @@ export async function createDiscordBot(
         embeds: [{
           color: 0x5865F2,
           title: '🚀 Advanced Agent Runner',
-          description: `**Step 2 of 3: Select Role**\n\nProvider: **${providerNames[provider] || provider}**`,
+          description: `**Step 2 of 3: Select Role**\n\nProvider: **${providerNames[provider] || provider}**\n\nRoles are independent of provider - they define your agent's focus and load context from repository documents (e.g., \`.roles/builder.md\`).`,
           fields: [
-            { name: '🔨 Builder', value: 'Agents specialized in building and creating code', inline: true },
-            { name: '🧪 Tester', value: 'Agents specialized in testing and quality assurance', inline: true },
-            { name: '🔍 Investigator', value: 'Agents specialized in investigation and analysis', inline: true }
+            { name: '🔨 Builder', value: 'Build and create code, implement features', inline: true },
+            { name: '🧪 Tester', value: 'Test code, ensure quality, find bugs', inline: true },
+            { name: '🔍 Investigator', value: 'Investigate issues, analyze systems', inline: true },
+            { name: '🏗️ Architect', value: 'Design systems, plan architecture', inline: true },
+            { name: '👁️ Reviewer', value: 'Review code, provide feedback', inline: true }
           ],
-          footer: { text: 'Select a role to continue' },
+          footer: { text: 'Select a role to continue. Role documents are loaded from .roles/ folder.' },
           timestamp: true
         }],
         components: [roleRow]
@@ -575,7 +612,7 @@ export async function createDiscordBot(
       const role = values[0];
       
       // Import role definitions
-      const { ROLE_DEFINITIONS, PREDEFINED_AGENTS } = await import("../agent/index.ts");
+      const { ROLE_DEFINITIONS } = await import("../agent/index.ts");
       const roleDef = ROLE_DEFINITIONS[role];
       
       if (!roleDef) {
@@ -591,47 +628,9 @@ export async function createDiscordBot(
         return;
       }
       
-      // Step 3a: If builder role, show agent selection (2 agents)
-      if (role === 'builder' && roleDef.agents.length > 0) {
-        const { StringSelectMenuBuilder, ActionRowBuilder } = await import("npm:discord.js@14.14.1");
-        
-        const agentMenu = new StringSelectMenuBuilder()
-          .setCustomId(`run-adv-agent:${provider}:${role}`)
-          .setPlaceholder('Select an agent (2 available)...')
-          .addOptions(
-            roleDef.agents.slice(0, 2).map(agent => ({
-              label: agent.name,
-              description: agent.description,
-              value: agent.id
-            }))
-          );
-        
-        const agentRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(agentMenu);
-        
-        await ctx.editReply({
-          embeds: [{
-            color: 0x5865F2,
-            title: '🚀 Advanced Agent Runner',
-            description: `**Step 3a: Select Agent**\n\nRole: **${roleDef.name}**\n\nChoose one of the available agents:`,
-            fields: roleDef.agents.slice(0, 2).map(agent => ({
-              name: agent.name,
-              value: agent.description,
-              inline: false
-            })),
-            footer: { text: 'Select an agent to continue' },
-            timestamp: true
-          }],
-          components: [agentRow]
-        });
-        return;
-      }
-      
-      // Step 3b: For tester/investigator, go directly to model selection
-      // (They have predefined agents, we'll use the first one)
-      const selectedAgent = roleDef.agents[0]?.id || 'code-reviewer';
-      
-      // Proceed to model selection
-      const { getModelsForAgents, listAvailableModels } = await import("../util/list-models.ts");
+      // Step 3: Go directly to model selection (no agent selection needed)
+      // The role is independent of the provider
+      const { listAvailableModels } = await import("../util/list-models.ts");
       
       let availableModels: Array<{ name: string; displayName: string }> = [];
       
@@ -705,12 +704,12 @@ export async function createDiscordBot(
       }));
       
       const modelMenu = new SMBuilder()
-        .setCustomId(`run-adv-model:${provider}:${role}:${selectedAgent}`)
+        .setCustomId(`run-adv-model:${provider}:${role}`)
         .setPlaceholder('Select a model or use auto-select...')
         .addOptions(modelOptions);
       
       const autoSelectButton = new ButtonBuilder()
-        .setCustomId(`run-adv-auto:${provider}:${role}:${selectedAgent}`)
+        .setCustomId(`run-adv-auto:${provider}:${role}`)
         .setLabel('✨ Auto-Select Best Model')
         .setStyle(1); // Primary style
       
@@ -721,10 +720,11 @@ export async function createDiscordBot(
         embeds: [{
           color: 0x5865F2,
           title: '🚀 Advanced Agent Runner',
-          description: `**Step 3: Select Model**\n\nRole: **${roleDef.name}**\nAgent: **${roleDef.agents[0]?.name || 'Default'}**\n\nChoose a model or use auto-select:`,
+          description: `**Step 3: Select Model**\n\nRole: **${roleDef.emoji} ${roleDef.name}**\nProvider: **${provider}**\n\nChoose a model or use auto-select:`,
           fields: [
-            { name: 'Available Models', value: `${availableModels.length} models available`, inline: false },
-            { name: 'Auto-Select', value: 'Let the system choose the best model for this task', inline: false }
+            { name: 'Role Description', value: roleDef.description, inline: false },
+            { name: 'Available Models', value: `${availableModels.length} models available`, inline: true },
+            { name: 'Auto-Select', value: 'Let the system choose the best model', inline: true }
           ],
           footer: { text: 'Select a model or click auto-select' },
           timestamp: true
@@ -734,15 +734,16 @@ export async function createDiscordBot(
       return;
     }
     
-    // Handle run-adv agent selection (for builder role)
+    // Handle run-adv agent selection (DEPRECATED - skip directly to model)
+    // This handler is kept for backwards compatibility but should skip to model selection
     if (customId.startsWith('run-adv-agent:') && values && values.length > 0) {
       await ctx.deferUpdate();
       const parts = customId.split(':');
       const provider = parts[1];
       const role = parts[2];
-      const agentId = values[0];
+      // Ignore agentId - not used anymore
       
-      // Proceed to model selection
+      // Redirect to model selection (same as role handler)
       const { listAvailableModels } = await import("../util/list-models.ts");
       
       let availableModels: Array<{ name: string; displayName: string }> = [];
@@ -815,12 +816,12 @@ export async function createDiscordBot(
       }));
       
       const modelMenu = new SMBuilder()
-        .setCustomId(`run-adv-model:${provider}:${role}:${agentId}`)
+        .setCustomId(`run-adv-model:${provider}:${role}`)
         .setPlaceholder('Select a model or use auto-select...')
         .addOptions(modelOptions);
       
       const autoSelectButton = new ButtonBuilder()
-        .setCustomId(`run-adv-auto:${provider}:${role}:${agentId}`)
+        .setCustomId(`run-adv-auto:${provider}:${role}`)
         .setLabel('✨ Auto-Select Best Model')
         .setStyle(1);
       
@@ -829,16 +830,16 @@ export async function createDiscordBot(
       
       const { ROLE_DEFINITIONS } = await import("../agent/index.ts");
       const roleDef = ROLE_DEFINITIONS[role];
-      const agent = roleDef?.agents.find(a => a.id === agentId);
       
       await ctx.editReply({
         embeds: [{
           color: 0x5865F2,
           title: '🚀 Advanced Agent Runner',
-          description: `**Step 3: Select Model**\n\nRole: **${roleDef?.name || role}**\nAgent: **${agent?.name || agentId}**\n\nChoose a model or use auto-select:`,
+          description: `**Step 3: Select Model**\n\nRole: **${roleDef?.emoji || ''} ${roleDef?.name || role}**\n\nChoose a model or use auto-select:`,
           fields: [
-            { name: 'Available Models', value: `${availableModels.length} models available`, inline: false },
-            { name: 'Auto-Select', value: 'Let the system choose the best model for this task', inline: false }
+            { name: 'Role Description', value: roleDef?.description || 'Custom role', inline: false },
+            { name: 'Available Models', value: `${availableModels.length} models available`, inline: true },
+            { name: 'Auto-Select', value: 'Let the system choose the best model', inline: true }
           ],
           footer: { text: 'Select a model or click auto-select' },
           timestamp: true
@@ -854,11 +855,11 @@ export async function createDiscordBot(
       const parts = customId.split(':');
       const provider = parts[1];
       const role = parts[2];
-      const agentId = parts[3];
+      // agentId is optional (old format had it, new format doesn't)
       const model = values[0];
       
       // Start the agent session
-      const { setAgentSession, PREDEFINED_AGENTS } = await import("../agent/index.ts");
+      const { setAgentSession, PREDEFINED_AGENTS, ROLE_DEFINITIONS } = await import("../agent/index.ts");
       const userId = ctx.user.id;
       const channelId = ctx.channelId || ctx.channel?.id;
       
@@ -875,10 +876,34 @@ export async function createDiscordBot(
         return;
       }
       
-      // Set the agent session
-      setAgentSession(userId, channelId, agentId);
+      // Use general-assistant as base agent
+      const agentId = 'general-assistant';
       
+      // Set the agent session with provider override
+      setAgentSession(userId, channelId, agentId, role);
+      
+      // Get the agent and role definition
       const agent = PREDEFINED_AGENTS[agentId];
+      const roleDef = ROLE_DEFINITIONS[role];
+      
+      // Map provider selection to agent client type
+      const providerToClient: Record<string, 'claude' | 'cursor' | 'antigravity' | 'ollama'> = {
+        'cursor': 'cursor',
+        'claude-cli': 'claude',
+        'gemini-api': 'antigravity',
+        'antigravity': 'antigravity',
+        'ollama': 'ollama'
+      };
+      
+      // Override agent config for this session
+      if (agent && providerToClient[provider]) {
+        agent.client = providerToClient[provider];
+        agent.model = model; // Also update the model
+        // Inject role into system prompt
+        if (roleDef) {
+          agent.systemPrompt = `${agent.systemPrompt}\n\n${roleDef.systemPromptAddition}`;
+        }
+      }
       
       const providerNames: Record<string, string> = {
         'cursor': '💻 Cursor',
@@ -892,12 +917,12 @@ export async function createDiscordBot(
         embeds: [{
           color: 0x00ff00,
           title: '✅ Agent Session Started',
-          description: `**Agent:** ${agent?.name || agentId}\n**Provider:** ${providerNames[provider] || provider}\n**Role:** ${role}\n**Model:** ${model}\n\nYou can now chat with the agent!`,
+          description: `**Role:** ${roleDef?.emoji || ''} ${roleDef?.name || role}\n**Provider:** ${providerNames[provider] || provider}\n**Model:** ${model}\n\n${roleDef?.description || ''}\n\nYou can now chat with the agent!`,
           fields: [
-            { name: 'Agent', value: agent?.name || agentId, inline: true },
+            { name: 'Role', value: `${roleDef?.emoji || ''} ${roleDef?.name || role}`, inline: true },
             { name: 'Provider', value: providerNames[provider] || provider, inline: true },
             { name: 'Model', value: model, inline: true },
-            { name: 'Role', value: role, inline: true }
+            { name: 'Role Document', value: roleDef?.documentPath || 'Built-in', inline: false }
           ],
           footer: { text: 'Start chatting to interact with the agent' },
           timestamp: true
@@ -992,26 +1017,33 @@ export async function createDiscordBot(
       const parts = buttonId.split(':');
       const provider = parts[1];
       const role = parts[2];
-      const agentId = parts[3];
+      // agentId no longer used (old format compatibility)
       
-      // Auto-select best model based on role and agent
+      // Auto-select best model based on role
       let selectedModel = 'gemini-3-flash'; // Default
       
       try {
         if (provider === 'ollama') {
-          // For Ollama, get the first available model
+          // For Ollama, prefer faster/smaller models for better performance
           const { AgentProviderRegistry } = await import("../agent/provider-interface.ts");
           const ollamaProvider = AgentProviderRegistry.getProvider('ollama');
           if (ollamaProvider) {
             const status = await ollamaProvider.getStatus?.();
             if (status?.available && status.metadata?.models) {
               const models = status.metadata.models as string[];
-              selectedModel = models[0] || 'llama3.2';
+              // Prefer: 1.5B/7B (fast) > 14B (balanced) > others
+              const fastModels = models.filter(m => 
+                m.includes('1.5b') || m.includes('7b') || m.includes('3b')
+              );
+              const mediumModels = models.filter(m => 
+                m.includes('14b') && !m.includes('32b')
+              );
+              selectedModel = fastModels[0] || mediumModels[0] || models[0] || 'deepseek-r1:1.5b';
             } else {
-              selectedModel = 'llama3.2'; // Fallback
+              selectedModel = 'deepseek-r1:1.5b'; // Fast fallback
             }
           } else {
-            selectedModel = 'llama3.2'; // Fallback
+            selectedModel = 'deepseek-r1:1.5b'; // Fast fallback
           }
         } else if (provider === 'cursor') {
           selectedModel = 'auto'; // Let Cursor choose
@@ -1034,7 +1066,7 @@ export async function createDiscordBot(
       } catch {
         // Use default if model fetching fails
         if (provider === 'ollama') {
-          selectedModel = 'llama3.2';
+          selectedModel = 'deepseek-r1:1.5b'; // Fast default
         } else if (provider === 'cursor') {
           selectedModel = 'auto';
         } else if (provider === 'claude-cli') {
@@ -1043,7 +1075,7 @@ export async function createDiscordBot(
       }
       
       // Start the agent session
-      const { setAgentSession, PREDEFINED_AGENTS } = await import("../agent/index.ts");
+      const { setAgentSession, PREDEFINED_AGENTS, ROLE_DEFINITIONS } = await import("../agent/index.ts");
       const userId = ctx.user.id;
       const channelId = ctx.channelId || ctx.channel?.id;
       
@@ -1060,12 +1092,34 @@ export async function createDiscordBot(
         return;
       }
       
-      // Set the agent session
-      setAgentSession(userId, channelId, agentId);
+      // Use general-assistant as base agent
+      const agentId = 'general-assistant';
       
+      // Set the agent session with provider override
+      setAgentSession(userId, channelId, agentId, role);
+      
+      // Get the agent and role definition
       const agent = PREDEFINED_AGENTS[agentId];
-      const { ROLE_DEFINITIONS } = await import("../agent/index.ts");
       const roleDef = ROLE_DEFINITIONS[role];
+      
+      // Map provider selection to agent client type
+      const providerToClient: Record<string, 'claude' | 'cursor' | 'antigravity' | 'ollama'> = {
+        'cursor': 'cursor',
+        'claude-cli': 'claude',
+        'gemini-api': 'antigravity',
+        'antigravity': 'antigravity',
+        'ollama': 'ollama'
+      };
+      
+      // Override agent config for this session
+      if (agent && providerToClient[provider]) {
+        agent.client = providerToClient[provider];
+        agent.model = selectedModel; // Also update the model
+        // Inject role into system prompt
+        if (roleDef) {
+          agent.systemPrompt = `${agent.systemPrompt}\n\n${roleDef.systemPromptAddition}`;
+        }
+      }
       
       const providerNames: Record<string, string> = {
         'cursor': '💻 Cursor',
@@ -1079,12 +1133,12 @@ export async function createDiscordBot(
         embeds: [{
           color: 0x00ff00,
           title: '✅ Agent Session Started (Auto-Selected)',
-          description: `**Agent:** ${agent?.name || agentId}\n**Provider:** ${providerNames[provider] || provider}\n**Role:** ${roleDef?.name || role}\n**Model:** ${selectedModel} (auto-selected)\n\nYou can now chat with the agent!`,
+          description: `**Role:** ${roleDef?.emoji || ''} ${roleDef?.name || role}\n**Provider:** ${providerNames[provider] || provider}\n**Model:** ${selectedModel} (auto-selected)\n\n${roleDef?.description || ''}\n\nYou can now chat with the agent!`,
           fields: [
-            { name: 'Agent', value: agent?.name || agentId, inline: true },
+            { name: 'Role', value: `${roleDef?.emoji || ''} ${roleDef?.name || role}`, inline: true },
             { name: 'Provider', value: providerNames[provider] || provider, inline: true },
             { name: 'Model', value: selectedModel, inline: true },
-            { name: 'Role', value: roleDef?.name || role, inline: true }
+            { name: 'Role Document', value: roleDef?.documentPath || 'Built-in', inline: false }
           ],
           footer: { text: 'Start chatting to interact with the agent' },
           timestamp: true

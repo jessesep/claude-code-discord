@@ -15,7 +15,7 @@ export interface AgentConfig {
   maxTokens: number;
   capabilities: string[];
   riskLevel: 'low' | 'medium' | 'high';
-  client?: 'claude' | 'cursor' | 'antigravity'; // Which CLI client to use (default: claude)
+  client?: 'claude' | 'cursor' | 'antigravity' | 'ollama'; // Which CLI client to use (default: claude)
   workspace?: string; // For cursor: working directory
   force?: boolean; // For cursor: auto-approve operations
   sandbox?: 'enabled' | 'disabled'; // For cursor: sandbox mode
@@ -37,6 +37,9 @@ export interface AgentSession {
   
   // Cursor session ID for resuming conversations
   cursorSessionId?: string;
+  
+  // Selected role for the session
+  roleId?: string;
 }
 
 // Context note for all agents (context is automatically injected, no tool needed)
@@ -503,7 +506,7 @@ async function listAgents(ctx: any) {
   });
 }
 
-async function startAgentSession(ctx: any, agentName: string) {
+async function startAgentSession(ctx: any, agentName: string, roleId?: string) {
   const agent = AgentRegistry.getInstance().getAgent(agentName);
   if (!agent) {
     await ctx.editReply({
@@ -535,7 +538,7 @@ async function startAgentSession(ctx: any, agentName: string) {
   }
 
   const channelId = ctx.channelId || ctx.channel?.id;
-  console.log(`[startSession] Creating session: userId=${userId}, channelId=${channelId}, agentName=${agentName}`);
+  console.log(`[startSession] Creating session: userId=${userId}, channelId=${channelId}, agentName=${agentName}, roleId=${roleId}`);
   addActiveAgent(userId, channelId, agentName);
 
   const session: AgentSession = {
@@ -548,7 +551,8 @@ async function startAgentSession(ctx: any, agentName: string) {
     totalCost: 0,
     lastActivity: new Date(),
     status: 'active',
-    history: []
+    history: [],
+    roleId
   };
 
   agentSessions.push(session);
@@ -760,7 +764,19 @@ export async function chatWithAgent(
   // Build the enhanced prompt with agent's system prompt
   const safeSystemPrompt = agent.systemPrompt.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const safeMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  let enhancedPrompt = `${safeSystemPrompt}${gitContext}\n\n${historyPrompt ? `=== CONVERSATION HISTORY ===\n${historyPrompt}=== END HISTORY ===\n\n` : ''}<user_query>${safeMessage}</user_query>`;
+  
+  // Load role document if available
+  let roleContext = "";
+  if (sessionData && sessionData.session && sessionData.session.roleId) {
+    try {
+      const workDir = deps?.workDir || Deno.cwd();
+      roleContext = await loadRoleDocument(sessionData.session.roleId, workDir);
+    } catch (e) {
+      console.debug('[Agent] Error loading role document:', e);
+    }
+  }
+
+  let enhancedPrompt = `${safeSystemPrompt}${roleContext}${gitContext}\n\n${historyPrompt ? `=== CONVERSATION HISTORY ===\n${historyPrompt}=== END HISTORY ===\n\n` : ''}<user_query>${safeMessage}</user_query>`;
 
   // Inject .agent-context.md files into prompt (since Gemini doesn't have tool access)
   let contextContent = "";
@@ -1226,6 +1242,57 @@ export async function chatWithAgent(
           }
         }
       );
+    } else if (clientType === 'ollama') {
+      // Import Ollama provider
+      const { AgentProviderRegistry } = await import("./provider-interface.ts");
+      const ollamaProvider = AgentProviderRegistry.getProvider('ollama');
+      
+      if (!ollamaProvider) {
+        throw new Error('Ollama provider not found. Please ensure Ollama is installed and running.');
+      }
+      
+      // Check if Ollama is available
+      const isAvailable = await ollamaProvider.isAvailable();
+      if (!isAvailable) {
+        throw new Error('Ollama server is not running. Please start Ollama with `ollama serve` or ensure it is running on your system.');
+      }
+
+      // Build full prompt with history
+      let fullPrompt = enhancedPrompt;
+
+      // Call Ollama provider with streaming
+      const ollamaResult = await ollamaProvider.execute(
+        fullPrompt,
+        {
+          model: agent.model,
+          temperature: agent.temperature,
+          maxTokens: agent.maxTokens,
+        },
+        async (chunk) => {
+          currentChunk += chunk;
+
+          const now = Date.now();
+          if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+            lastUpdate = now;
+
+            const claudeMessages = [{
+              type: 'text' as const,
+              content: currentChunk,
+              timestamp: new Date().toISOString()
+            }];
+
+            await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+            currentChunk = "";
+          }
+        },
+        controller.signal
+      );
+
+      result = {
+        response: ollamaResult.response,
+        duration: ollamaResult.timing?.duration,
+        modelUsed: ollamaResult.modelUsed,
+      };
     }
 
     // Send final chunk if there's any remaining content
@@ -1431,12 +1498,22 @@ export async function chatWithAgent(
       }
     } else if (errorMessage.includes("exited with code 1")) {
       errorMessage = "❌ Cursor CLI encountered an error. This might be a temporary issue - please try again.";
+    } else if (errorMessage.includes("Ollama server is not running")) {
+      errorMessage = "❌ Ollama server is not running. Please start Ollama with `ollama serve` or check if it's running.";
+    } else if (errorMessage.includes("No Ollama models available")) {
+      errorMessage = "❌ No Ollama models found. Please pull a model first (e.g., `ollama pull llama3.2`).";
     }
+    
+    // Get proper client display name
+    const clientDisplayName = clientType === 'cursor' ? 'Cursor' : 
+                             clientType === 'ollama' ? 'Ollama' : 
+                             clientType === 'antigravity' ? 'Antigravity' : 
+                             'Claude';
     
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
-        title: `❌ Agent Error (${clientType === 'cursor' ? 'Cursor' : 'Claude'})`,
+        title: `❌ Agent Error (${clientDisplayName})`,
         description: `Failed to process: ${errorMessage}`,
         timestamp: new Date().toISOString()
       }]
@@ -1592,7 +1669,7 @@ async function endAgentSession(ctx: any) {
 
 // (Removed duplicate getActiveSession)
 
-export function setAgentSession(userId: string, channelId: string, agentName: string) {
+export function setAgentSession(userId: string, channelId: string, agentName: string, roleId?: string) {
   addActiveAgent(userId, channelId, agentName);
   const session: AgentSession = {
     id: `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1604,7 +1681,8 @@ export function setAgentSession(userId: string, channelId: string, agentName: st
     totalCost: 0,
     lastActivity: new Date(),
     status: 'active',
-    history: []
+    history: [],
+    roleId
   };
   agentSessions.push(session);
 }
@@ -2016,39 +2094,113 @@ export const runAdvCommand = new SlashCommandBuilder()
 
 export const simpleCommands = [runCommand, killCommand, syncCommand, runAdvCommand];
 
-// Role definitions with agents
+// Role definitions - repository-based, independent of provider
 export interface RoleDefinition {
   name: string;
   description: string;
-  agents: Array<{ id: string; name: string; description: string }>;
+  emoji: string;
+  documentPath: string; // Path to role document in repository (e.g., ".roles/builder.md")
+  systemPromptAddition: string; // Additional instructions for this role
 }
 
 export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
   builder: {
     name: 'Builder',
-    description: 'Agents specialized in building and creating code',
-    agents: [
-      { id: 'cursor-coder', name: 'Cursor Coder', description: 'Autonomous code building with Cursor' },
-      { id: 'ag-coder', name: 'Antigravity Coder', description: 'Code building with Antigravity/Gemini' }
-    ]
+    description: 'Build and create code, implement features',
+    emoji: '🔨',
+    documentPath: '.roles/builder.md',
+    systemPromptAddition: `
+**Role: Builder**
+Your primary focus is building and creating code. You should:
+- Implement new features and functionality
+- Write clean, well-structured code
+- Follow best practices and coding standards
+- Create comprehensive documentation
+- Consider maintainability and scalability
+`
   },
   tester: {
     name: 'Tester',
-    description: 'Agents specialized in testing and quality assurance',
-    agents: [
-      { id: 'code-reviewer', name: 'Code Reviewer', description: 'Code review and quality analysis' },
-      { id: 'debugger', name: 'Debug Specialist', description: 'Bug finding and fixing' }
-    ]
+    description: 'Test code, ensure quality, find bugs',
+    emoji: '🧪',
+    documentPath: '.roles/tester.md',
+    systemPromptAddition: `
+**Role: Tester**
+Your primary focus is testing and quality assurance. You should:
+- Write comprehensive tests (unit, integration, e2e)
+- Identify bugs and edge cases
+- Verify code quality and standards
+- Perform code reviews
+- Ensure proper error handling
+`
   },
   investigator: {
     name: 'Investigator',
-    description: 'Agents specialized in investigation and analysis',
-    agents: [
-      { id: 'security-expert', name: 'Security Analyst', description: 'Security analysis and vulnerability assessment' },
-      { id: 'architect', name: 'Software Architect', description: 'System design and architecture analysis' }
-    ]
+    description: 'Investigate issues, analyze systems, security',
+    emoji: '🔍',
+    documentPath: '.roles/investigator.md',
+    systemPromptAddition: `
+**Role: Investigator**
+Your primary focus is investigation and analysis. You should:
+- Analyze system architecture and design
+- Investigate security vulnerabilities
+- Debug complex issues
+- Perform root cause analysis
+- Document findings and recommendations
+`
+  },
+  architect: {
+    name: 'Architect',
+    description: 'Design systems, plan architecture',
+    emoji: '🏗️',
+    documentPath: '.roles/architect.md',
+    systemPromptAddition: `
+**Role: Architect**
+Your primary focus is system design and architecture. You should:
+- Design scalable, maintainable systems
+- Plan implementation strategies
+- Make technology decisions
+- Create architectural diagrams
+- Consider trade-offs and best practices
+`
+  },
+  reviewer: {
+    name: 'Reviewer',
+    description: 'Review code, provide feedback',
+    emoji: '👁️',
+    documentPath: '.roles/reviewer.md',
+    systemPromptAddition: `
+**Role: Reviewer**
+Your primary focus is code review and feedback. You should:
+- Review code for quality and standards
+- Identify potential issues
+- Suggest improvements
+- Ensure best practices are followed
+- Provide constructive feedback
+`
   }
 };
+
+/**
+ * Load role document from repository
+ * Falls back to systemPromptAddition if document doesn't exist
+ */
+export async function loadRoleDocument(roleId: string, workDir: string): Promise<string> {
+  const role = ROLE_DEFINITIONS[roleId];
+  if (!role) {
+    return '';
+  }
+
+  try {
+    const rolePath = `${workDir}/${role.documentPath}`;
+    const roleContent = await Deno.readTextFile(rolePath);
+    return `\n\n=== ROLE CONTEXT ===\n${roleContent}\n=== END ROLE CONTEXT ===\n`;
+  } catch (error) {
+    // If document doesn't exist, use the built-in prompt addition
+    console.debug(`[Role] Could not read ${role.documentPath}, using built-in prompt`);
+    return role.systemPromptAddition;
+  }
+}
 
 export async function handleSimpleCommand(ctx: any, commandName: string, deps: AgentHandlerDeps) {
   // Map simple commands to agent actions

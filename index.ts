@@ -6,6 +6,7 @@ import { SettingsPersistence } from "./util/settings-persistence.ts";
 import { WebServer } from "./server/index.ts";
 import { getGitInfo, WorktreeBotManager, createGitHandlers, gitCommands } from "./git/index.ts";
 import { ShellManager, createShellHandlers, shellCommands } from "./shell/index.ts";
+import { repoCommands, createRepoHandlers } from "./repo/index.ts";
 import { ClaudeSessionManager, createClaudeHandlers, claudeCommands, enhancedClaudeCommands, createEnhancedClaudeHandlers, cleanSessionId, createClaudeSender, convertToClaudeMessages, expandableContent } from "./claude/index.ts";
 import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
 import { helpCommand, createHelpHandlers } from "./help/index.ts";
@@ -237,6 +238,17 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
   const gitHandlers = createGitHandlers({
     workDir,
+    actualCategoryName,
+    discordToken,
+    applicationId,
+    botSettings,
+    worktreeBotManager
+  });
+
+  const repoHandlers = createRepoHandlers({
+    workDir,
+    repoName,
+    branchName,
     actualCategoryName,
     discordToken,
     applicationId,
@@ -603,6 +615,19 @@ export async function createClaudeCodeBot(config: BotConfig) {
             }]
           });
         }
+      }
+    }],
+    ['repo-sync', {
+      execute: async (ctx: InteractionContext) => {
+        const action = ctx.getString('action', true)!;
+        await repoHandlers.onRepoSync(ctx, action);
+      }
+    }],
+    ['repo', {
+      execute: async (ctx: InteractionContext) => {
+        const action = ctx.getString('action', true)!;
+        const repoName = ctx.getString('repo_name');
+        await repoHandlers.onRepo(ctx, action, repoName || undefined);
       }
     }],
     ['worktree-bots', {
