@@ -13,8 +13,10 @@ export function handleMessageCreate(
   channelContextManager: any
 ) {
   client.on(Events.MessageCreate, async (message: any) => {
-    // Ignore own messages
-    if (message.author.bot) return;
+    console.log(`[MessageHandler] Received message from ${message.author.tag} (${message.author.id}): ${message.content.substring(0, 50)}`);
+    // Ignore other bots unless it's our whitelisted tester bot
+    const TESTER_BOT_ID = Deno.env.get("TESTER_BOT_ID") || "1458440747295576206";
+    if (message.author.bot && message.author.id !== TESTER_BOT_ID) return;
     
     const myChannel = getMyChannel();
     
@@ -87,8 +89,21 @@ export function handleMessageCreate(
 
     try {
       // Extract prompt (remove the mention)
-      const prompt = message.content.replace(/<@!?\d+>/g, '').trim();
-      if (!prompt) return;
+      const contentWithoutMentions = message.content.replace(/<@!?\d+>/g, '').trim();
+      if (!contentWithoutMentions) return;
+
+      // Check for model override in prompt: model="xxx"
+      let prompt = contentWithoutMentions;
+      let modelOverride: string | null = null;
+      const modelMatch = contentWithoutMentions.match(/model=["']([^"']+)["']/i);
+      if (modelMatch) {
+        modelOverride = modelMatch[1];
+        // Remove the model override from the prompt to avoid confusing the agent
+        prompt = contentWithoutMentions.replace(/model=["']([^"']+)["']/i, '').trim();
+        console.log(`[MessageHandler] Detected model override in prompt: ${modelOverride}`);
+      }
+
+      console.log(`[MessageHandler] Processing prompt: "${prompt.substring(0, 50)}..."`);
 
       const agentHandler = handlers.get('agent');
       if (!agentHandler) {
@@ -106,8 +121,20 @@ export function handleMessageCreate(
       const activeAgents = getActiveAgents(message.author.id, message.channelId);
       
       let targetAgent = activeSession?.agentName || 'general-assistant';
+      let agentExplicitlyNamed = false;
       
-      const messageLower = prompt.toLowerCase();
+      const messageLower = contentWithoutMentions.toLowerCase();
+
+      // NEW: Check for exact agent name mentions first
+      for (const agentName of Object.keys(PREDEFINED_AGENTS)) {
+        if (messageLower.includes(agentName.toLowerCase())) {
+          targetAgent = agentName;
+          agentExplicitlyNamed = true;
+          console.log(`[MessageHandler] Detected agent mention: ${agentName}`);
+          break;
+        }
+      }
+      
       const providerMentions: Record<string, { client: 'claude' | 'cursor' | 'antigravity' | 'ollama'; agentNames: string[] }> = {
         'ollama': { client: 'ollama', agentNames: ['general-assistant'] },
         'cursor': { client: 'cursor', agentNames: ['cursor-coder', 'cursor-refactor', 'cursor-debugger', 'cursor-fast'] },
@@ -120,23 +147,32 @@ export function handleMessageCreate(
       for (const [provider, config] of Object.entries(providerMentions)) {
         if (messageLower.includes(provider)) {
           detectedClient = config.client;
-          const matchingAgent = activeAgents.find(agentName => {
-            const agent = PREDEFINED_AGENTS[agentName];
-            return agent && agent.client === config.client;
-          });
+          console.log(`[MessageHandler] Detected provider mention: ${provider} (client: ${detectedClient})`);
           
-          if (matchingAgent) {
-            targetAgent = matchingAgent;
-            break;
+          // Only change the target agent if it wasn't explicitly named
+          if (!agentExplicitlyNamed) {
+            const matchingAgent = activeAgents.find(agentName => {
+              const agent = PREDEFINED_AGENTS[agentName];
+              return agent && agent.client === config.client;
+            });
+            
+            if (matchingAgent) {
+              targetAgent = matchingAgent;
+              console.log(`[MessageHandler] Using matching active agent for provider: ${targetAgent}`);
+            } else {
+              // Try to find a matching agent in predefined agents if none active
+              const nameMatchingAgent = config.agentNames.find(name => PREDEFINED_AGENTS[name]);
+              if (nameMatchingAgent) {
+                targetAgent = nameMatchingAgent;
+                console.log(`[MessageHandler] Using default agent for provider: ${targetAgent}`);
+              }
+            }
           }
-          
-          const nameMatchingAgent = activeAgents.find(agentName => config.agentNames.includes(agentName));
-          if (nameMatchingAgent) {
-            targetAgent = nameMatchingAgent;
-            break;
-          }
+          break;
         }
       }
+
+      console.log(`[MessageHandler] Final target agent: ${targetAgent}`);
 
       // Create mock interaction
       let replyMessage: any = null;
@@ -151,6 +187,7 @@ export function handleMessageCreate(
             if (name === 'action') return 'chat';
             if (name === 'agent_name') return targetAgent;
             if (name === 'message') return prompt;
+            if (name === 'model') return modelOverride;
             return null;
           },
           getBoolean: () => null
@@ -159,6 +196,7 @@ export function handleMessageCreate(
           replyMessage = await message.reply(opts);
         },
         deferReply: async () => {
+          console.log(`[MessageHandler] Deferring reply...`);
           replyMessage = await message.reply({
             embeds: [{
               color: 0x5865F2,
