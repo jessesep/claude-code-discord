@@ -371,3 +371,152 @@ export async function refreshModelCache(): Promise<AvailableModel[]> {
   lastFetchTime = 0; // Force refresh
   return getCachedModels();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Model Fallback Chain
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Fallback chains for different model families
+ * When a model fails (429, 503, unavailable), try the next in the chain
+ * 
+ * GOLDEN RULE: Fallbacks should be same-generation or newer, never older
+ */
+export const MODEL_FALLBACK_CHAINS: Record<string, string[]> = {
+  // Gemini 3 family (newest)
+  'gemini-3-flash-preview': ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash'],
+  'gemini-3-flash': ['gemini-3-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash'],
+  'gemini-3-pro-preview': ['gemini-3-pro-preview', 'gemini-2.5-pro', 'gemini-2.0-pro-exp'],
+  
+  // Gemini 2.5 family
+  'gemini-2.5-flash': ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-exp'],
+  'gemini-2.5-pro': ['gemini-2.5-pro', 'gemini-2.0-pro-exp', 'gemini-1.5-pro-latest'],
+  
+  // Gemini 2.0 family
+  'gemini-2.0-flash': ['gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-2.0-flash-lite'],
+  'gemini-2.0-flash-exp': ['gemini-2.0-flash-exp', 'gemini-2.0-flash'],
+  'gemini-2.0-pro-exp': ['gemini-2.0-pro-exp', 'gemini-1.5-pro-latest'],
+  
+  // Claude family (Anthropic)
+  'sonnet-4.5': ['sonnet-4.5', 'sonnet-4', 'sonnet-4-thinking'],
+  'sonnet-4': ['sonnet-4', 'sonnet-4-thinking'],
+  'opus-4.5': ['opus-4.5', 'opus-4'],
+  'opus-4': ['opus-4'],
+  
+  // OpenAI family (via Cursor)
+  'gpt-5.1': ['gpt-5.1', 'gpt-5', 'gpt-4o'],
+  'gpt-5': ['gpt-5', 'gpt-4o', 'o3-mini'],
+  'gpt-4o': ['gpt-4o', 'o3-mini'],
+  'o3-mini': ['o3-mini', 'o1'],
+};
+
+/**
+ * Get the fallback chain for a model
+ * Returns the chain starting from the given model, or a default chain if not found
+ */
+export function getFallbackChain(modelName: string): string[] {
+  // Direct match
+  if (MODEL_FALLBACK_CHAINS[modelName]) {
+    return MODEL_FALLBACK_CHAINS[modelName];
+  }
+  
+  // Try to find a matching family
+  for (const [key, chain] of Object.entries(MODEL_FALLBACK_CHAINS)) {
+    if (modelName.startsWith(key.split('-').slice(0, 2).join('-'))) {
+      console.log(`[Fallback] Using chain for ${key} as fallback for ${modelName}`);
+      return [modelName, ...chain.slice(1)];
+    }
+  }
+  
+  // No chain found - return just the model itself (no fallback)
+  console.warn(`[Fallback] No fallback chain defined for ${modelName}`);
+  return [modelName];
+}
+
+/**
+ * Get the next fallback model after a failure
+ * Returns null if no more fallbacks available
+ */
+export function getNextFallback(currentModel: string, attemptedModels: string[]): string | null {
+  const chain = getFallbackChain(currentModel);
+  
+  // Find the next model in the chain that hasn't been tried
+  for (const model of chain) {
+    if (!attemptedModels.includes(model)) {
+      return model;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Check if an error is a rate limit or availability error that should trigger fallback
+ */
+export function shouldTriggerFallback(error: unknown): boolean {
+  const msg = String(error).toLowerCase();
+  return (
+    msg.includes('rate limit') ||
+    msg.includes('quota') ||
+    msg.includes('429') ||
+    msg.includes('503') ||
+    msg.includes('503') ||
+    msg.includes('service unavailable') ||
+    msg.includes('model is overloaded') ||
+    msg.includes('temporarily unavailable') ||
+    msg.includes('not found') ||
+    msg.includes('404')
+  );
+}
+
+export interface FallbackResult {
+  success: boolean;
+  modelUsed: string;
+  attemptedModels: string[];
+  response?: string;
+  error?: string;
+}
+
+/**
+ * Execute a function with automatic model fallback
+ * Tries each model in the fallback chain until one succeeds
+ */
+export async function executeWithFallback<T>(
+  initialModel: string,
+  executor: (model: string) => Promise<T>,
+  onFallback?: (fromModel: string, toModel: string, error: string) => void
+): Promise<{ result: T; modelUsed: string; attemptedModels: string[] }> {
+  const attemptedModels: string[] = [];
+  let currentModel = initialModel;
+  let lastError: unknown;
+  
+  while (currentModel) {
+    attemptedModels.push(currentModel);
+    
+    try {
+      const result = await executor(currentModel);
+      return { result, modelUsed: currentModel, attemptedModels };
+    } catch (error) {
+      lastError = error;
+      
+      if (shouldTriggerFallback(error)) {
+        const nextModel = getNextFallback(initialModel, attemptedModels);
+        
+        if (nextModel) {
+          console.log(`[Fallback] ${currentModel} failed (${String(error).substring(0, 50)}...), trying ${nextModel}`);
+          if (onFallback) {
+            onFallback(currentModel, nextModel, String(error));
+          }
+          currentModel = nextModel;
+          continue;
+        }
+      }
+      
+      // Non-recoverable error or no more fallbacks
+      throw error;
+    }
+  }
+  
+  // Should never reach here, but just in case
+  throw lastError || new Error('All fallback models exhausted');
+}

@@ -709,6 +709,8 @@ export async function chatWithAgent(
   });
 
   const processingEmbed = getAgentEmbed(activeAgentName, agent.name, 'processing');
+  const processingStartTime = Date.now();
+  
   await ctx.editReply({
     embeds: [{
       color: processingEmbed.color,
@@ -717,6 +719,54 @@ export async function chatWithAgent(
       timestamp: new Date().toISOString()
     }]
   });
+
+  // Progress update interval - shows elapsed time for long-running tasks
+  let progressInterval: number | undefined;
+  let lastProgressUpdate = Date.now();
+  const PROGRESS_UPDATE_INTERVAL = 5000; // Update every 5 seconds after initial 3s
+  
+  const startProgressUpdates = () => {
+    progressInterval = setInterval(async () => {
+      const elapsed = Date.now() - processingStartTime;
+      const elapsedStr = formatDuration(elapsed);
+      
+      // Only update if enough time has passed and task is still running
+      if (elapsed > 3000 && Date.now() - lastProgressUpdate >= PROGRESS_UPDATE_INTERVAL) {
+        lastProgressUpdate = Date.now();
+        
+        // Build progress bar based on elapsed time (visual indicator)
+        const progressEmoji = elapsed < 10000 ? '🔄' : elapsed < 30000 ? '⏳' : elapsed < 60000 ? '🔄⏳' : '⏳⏳';
+        
+        const updatedFields = buildAgentInfoFields(ctx, agent, clientType, sessionData, { agentKey: activeAgentName });
+        updatedFields.push({ name: '⏱️ Elapsed', value: elapsedStr, inline: true });
+        updatedFields.push({ name: '📝 Task', value: `\`${message.substring(0, 100)}${message.length > 100 ? '...' : ''}\``, inline: false });
+        
+        try {
+          await ctx.editReply({
+            embeds: [{
+              color: processingEmbed.color,
+              title: `${processingEmbed.title.split(' - ')[0]} - ${progressEmoji} Processing (${elapsedStr})`,
+              fields: updatedFields,
+              footer: { text: `Working... ${elapsed > 30000 ? 'This may take a while' : ''}` },
+              timestamp: new Date().toISOString()
+            }]
+          });
+        } catch {
+          // Ignore update errors (message may have been deleted)
+        }
+      }
+    }, 3000); // Check every 3 seconds
+  };
+  
+  const stopProgressUpdates = () => {
+    if (progressInterval) {
+      clearInterval(progressInterval);
+      progressInterval = undefined;
+    }
+  };
+  
+  // Start progress updates
+  startProgressUpdates();
 
   const isRateLimitError = (error: any): boolean => {
     const msg = String(error).toLowerCase();
@@ -822,6 +872,9 @@ export async function chatWithAgent(
       }
     }
 
+    // Stop progress updates before showing completion
+    stopProgressUpdates();
+    
     const responseDuration = Date.now() - requestStartTime;
     const displayResponse = formatAgentResponse(fullResponse);
     
@@ -845,6 +898,9 @@ export async function chatWithAgent(
     });
 
   } catch (error) {
+    // Stop progress updates on error
+    stopProgressUpdates();
+    
     console.error(`[Agent] Error:`, error);
     
     // Build error embed with agent styling

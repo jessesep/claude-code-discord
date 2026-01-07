@@ -22,25 +22,63 @@ async function runGitTest() {
   const branchName = `test-e2e-branch-${Date.now()}`;
   
   try {
-    const result = await spawnAgent(
+    // Step 1: Create and switch to branch, then back to main
+    console.log(`📝 Step 1: Creating branch "${branchName}" and testing checkout...`);
+    const result1 = await spawnAgent(
       ctx,
       'cursor-coder',
-      `Perform these git operations in order:
-1. Create a new branch named "${branchName}"
-2. Switch to this new branch
-3. Switch back to the main branch
-4. Delete the branch "${branchName}"
-Confirm when all steps are completed.`,
-      { timeout: 180000, useBudget: true }
+      `Execute these exact git commands in order and tell me the output of each:
+1. git checkout -b ${branchName}
+2. git branch (to confirm the new branch exists)
+3. git checkout main
+Report what each command output.`,
+      { timeout: 120000, useBudget: true }
     );
 
-    if (!result.success) {
-      throw new Error(result.error || 'Test failed');
+    if (!result1.success) {
+      throw new Error(`Step 1 failed: ${result1.error}`);
     }
 
-    console.log(`✅ Agent finished in ${result.duration}ms. Verifying branch "${branchName}" does not exist...`);
+    console.log(`✅ Step 1 complete in ${result1.duration}ms`);
     
+    // Small delay to ensure git operations complete
+    await new Promise(r => setTimeout(r, 2000));
+    
+    // Verify branch exists before deletion
+    const checkCmd = new Deno.Command("git", {
+      args: ["branch", "--list", branchName],
+      stdout: "piped",
+    });
+    const checkOutput = await checkCmd.output();
+    const branchList = new TextDecoder().decode(checkOutput.stdout).trim();
+    
+    if (!branchList.includes(branchName)) {
+      throw new Error(`Branch "${branchName}" was not created!`);
+    }
+    console.log(`✅ Verified branch "${branchName}" exists`);
+
+    // Step 2: Delete the branch (separate prompt for clarity)
+    console.log(`📝 Step 2: Deleting branch "${branchName}"...`);
+    const result2 = await spawnAgent(
+      ctx,
+      'cursor-coder',
+      `Delete the git branch named "${branchName}" using: git branch -D ${branchName}
+Then run: git branch
+Report what both commands output to confirm the branch is deleted.`,
+      { timeout: 60000, useBudget: true }
+    );
+
+    if (!result2.success) {
+      throw new Error(`Step 2 failed: ${result2.error}`);
+    }
+
+    console.log(`✅ Step 2 complete in ${result2.duration}ms`);
+    
+    // Wait for git to sync
+    await new Promise(r => setTimeout(r, 2000));
+
     // Verify branch was deleted with retries
+    console.log(`🔍 Verifying branch deletion...`);
     let branchExists = true;
     for (let i = 0; i < 5; i++) {
       const cmd = new Deno.Command("git", {
@@ -64,7 +102,8 @@ Confirm when all steps are completed.`,
     }
     
     console.log(`✅ Git operation verification passed.`);
-    return { success: true, message: 'Git operation test passed', duration: result.duration };
+    const totalDuration = (result1.duration || 0) + (result2.duration || 0);
+    return { success: true, message: 'Git operation test passed', duration: totalDuration };
 
   } catch (err) {
     return { success: false, message: err.message };

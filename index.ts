@@ -41,6 +41,7 @@ import { repoCommands, createRepoHandlers } from "./repo/index.ts";
 import { githubCommands, createGitHubHandlers } from "./git/index.ts";
 import { simpleCommands } from "./agent/index.ts";
 import { configCommand, handleConfigCommand } from "./settings/index.ts";
+import { forceAcquireLock, releaseInstanceLock } from "./util/instance-lock.ts";
 
 
 
@@ -2137,6 +2138,14 @@ export async function createOneAgentBot(config: BotConfig) {
 // Main execution
 if (import.meta.main) {
   try {
+    // Acquire instance lock to prevent duplicate bot instances
+    await forceAcquireLock();
+    
+    // Register cleanup on exit
+    globalThis.addEventListener('unload', () => {
+      releaseInstanceLock();
+    });
+    
     // Get environment variables and command line arguments
     const discordToken = Deno.env.get("DISCORD_TOKEN");
     const applicationId = Deno.env.get("APPLICATION_ID");

@@ -36,8 +36,8 @@ sleep 2
 echo "Starting Main Bot and Server..."
 notify_discord "🚀 Main Bot" "Starting main bot process..." "0x5865F2"
 
-# Run in background with nohup
-nohup deno run --allow-all index.ts >> bot_output.log 2>&1 &
+# Run in background with nohup (--unstable-net for OSC UDP support)
+nohup deno run --allow-all --unstable-net index.ts >> bot_output.log 2>&1 &
 
 # 3. Reboot Testing Bot (Run E2E Suite)
 echo "Rebooting Testing Bot..."
