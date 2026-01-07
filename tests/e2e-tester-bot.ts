@@ -1,13 +1,29 @@
-import { setupTester, waitForResult, isFinalResponse, ONE_BOT_ID, getBudgetPrompt } from './e2e-utils.ts';
+/**
+ * one agent discord - E2E Tester Bot
+ * 
+ * Basic end-to-end test that validates core agent functionality.
+ * Uses the #e2e-basic testing channel (not the main channel).
+ */
+
+import { 
+  createTestContext, 
+  spawnAgent, 
+  cleanupTestContext,
+  isFinalResponse,
+  waitForResult,
+  buildAgentPrompt,
+} from './e2e-utils.ts';
 
 async function runE2ETest() {
-  console.log('🧪 Starting E2E Tester Bot Suite (Refactored)...');
+  console.log('🧪 Starting E2E Tester Bot Suite...');
+  console.log('   Using dedicated testing channel (not main)\n');
   
-  const ctx = await setupTester();
+  // Create context for e2e-basic channel
+  const ctx = await createTestContext('e2e-basic');
   console.log(`✅ Tester connected as ${ctx.tester.user?.tag}`);
-  console.log(`📂 Testing in channel: #${ctx.channel.name}`);
+  console.log(`📂 Testing in channel: #${ctx.channel.name} (${ctx.channelType})`);
 
-  // NEW: Announce startup to Discord
+  // Announce startup to Discord
   await ctx.channel.send({
     embeds: [{
       color: 0x9b59b6,
@@ -15,6 +31,7 @@ async function runE2ETest() {
       description: `Testing bot **${ctx.tester.user?.tag}** is now online and initiating scenarios.`,
       fields: [
         { name: "📂 Channel", value: `#${ctx.channel.name}`, inline: true },
+        { name: "🏷️ Type", value: ctx.channelType, inline: true },
         { name: "🤖 Mode", value: "Budget (Gemini 3 Flash)", inline: true }
       ],
       timestamp: new Date().toISOString()
@@ -25,24 +42,20 @@ async function runE2ETest() {
   const filename = `e2e_test_${timestamp}.txt`;
   const expectedContent = "E2E TEST PASSED";
   
-  // Use budget-friendly prompt helper
-  const testPrompt = getBudgetPrompt(
-    "cursor-coder", 
-    `Create a file named "${filename}" with the text "${expectedContent}" and then show me the contents of that file.`
-  );
-  
   try {
-    console.log(`📤 Sending command: "${testPrompt.substring(0, 50)}..."`);
-    await ctx.channel.send(testPrompt);
-
-    console.log(`⏳ Waiting for agent to complete task...`);
-    const result = await waitForResult(ctx, 120000, isFinalResponse);
+    // Use the new spawnAgent helper
+    const result = await spawnAgent(
+      ctx,
+      'cursor-coder',
+      `Create a file named "${filename}" with the text "${expectedContent}" and then show me the contents of that file.`,
+      { timeout: 120000, useBudget: true }
+    );
 
     if (!result.success) {
       throw new Error(result.error || 'Test failed');
     }
 
-    console.log(`✅ Agent finished. Verifying file: ${filename}`);
+    console.log(`✅ Agent finished in ${result.duration}ms. Verifying file: ${filename}`);
     
     const fileContent = await Deno.readTextFile(filename);
     if (fileContent.trim() !== expectedContent) {
@@ -51,20 +64,24 @@ async function runE2ETest() {
     
     console.log(`✅ File verification passed.`);
     
-    // NEW: Report final success to Discord
+    // Report final success to Discord
     await ctx.channel.send({
       embeds: [{
         color: 0x00ff00,
         title: "✨ E2E Test Passed",
         description: "Basic file creation and verification sequence completed successfully.",
+        fields: [
+          { name: "⏱️ Duration", value: `${result.duration}ms`, inline: true },
+          { name: "📁 File", value: filename, inline: true }
+        ],
         timestamp: new Date().toISOString()
       }]
     });
 
-    return { success: true, message: 'Basic file creation test passed' };
+    return { success: true, message: 'Basic file creation test passed', duration: result.duration };
 
   } catch (err) {
-    // NEW: Report error to Discord
+    // Report error to Discord
     try {
       await ctx.channel.send({
         embeds: [{
@@ -82,7 +99,7 @@ async function runE2ETest() {
       await Deno.remove(filename);
       console.log(`🧹 Cleaned up test file: ${filename}`);
     } catch {}
-    ctx.tester.destroy();
+    await cleanupTestContext(ctx);
   }
 }
 
@@ -91,6 +108,9 @@ if (import.meta.main) {
   console.log('\n' + '━'.repeat(40));
   console.log(`Result: ${result.success ? '✅ PASSED' : '❌ FAILED'}`);
   console.log(`Message: ${result.message}`);
+  if (result.duration) {
+    console.log(`Duration: ${result.duration}ms`);
+  }
   console.log('━'.repeat(40) + '\n');
   Deno.exit(result.success ? 0 : 1);
 }

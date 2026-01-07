@@ -3,6 +3,7 @@
   "specifiers": {
     "npm:@anthropic-ai/claude-code@1.0.95": "1.0.95",
     "npm:@google/generative-ai@0.21": "0.21.0",
+    "npm:discord.js@14": "14.14.1",
     "npm:discord.js@14.14.1": "14.14.1",
     "npm:hono@4.0.0": "4.0.0",
     "npm:osc-js@*": "2.4.1"
