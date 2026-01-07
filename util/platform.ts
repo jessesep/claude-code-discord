@@ -113,7 +113,7 @@ export async function executeSystemCommand(command: string[]): Promise<string> {
       return `Command failed (exit code ${code}): ${errorOutput}`;
     }
   } catch (error) {
-    return `Execution error: ${error.message}`;
+    return `Execution error: ${(error as Error).message}`;
   }
 }
 

@@ -12,8 +12,8 @@ import {
 import { ShellManager } from "./shell/index.ts";
 import { getGitInfo } from "./git/index.ts";
 
-import { createClaudeHandlers, claudeCommands, cleanSessionId, createClaudeSender, expandableContent, type DiscordSender, ClaudeMessage, enhancedAgentCommands as enhancedClaudeCommands, createEnhancedAgentHandlers as createEnhancedClaudeHandlers, ClaudeSessionManager } from "./claude/index.ts";
-import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
+import { createPrimaryHandlers, primaryCommands, cleanSessionId, createAgentSender, expandableContent, type DiscordSender, type AgentMessage, enhancedAgentCommands, createEnhancedAgentHandlers, PrimarySessionManager } from "./provider-clients/index.ts";
+import { additionalAgentCommands, createAdditionalAgentHandlers } from "./provider-clients/additional-index.ts";
 import {
   advancedSettingsCommands,
   createAdvancedSettingsHandlers,
@@ -74,7 +74,7 @@ function parseArgs(args: string[]): { category?: string; userId?: string } {
 
 // Re-export for backward compatibility
 export { getGitInfo, executeGitCommand } from "./git/index.ts";
-export { sendToOneAgent } from "./claude/index.ts";
+export { sendToOneAgent } from "./provider-clients/index.ts";
 
 // Create One Agent Bot
 export async function createOneAgentBot(config: BotConfig) {
@@ -170,7 +170,7 @@ export async function createOneAgentBot(config: BotConfig) {
   setupGlobalErrorHandlers(crashHandler);
 
   // Create agent session manager
-  const agentSessionManager = new ClaudeSessionManager();
+  const agentSessionManager = new PrimarySessionManager();
 
   // Set up crash handler dependencies
   crashHandler.setManagers(shellManager, worktreeBotManager);
@@ -251,10 +251,10 @@ export async function createOneAgentBot(config: BotConfig) {
   let bot: any;
 
   // We'll create the agent sender after bot initialization
-  let agentSender: ((messages: ClaudeMessage[]) => Promise<void>) | null = null;
+  let agentSender: ((messages: AgentMessage[]) => Promise<void>) | null = null;
 
   // Create handlers with dependencies (sendAgentMessages will be updated after bot creation)
-  const claudeHandlers = createClaudeHandlers({
+  const primaryHandlers = createPrimaryHandlers({
     workDir,
     claudeController: agentController,
     setClaudeController: (controller) => { agentController = controller; },
@@ -320,7 +320,7 @@ export async function createOneAgentBot(config: BotConfig) {
     categoryName: actualCategoryName
   });
 
-  const enhancedClaudeHandlers = createEnhancedClaudeHandlers({
+  const enhancedAgentHandlers = createEnhancedAgentHandlers({
     workDir,
     agentController: agentController,
     setAgentController: (controller: AbortController | null) => { agentController = controller; },
@@ -339,7 +339,7 @@ export async function createOneAgentBot(config: BotConfig) {
     crashHandler
   });
 
-  const additionalClaudeHandlers = createAdditionalClaudeHandlers({
+  const additionalAgentHandlers = createAdditionalAgentHandlers({
     workDir,
     claudeController: agentController,
     setClaudeController: (controller) => { agentController = controller; },
@@ -392,7 +392,7 @@ export async function createOneAgentBot(config: BotConfig) {
       },
       { 
         gitHandlers, 
-        claudeHandlers, 
+        claudeHandlers: primaryHandlers, 
         agentHandlers, 
         shellHandlers, 
         utilsHandlers 
@@ -461,12 +461,12 @@ export async function createOneAgentBot(config: BotConfig) {
         });
       }
     }],
-    ['claude', {
+    ['one-agent', {
       execute: async (ctx: InteractionContext) => {
         const prompt = ctx.getString('prompt', true)!;
         const sessionId = ctx.getString('session_id');
         addToHistory(prompt); // Add to message history
-        await claudeHandlers.onClaude(ctx, prompt, sessionId || undefined);
+        await primaryHandlers.onClaude(ctx, prompt, sessionId || undefined);
       },
       handleButton: async (ctx: InteractionContext, customId: string) => {
         if (customId.startsWith('expand:')) {
@@ -537,22 +537,22 @@ export async function createOneAgentBot(config: BotConfig) {
         }
       }
     }],
-    ['continue', {
+    ['agent-continue', {
       execute: async (ctx: InteractionContext) => {
         const prompt = ctx.getString('prompt');
         if (prompt) addToHistory(prompt); // Add to message history if prompt provided
-        await claudeHandlers.onContinue(ctx, prompt || undefined);
+        await primaryHandlers.onContinue(ctx, prompt || undefined);
       }
     }],
-    ['claude-cancel', {
+    ['agent-cancel', {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
-        const cancelled = claudeHandlers.onClaudeCancel(ctx);
+        const cancelled = primaryHandlers.onClaudeCancel(ctx);
         await ctx.editReply({
           embeds: [{
             color: cancelled ? 0xff0000 : 0x808080,
             title: cancelled ? 'Cancel Successful' : 'Cancel Failed',
-            description: cancelled ? 'Claude Code session cancelled.' : 'No running Claude Code session.',
+            description: cancelled ? 'One Agent session cancelled.' : 'No running One Agent session.',
             timestamp: true
           }]
         });
@@ -1284,7 +1284,7 @@ export async function createOneAgentBot(config: BotConfig) {
         await handleConfigCommand(ctx);
       }
     }],
-    ['claude-enhanced', {
+    ['agent-enhanced', {
       execute: async (ctx: InteractionContext) => {
         const prompt = ctx.getString('prompt', true)!;
         const model = ctx.getString('model');
@@ -1294,31 +1294,31 @@ export async function createOneAgentBot(config: BotConfig) {
         const contextFiles = ctx.getString('context_files');
         const sessionId = ctx.getString('session_id');
 
-        await enhancedClaudeHandlers.onAgentEnhanced(
+        await enhancedAgentHandlers.onAgentEnhanced(
           ctx, prompt, model || undefined, template || undefined,
           includeSystemInfo || undefined, includeGitContext || undefined,
           contextFiles || undefined, sessionId || undefined
         );
       }
     }],
-    ['claude-models', {
+    ['agent-models', {
       execute: async (ctx: InteractionContext) => {
-        await enhancedClaudeHandlers.onAgentModels(ctx);
+        await enhancedAgentHandlers.onAgentModels(ctx);
       }
     }],
-    ['claude-sessions', {
+    ['agent-sessions', {
       execute: async (ctx: InteractionContext) => {
         const action = ctx.getString('action', true)!;
         const sessionId = ctx.getString('session_id');
-        await enhancedClaudeHandlers.onAgentSessions(ctx, action, sessionId || undefined);
+        await enhancedAgentHandlers.onAgentSessions(ctx, action, sessionId || undefined);
       }
     }],
-    ['claude-context', {
+    ['agent-context', {
       execute: async (ctx: InteractionContext) => {
         const includeSystemInfo = ctx.getBoolean('include_system_info');
         const includeGitContext = ctx.getBoolean('include_git_context');
         const contextFiles = ctx.getString('context_files');
-        await enhancedClaudeHandlers.onAgentContext(
+        await enhancedAgentHandlers.onAgentContext(
           ctx, includeSystemInfo || undefined, includeGitContext || undefined,
           contextFiles || undefined
         );
@@ -1472,68 +1472,68 @@ export async function createOneAgentBot(config: BotConfig) {
         }
       }
     }],
-    // Additional Claude Commands
-    ['claude-explain', {
+    // Additional One Agent Commands
+    ['agent-explain', {
       execute: async (ctx: InteractionContext) => {
         const content = ctx.getString('content', true)!;
         const detailLevel = ctx.getString('detail_level');
         const includeExamples = ctx.getBoolean('include_examples');
-        await additionalClaudeHandlers.onClaudeExplain(ctx, content, detailLevel || undefined, includeExamples || undefined);
+        await additionalAgentHandlers.onClaudeExplain(ctx, content, detailLevel || undefined, includeExamples || undefined);
       }
     }],
-    ['claude-debug', {
+    ['agent-debug', {
       execute: async (ctx: InteractionContext) => {
         const errorOrCode = ctx.getString('error_or_code', true)!;
         const language = ctx.getString('language');
         const contextFiles = ctx.getString('context_files');
-        await additionalClaudeHandlers.onClaudeDebug(ctx, errorOrCode, language || undefined, contextFiles || undefined);
+        await additionalAgentHandlers.onClaudeDebug(ctx, errorOrCode, language || undefined, contextFiles || undefined);
       }
     }],
-    ['claude-optimize', {
+    ['agent-optimize', {
       execute: async (ctx: InteractionContext) => {
         const code = ctx.getString('code', true)!;
         const focus = ctx.getString('focus');
         const preserveFunctionality = ctx.getBoolean('preserve_functionality');
-        await additionalClaudeHandlers.onClaudeOptimize(ctx, code, focus || undefined, preserveFunctionality || undefined);
+        await additionalAgentHandlers.onClaudeOptimize(ctx, code, focus || undefined, preserveFunctionality || undefined);
       }
     }],
-    ['claude-review', {
+    ['agent-review', {
       execute: async (ctx: InteractionContext) => {
         const codeOrFile = ctx.getString('code_or_file', true)!;
         const reviewType = ctx.getString('review_type');
         const includeSecurity = ctx.getBoolean('include_security');
         const includePerformance = ctx.getBoolean('include_performance');
-        await additionalClaudeHandlers.onClaudeReview(ctx, codeOrFile, reviewType || undefined, includeSecurity || undefined, includePerformance || undefined);
+        await additionalAgentHandlers.onClaudeReview(ctx, codeOrFile, reviewType || undefined, includeSecurity || undefined, includePerformance || undefined);
       }
     }],
-    ['claude-generate', {
+    ['agent-generate', {
       execute: async (ctx: InteractionContext) => {
         const request = ctx.getString('request', true)!;
         const type = ctx.getString('type');
         const style = ctx.getString('style');
-        await additionalClaudeHandlers.onClaudeGenerate(ctx, request, type || undefined, style || undefined);
+        await additionalAgentHandlers.onClaudeGenerate(ctx, request, type || undefined, style || undefined);
       }
     }],
-    ['claude-refactor', {
+    ['agent-refactor', {
       execute: async (ctx: InteractionContext) => {
         const code = ctx.getString('code', true)!;
         const goal = ctx.getString('goal');
         const preserveBehavior = ctx.getBoolean('preserve_behavior');
         const addTests = ctx.getBoolean('add_tests');
-        await additionalClaudeHandlers.onClaudeRefactor(ctx, code, goal || undefined, preserveBehavior || undefined, addTests || undefined);
+        await additionalAgentHandlers.onClaudeRefactor(ctx, code, goal || undefined, preserveBehavior || undefined, addTests || undefined);
       }
     }],
-    ['claude-learn', {
+    ['agent-learn', {
       execute: async (ctx: InteractionContext) => {
         const topic = ctx.getString('topic', true)!;
         const level = ctx.getString('level');
         const includeExercises = ctx.getBoolean('include_exercises');
         const stepByStep = ctx.getBoolean('step_by_step');
-        await additionalClaudeHandlers.onClaudeLearn(ctx, topic, level || undefined, includeExercises || undefined, stepByStep || undefined);
+        await additionalAgentHandlers.onClaudeLearn(ctx, topic, level || undefined, includeExercises || undefined, stepByStep || undefined);
       }
     }],
     // Advanced Settings Commands
-    ['claude-settings', {
+    ['agent-settings', {
       execute: async (ctx: InteractionContext) => {
         const action = ctx.getString('action', true)!;
         const value = ctx.getString('value');
@@ -1616,9 +1616,9 @@ export async function createOneAgentBot(config: BotConfig) {
       ...adminCommands.map(c => c.data), // /restart
       // Old commands commented out to simplify Discord interface
       // They can still be accessed programmatically if needed
-      // ...claudeCommands,
-      // ...enhancedClaudeCommands,
-      // ...additionalClaudeCommands,
+      // ...primaryCommands,
+      // ...enhancedAgentCommands,
+      // ...additionalAgentCommands,
       // ...advancedSettingsCommands,
       // ...unifiedSettingsCommands,
       // agentCommand,
@@ -1636,7 +1636,7 @@ export async function createOneAgentBot(config: BotConfig) {
   const buttonHandlers: ButtonHandlers = new Map([
     // Agent action buttons
     ['cancel-agent', async (ctx: InteractionContext) => {
-      const cancelled = claudeHandlers.onClaudeCancel(ctx);
+      const cancelled = primaryHandlers.onClaudeCancel(ctx);
       await ctx.update({
         embeds: [{
           color: cancelled ? 0xff0000 : 0x808080,
@@ -1904,7 +1904,7 @@ export async function createOneAgentBot(config: BotConfig) {
         embeds: [{
           color: 0x00ff00,
           title: '🔄 Using Previous Message',
-          description: `Running Claude Code with:\n\`\`\`\n${currentMessage}\n\`\`\``,
+          description: `Running Agent with:\n\`\`\`\n${currentMessage}\n\`\`\``,
           fields: [
             { name: 'Status', value: 'Executing...', inline: false }
           ],
@@ -1915,8 +1915,8 @@ export async function createOneAgentBot(config: BotConfig) {
 
       // Add the reused message to history again (as it's being sent again)
       addToHistory(currentMessage);
-      // Execute the Claude command with the selected message
-      await claudeHandlers.onClaude(ctx, currentMessage);
+      // Execute the command with the selected message
+      await primaryHandlers.onClaude(ctx, currentMessage);
     }],
 
     ['history-close', async (ctx: InteractionContext) => {
@@ -2030,7 +2030,7 @@ export async function createOneAgentBot(config: BotConfig) {
   };
 
   // Create agent sender function
-  agentSender = createClaudeSender(discordSender);
+  agentSender = createAgentSender(discordSender);
 
   // Signal handlers
   const handleSignal = async (signal: string) => {
@@ -2085,18 +2085,18 @@ export async function createOneAgentBot(config: BotConfig) {
       try {
         Deno.addSignalListener("SIGBREAK", () => handleSignal("SIGBREAK"));
       } catch (winError) {
-        console.warn('Could not register SIGBREAK handler:', winError.message);
+        console.warn('Could not register SIGBREAK handler:', (winError as Error).message);
       }
     } else {
       // Unix-like systems
       try {
         Deno.addSignalListener("SIGTERM", () => handleSignal("SIGTERM"));
       } catch (unixError) {
-        console.warn('Could not register SIGTERM handler:', unixError.message);
+        console.warn('Could not register SIGTERM handler:', (unixError as Error).message);
       }
     }
   } catch (error) {
-    console.warn('Signal handler registration error:', error.message);
+    console.warn('Signal handler registration error:', (error as Error).message);
   }
 
   return bot;

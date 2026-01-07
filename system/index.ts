@@ -40,7 +40,7 @@ ${systemInfoOutput}`;
 
         return { data: systemInfo };
       } catch (error) {
-        throw new Error(`Failed to get system info: ${error.message}`);
+        throw new Error(`Failed to get system info: ${(error as Error).message}`);
       }
     },
 
@@ -90,7 +90,7 @@ ${systemInfoOutput}`;
 
         return { data: processInfo };
       } catch (error) {
-        throw new Error(`Failed to list processes: ${error.message}`);
+        throw new Error(`Failed to list processes: ${(error as Error).message}`);
       }
     },
 
@@ -129,7 +129,7 @@ ${systemInfoOutput}`;
 
         return { data: resourceInfo };
       } catch (error) {
-        throw new Error(`Failed to get system resources: ${error.message}`);
+        throw new Error(`Failed to get system resources: ${(error as Error).message}`);
       }
     },
 
@@ -154,7 +154,7 @@ ${systemInfoOutput}`;
 
         return { data: networkInfo };
       } catch (error) {
-        throw new Error(`Failed to get network info: ${error.message}`);
+        throw new Error(`Failed to get network info: ${(error as Error).message}`);
       }
     },
 
@@ -165,7 +165,7 @@ ${systemInfoOutput}`;
         const diskInfo = `Disk Usage - ${getPlatformDisplayName()}\n\n${diskOutput}`;
         return { data: diskInfo };
       } catch (error) {
-        throw new Error(`Failed to get disk usage: ${error.message}`);
+        throw new Error(`Failed to get disk usage: ${(error as Error).message}`);
       }
     },
 
@@ -198,7 +198,7 @@ ${systemInfoOutput}`;
 
         return { data: envInfo };
       } catch (error) {
-        throw new Error(`Failed to get environment variables: ${error.message}`);
+        throw new Error(`Failed to get environment variables: ${(error as Error).message}`);
       }
     },
 
@@ -238,7 +238,7 @@ ${systemInfoOutput}`;
 
         return { data: logInfo };
       } catch (error) {
-        throw new Error(`Failed to get system logs: ${error.message}`);
+        throw new Error(`Failed to get system logs: ${(error as Error).message}`);
       }
     },
 
@@ -262,7 +262,7 @@ ${systemInfoOutput}`;
 
         return { data: portInfo };
       } catch (error) {
-        throw new Error(`Failed to scan ports: ${error.message}`);
+        throw new Error(`Failed to scan ports: ${(error as Error).message}`);
       }
     },
 
@@ -288,7 +288,7 @@ ${systemInfoOutput}`;
 
         return { data: serviceInfo };
       } catch (error) {
-        throw new Error(`Failed to get service status: ${error.message}`);
+        throw new Error(`Failed to get service status: ${(error as Error).message}`);
       }
     },
 
@@ -299,7 +299,7 @@ ${systemInfoOutput}`;
         const uptimeInfo = `System Uptime - ${getPlatformDisplayName()}\n\n${uptimeOutput}`;
         return { data: uptimeInfo };
       } catch (error) {
-        throw new Error(`Failed to get uptime: ${error.message}`);
+        throw new Error(`Failed to get uptime: ${(error as Error).message}`);
       }
     }
   };

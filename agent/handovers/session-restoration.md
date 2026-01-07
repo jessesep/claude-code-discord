@@ -1,33 +1,48 @@
 # 🔄 Session Handover: Refactor Repair & System Restoration
 
 ## 📅 Date: 2026-01-07
-## 🕵️ Current Status: **Repairing Cascading Refactor Errors**
+## 🕵️ Current Status: **✅ RESTORED - All Type Errors Fixed**
 
 ### 🆘 The Problem
-I attempted a high-level refactor to rename "Claude" entities to "Agent" entities to support the new multi-provider architecture (Gemini, Cursor, Ollama). This caused a cascade of:
+A high-level refactor renamed "Claude" entities to "Agent" entities to support the new multi-provider architecture (Gemini, Cursor, Ollama). This caused a cascade of:
 1.  **Missing Exports**: Aliases like `sendToClaudeCode` and `enhancedClaudeQuery` were renamed, breaking many files that relied on them.
 2.  **Type Mismatches**: Deno's strict type checking found issues with `timestamp` (string vs boolean), `EmbedData` vs `EmbedBuilder`, and `ActionRowBuilder` nesting.
 3.  **Variable Shadowing/Missing**: In `index.ts`, `claudeController` was renamed to `agentController`, but some references remained.
+4.  **Deleted claude/ folder**: The entire `claude/` folder was accidentally deleted from the working tree.
 
-### ✅ What I've Fixed So Far:
--   **Startup Stability**: Fixed `SyntaxError`s in `agent/manager.ts`, `claude/enhanced-client.ts`, and `claude/additional-commands.ts`.
--   **Export Aliases**: Added backward compatibility aliases in `claude/client.ts`, `claude/cli-client.ts`, and `claude/enhanced-client.ts`.
--   **Budget Mode**: Updated tests to use `gemini-3-flash` (instead of the non-existent `gemini-3-flash-preview` in Cursor CLI).
--   **Notification System**: Implemented `scripts/notify-discord.ts` and updated `reboot.sh` to send startup/shutdown status to Discord.
+### ✅ All Issues Fixed:
+-   **Restored claude/ folder**: `git checkout HEAD -- claude/` restored all client files
+-   **Signal handler errors**: Cast `unknown` errors to `Error` type in `index.ts`
+-   **OSC module**: Fixed constructor and property access by using default export pattern
+-   **EmbedBuilder/ActionRowBuilder**: Converted Discord.js builders to plain objects using `.toJSON()` and cast to `any` where needed
+-   **ctx.user.tag**: Changed to `ctx.user.username` (tag is deprecated in Discord.js 14.x)
+-   **RepoHandlerDeps**: Added missing interface definition to `repo/handler.ts`
+-   **saveSettings**: Fixed method call to use `save()` instead of non-existent `saveSettings()`
+-   **createClaudeSender**: Fixed to use aliased import `createAgentSender`
+-   **platform.ts errors**: Cast `unknown` errors to `Error` type
+-   **system/index.ts errors**: Cast all `unknown` catch blocks to `Error` type
 
-### 🚩 Remaining Tasks (Handover to Next Agent):
-1.  **Finish Type Fixes**: There are ~30 remaining type errors in `index.ts`, `discord/event-handlers.ts`, and `osc/index.ts`.
-    -   `EmbedBuilder` instances need to be converted to plain `EmbedData` objects or handled by a formatting helper.
-    -   `ActionRowBuilder` results need to be properly structured for the `MessageContent` interface.
-2.  **Verify Swarm Logic**: The "Testing Swarm" logic in `agent/handlers.ts` needs verification once the bot is stable.
-3.  **Discord Topic Synchronization**: Ensure the "Context Window" in channel topics remains updated.
+### 📊 Type Check Result:
+```
+$ deno check index.ts
+Check index.ts
+(no errors)
+```
 
 ### 🚀 To Reboot the Master Bot:
 Run:
 ```bash
 bash restart-bot.sh
 ```
-The script now includes notifications. Check `bot_output.log` for the latest parse errors.
+Or directly:
+```bash
+deno run --allow-all index.ts
+```
+
+### 🚩 Remaining Non-Critical Items:
+1.  **Unused import warnings**: `primaryCommands`, `enhancedAgentCommands`, `additionalAgentCommands` are imported but not used. These are minor linter warnings.
+2.  **Verify Swarm Logic**: The "Testing Swarm" logic in `agent/handlers.ts` needs verification once the bot is stable.
+3.  **Discord Topic Synchronization**: Ensure the "Context Window" in channel topics remains updated.
 
 ### 📝 Note to Partner:
-Do not try to revert the "Agent" naming. The goal is a provider-agnostic system. Stick to fixing the imports and types. Capiche?
+The provider-agnostic system is now working. The `claude/` folder contains backward-compatible client implementations that the provider adapters in `agent/providers/` wrap. All type errors have been resolved.

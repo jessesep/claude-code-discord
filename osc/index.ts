@@ -1,19 +1,35 @@
-import OSC from "npm:osc-js";
+// deno-lint-ignore-file no-explicit-any
+import OSCModule from "npm:osc-js";
 
+/**
+ * Handle both default export and module export patterns for osc-js
+ */
+const OSC = (OSCModule as any).default || OSCModule;
+
+/**
+ * Configuration for the OSC Manager
+ */
 export interface OSCConfig {
-  port: number;
-  remoteHosts?: string[];
-  remotePort?: number;
+  port: number;           // Port the bot listens on
+  remoteHosts?: string[]; // IPs/Hosts to send feedback to
+  remotePort?: number;    // Port the remote devices listen on (default 9001)
 }
 
+/**
+ * Dependencies for the OSC Manager, matching the One Agent architecture
+ */
 export interface OSCDependencies {
   gitHandlers?: any;
-  claudeHandlers?: any;
+  primaryHandlers?: any; // Formerly claudeHandlers
   agentHandlers?: any;
   shellHandlers?: any;
   utilsHandlers?: any;
 }
 
+/**
+ * OSC Manager Class
+ * Acts as a bridge between TouchOSC control surfaces and the One Agent bot system.
+ */
 export class OSCManager {
   private osc: any;
   private port: number;
@@ -37,84 +53,94 @@ export class OSCManager {
     this.setupListeners();
   }
 
+  /**
+   * Initialize OSC message listeners
+   */
   private setupListeners() {
     this.osc.on('*', (message: any) => {
       console.log(`[OSC] Received: ${message.address}`, message.args);
       
-      // Handle wildcard agent selection
+      // Handle wildcard agent selection: /agent/select/<key>
       if (message.address.startsWith('/agent/select/')) {
         const agentKey = message.address.split('/').pop();
         this.handleAgentSelect(agentKey);
       }
     });
 
+    /**
+     * Heartbeat / Connection Test
+     */
     this.osc.on('/ping', () => {
-      this.send('/pong', ['Bot is alive!']);
+      this.sendFeedback('/pong', ['One Agent is Active']);
+      this.sendFeedback('/label/console', ['Connection Verified']);
     });
 
-    // Git Status
+    /**
+     * Git Status Command
+     */
     this.osc.on('/git/status', async (message: any) => {
-      // Buttons send 1 on press, 0 on release. We only care about 1.
+      // Debounce: Buttons send 1 on press, 0 on release. We only care about 1.
       if (message.args[0] === 0) return;
 
       if (this.deps.gitHandlers) {
         try {
-          console.log('[OSC] Fetching git status...');
-          this.send('/label/console', ['Fetching Git Status...']);
+          console.log('[OSC] Requesting Git Status...');
+          this.sendFeedback('/label/console', ['Fetching Git Status...']);
           const status = await this.deps.gitHandlers.getStatus();
           
-          // Send just the value to the labeled value labels
-          this.send('/label/git_branch', [status.branch]);
-          
+          this.sendFeedback('/label/git_branch', [status.branch]);
           const cleanStatus = status.status.replace(/\n/g, ' ').substring(0, 50);
-          this.send('/label/console', [`Git: ${cleanStatus}...`]);
+          this.sendFeedback('/label/console', [`Git: ${cleanStatus}...`]);
         } catch (err) {
           console.error('[OSC] Git status error:', err);
-          this.send('/label/console', [`Git Error: ${err.message}`]);
+          this.sendFeedback('/label/console', [`Git Error: ${(err as Error).message}`]);
         }
       }
     });
 
-    // GitHub Sync
+    /**
+     * GitHub Sync Command (Pull -> Push)
+     */
     this.osc.on('/github/sync', async (message: any) => {
       if (message.args[0] === 0) return;
 
       if (this.deps.gitHandlers) {
         try {
-          console.log('[OSC] GitHub Sync initiated');
-          this.send('/label/console', ['Syncing: git pull...']);
+          console.log('[OSC] GitHub Sync sequence initiated');
+          this.sendFeedback('/label/console', ['Syncing: git pull...']);
           await this.deps.gitHandlers.onGit(null, "pull");
           
-          this.send('/label/console', ['Syncing: git push...']);
+          this.sendFeedback('/label/console', ['Syncing: git push...']);
           await this.deps.gitHandlers.onGit(null, "push");
           
-          this.send('/label/console', ['Sync Complete!']);
+          this.sendFeedback('/label/console', ['GitHub Sync Complete!']);
           
-          // Refresh branch label after sync
+          // Refresh metadata
           const status = await this.deps.gitHandlers.getStatus();
-          this.send('/label/git_branch', [status.branch]);
+          this.sendFeedback('/label/git_branch', [status.branch]);
         } catch (err) {
           console.error('[OSC] Sync error:', err);
-          this.send('/label/console', [`Sync Failed: ${err.message}`]);
+          this.sendFeedback('/label/console', [`Sync Failed: ${(err as Error).message}`]);
         }
       }
     });
 
-    // GitHub Issue Creation
+    /**
+     * GitHub Issue Creation
+     */
     this.osc.on('/github/issue/new', async (message: any) => {
       if (message.args[0] === 0) return;
 
       try {
-        // Use provided argument as title, or default to a quick bug report
         const title = (message.args && typeof message.args[1] === 'string') 
           ? message.args[1] 
-          : "Bug Report: Detected via Mobile Dashboard";
+          : "Bug Report: Mobile Dashboard";
         
         console.log(`[OSC] Creating GitHub issue: ${title}`);
-        this.send('/label/console', [`Creating Issue...`]);
+        this.sendFeedback('/label/console', [`Creating Issue...`]);
 
         const cmd = new Deno.Command("gh", {
-          args: ["issue", "create", "--title", title, "--body", "This issue was created via the ClaudeOps TouchOSC Mobile Dashboard."],
+          args: ["issue", "create", "--title", title, "--body", "Created via One Agent Mobile Dashboard."],
           stdout: "piped",
           stderr: "piped"
         });
@@ -124,87 +150,102 @@ export class OSCManager {
 
         if (code === 0) {
           const issueNum = outText.split('/').pop();
-          this.send('/label/console', [`Issue #${issueNum} Created Successfully`]);
+          this.sendFeedback('/label/console', [`Issue #${issueNum} Created`]);
         } else {
-          this.send('/label/console', ['Failed to create issue via gh CLI']);
+          this.sendFeedback('/label/console', ['GH CLI Issue Failed']);
         }
       } catch (err) {
         console.error('[OSC] Issue creation error:', err);
-        this.send('/label/console', [`Error: ${err.message}`]);
+        this.sendFeedback('/label/console', [`Error: ${(err as Error).message}`]);
       }
     });
   }
 
+  /**
+   * Handle Agent Selection
+   * Maps UI keys to the new One Agent Registry keys.
+   */
   private async handleAgentSelect(agentKey: string | undefined) {
     if (!agentKey) return;
     
-    // Convert short keys to full keys if needed
-    const fullKeys: Record<string, string> = {
+    // Mapping table for TouchOSC keys to Registry IDs
+    const registryMapping: Record<string, string> = {
       'manager': 'ag-manager',
       'coder': 'ag-coder',
-      'architect': 'architect',
-      'reviewer': 'code-reviewer'
+      'architect': 'ag-architect',
+      'tester': 'ag-tester',
+      'security': 'ag-security',
+      'reviewer': 'code-reviewer',
+      'cursor-coder': 'cursor-coder',
+      'assistant': 'general-assistant'
     };
     
-    const actualKey = fullKeys[agentKey] || agentKey;
-    const displayName = agentKey.charAt(0).toUpperCase() + agentKey.slice(1);
+    const targetAgentId = registryMapping[agentKey] || agentKey;
+    const displayName = agentKey.charAt(0).toUpperCase() + agentKey.slice(1).replace('-', ' ');
     
-    console.log(`[OSC] Triggering bot selection for agent: ${actualKey}`);
+    console.log(`[OSC] Deploying Agent: ${targetAgentId}`);
     
     if (this.deps.agentHandlers) {
       try {
-        // Mock a context for the bot handler
+        // Create a compliant InteractionContext for the agent handler
         const mockCtx = {
-          user: { id: "osc-user", username: "OSC-Dashboard" },
-          channelId: "osc-channel",
+          user: { id: "osc-remote", username: "Dashboard" },
+          channelId: "osc-control-surface",
           deferReply: async () => {},
           editReply: async (content: any) => {
             if (content.embeds && content.embeds[0]) {
-              this.send('/label/console', [content.embeds[0].title || "Agent Switched"]);
+              const feedback = content.embeds[0].title || content.embeds[0].description || "Success";
+              this.sendFeedback('/label/console', [feedback.substring(0, 30)]);
             }
           },
           reply: async () => {},
           followUp: async () => {},
           getString: (name: string) => {
             if (name === 'action') return 'select';
-            if (name === 'agent_name') return actualKey;
+            if (name === 'agent_name') return targetAgentId;
             return null;
           },
           getBoolean: () => null,
           getInteger: () => null
         };
 
-        await this.deps.agentHandlers.onAgent(mockCtx, 'select', actualKey);
+        await this.deps.agentHandlers.onAgent(mockCtx, 'select', targetAgentId);
         
-        this.send('/label/agent_name', [displayName]);
-        this.send('/label/console', [`Agent Deployed: ${displayName}`]);
+        this.sendFeedback('/label/agent_name', [displayName]);
+        this.sendFeedback('/label/console', [`Deployed: ${displayName}`]);
       } catch (err) {
-        console.error('[OSC] Agent selection error:', err);
-        this.send('/label/console', [`Deploy Error: ${err.message}`]);
+        console.error('[OSC] Deployment error:', err);
+        this.sendFeedback('/label/console', [`Deploy Error: ${(err as Error).message}`]);
       }
     } else {
-      this.send('/label/agent_name', [displayName]);
-      this.send('/label/console', [`(UI ONLY) Switched to: ${displayName}`]);
+      this.sendFeedback('/label/agent_name', [displayName]);
+      this.sendFeedback('/label/console', [`(Mock) Switched to ${displayName}`]);
     }
   }
 
+  /**
+   * Open the OSC Server
+   */
   public async start() {
     try {
       await this.osc.open();
-      console.log(`[OSC] Server listening on port ${this.port}`);
-      console.log(`[OSC] Feedback targets: ${this.remoteHosts.join(', ')} on port ${this.remotePort}`);
+      console.log(`[OSC] Mobile Bridge started on port ${this.port}`);
+      console.log(`[OSC] Feedback Targets: ${this.remoteHosts.join(', ')}:${this.remotePort}`);
     } catch (error) {
-      console.error('[OSC] Failed to start server:', error);
+      console.error('[OSC] Startup Error:', error);
     }
   }
 
-  public send(address: string, args: any[] = []) {
+  /**
+   * Send Feedback to Remote Control Surfaces
+   */
+  public sendFeedback(address: string, args: any[] = []) {
     for (const host of this.remoteHosts) {
       try {
         const message = new OSC.Message(address, ...args);
         this.osc.send(message, { host, port: this.remotePort });
       } catch (error) {
-        // Target might be offline
+        // Host unreachable
       }
     }
   }

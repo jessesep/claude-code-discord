@@ -28,7 +28,8 @@ function getProviderConfig(): ProviderConfigStore {
 function saveProviderConfig(config: ProviderConfigStore): void {
   const settings = SettingsPersistence.getInstance().getSettings();
   (settings as any).providerConfig = config;
-  SettingsPersistence.getInstance().saveSettings(settings);
+  // save() is async but we fire-and-forget here to avoid changing the function signature
+  SettingsPersistence.getInstance().save(settings);
 }
 
 /**

@@ -29,7 +29,7 @@ export async function getAdminCommands() {
                     ephemeral: false 
                 });
 
-                console.log(`[Admin] Restart requested for ${target} by ${ctx.user.tag}`);
+                console.log(`[Admin] Restart requested for ${target} by ${ctx.user.username}`);
 
                 // Give Discord a moment to send the reply
                 setTimeout(async () => {

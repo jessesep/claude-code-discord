@@ -1,6 +1,17 @@
 import { RepoManager } from "./manager.ts";
 import { StringSelectMenuBuilder, ActionRowBuilder } from "npm:discord.js@14.14.1";
 
+export interface RepoHandlerDeps {
+  workDir: string;
+  repoName: string;
+  branchName: string;
+  actualCategoryName: string;
+  discordToken: string;
+  applicationId: string;
+  botSettings: any;
+  worktreeBotManager: any;
+}
+
 export function createRepoHandlers(deps: RepoHandlerDeps) {
   const { workDir, repoName, branchName, actualCategoryName, discordToken, applicationId, botSettings, worktreeBotManager } = deps;
   const repoManager = RepoManager.getInstance(workDir);

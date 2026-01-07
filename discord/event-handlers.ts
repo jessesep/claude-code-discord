@@ -152,7 +152,7 @@ export async function handleButton(
         }
       } else if (provider === 'cursor') {
         selectedModel = 'auto';
-      } else if (provider === 'claude-cli') {
+      } else if (provider === 'primary-cli') {
         selectedModel = 'claude-sonnet-4';
       } else {
         const { getModelsForAgents } = await import("../util/list-models.ts");
@@ -172,7 +172,7 @@ export async function handleButton(
       // Store customizations in session, not in global PREDEFINED_AGENTS
       const providerToClient: any = { 
         'cursor': 'cursor', 
-        'claude-cli': 'claude', 
+        'primary-cli': 'claude', 
         'gemini-api': 'antigravity', 
         'antigravity': 'antigravity', 
         'ollama': 'ollama',
@@ -203,7 +203,13 @@ export async function handleButton(
     const { handleRepoCreationButton } = await import("../util/repo-creation-handler.ts");
     const result = await handleRepoCreationButton(buttonId, ctx.user.id, ctx.channelId || '');
     if (result) {
-      await ctx.editReply({ embeds: [result.embed], components: result.components || [] });
+      // Convert EmbedBuilder to plain EmbedData and ActionRowBuilder to plain objects
+      const embedData = result.embed.toJSON();
+      const componentsData = result.components?.map(row => ({
+        type: 'actionRow' as const,
+        components: row.components.map((c: any) => c.toJSON())
+      })) || [];
+      await ctx.editReply({ embeds: [embedData], components: componentsData as any });
       if (result.complete) channelContextManager.invalidateCache(ctx.channelId || '');
       return;
     }
@@ -258,7 +264,7 @@ export async function handleButton(
 
   if (buttonId.startsWith('expand:')) {
     const expandId = buttonId.substring(7);
-    const { expandableContent } = await import("../claude/discord-sender.ts");
+    const { expandableContent } = await import("../provider-clients/discord-sender.ts");
     const fullContent = expandableContent.get(expandId);
     
     if (!fullContent) {
@@ -395,7 +401,8 @@ export async function handleSelectMenu(
     const repos = await RepoManager.getInstance(workDir).scanRepositories(1);
     const currentPath = ctx.channelContext?.projectPath || workDir;
     const options = [{ label: `📍 Current Workspace`, value: currentPath }, ...repos.filter(r => r.path !== currentPath).map(r => ({ label: `📁 ${r.name}`, value: r.path }))].slice(0, 25);
-    await ctx.editReply({ embeds: [{ color: 0x5865F2, title: '🚀 Step 2: Select Workspace', description: `Provider: **${provider}**` }], components: [new ActionRowBuilder<any>().addComponents(new StringSelectMenuBuilder().setCustomId(`run-adv-workspace:${provider}`).addOptions(options))] });
+    const selectRow = new ActionRowBuilder<any>().addComponents(new StringSelectMenuBuilder().setCustomId(`run-adv-workspace:${provider}`).addOptions(options));
+    await ctx.editReply({ embeds: [{ color: 0x5865F2, title: '🚀 Step 2: Select Workspace', description: `Provider: **${provider}**` }], components: [{ type: 'actionRow', components: selectRow.components.map((c: any) => c.toJSON()) }] });
     return;
   }
 
@@ -411,7 +418,8 @@ export async function handleSelectMenu(
       { label: '🏗️ Architect', value: 'architect' },
       { label: '👁️ Reviewer', value: 'reviewer' }
     ];
-    await ctx.editReply({ embeds: [{ color: 0x5865F2, title: '🚀 Step 3: Select Role', description: `Workspace: \`${workspacePath}\`` }], components: [new ActionRowBuilder<any>().addComponents(new StringSelectMenuBuilder().setCustomId(`run-adv-role:${provider}:${workspacePath}`).addOptions(roleOptions))] });
+    const roleRow = new ActionRowBuilder<any>().addComponents(new StringSelectMenuBuilder().setCustomId(`run-adv-role:${provider}:${workspacePath}`).addOptions(roleOptions));
+    await ctx.editReply({ embeds: [{ color: 0x5865F2, title: '🚀 Step 3: Select Role', description: `Workspace: \`${workspacePath}\`` }], components: [{ type: 'actionRow', components: roleRow.components.map((c: any) => c.toJSON()) }] });
     return;
   }
 
@@ -433,7 +441,7 @@ export async function handleSelectMenu(
         'auto', 'sonnet-4', 'sonnet-4-thinking', 'opus-4', 'gpt-5', 'gpt-4o', 'o1', 'gemini-2.5-pro'
       ];
       modelOptions = cursorModels.map(m => ({ label: m, value: m }));
-    } else if (provider === 'claude-cli') {
+    } else if (provider === 'primary-cli') {
       modelOptions = [
         { label: 'Claude Sonnet 4', value: 'claude-sonnet-4' },
         { label: 'Claude Opus 4', value: 'claude-opus-4' },
@@ -486,11 +494,13 @@ export async function handleSelectMenu(
       modelOptions = [{ label: 'Default Model', value: 'auto' }];
     }
     
+    const modelSelectRow = new ActionRowBuilder<any>().addComponents(new StringSelectMenuBuilder().setCustomId(`run-adv-model:${provider}:${role}:${workspacePath}`).addOptions(modelOptions));
+    const autoSelectRow = new ActionRowBuilder<any>().addComponents(new ButtonBuilder().setCustomId(`run-adv-auto:${provider}:${role}:${workspacePath}`).setLabel('✨ Auto-Select').setStyle(1));
     await ctx.editReply({
       embeds: [{ color: 0x5865F2, title: '🚀 Step 4: Select Model', description: `Provider: **${provider}**\nRole: **${role}**` }],
       components: [
-        new ActionRowBuilder<any>().addComponents(new StringSelectMenuBuilder().setCustomId(`run-adv-model:${provider}:${role}:${workspacePath}`).addOptions(modelOptions)),
-        new ActionRowBuilder<any>().addComponents(new ButtonBuilder().setCustomId(`run-adv-auto:${provider}:${role}:${workspacePath}`).setLabel('✨ Auto-Select').setStyle(1))
+        { type: 'actionRow', components: modelSelectRow.components.map((c: any) => c.toJSON()) },
+        { type: 'actionRow', components: autoSelectRow.components.map((c: any) => c.toJSON()) }
       ]
     });
     return;
@@ -507,7 +517,7 @@ export async function handleSelectMenu(
       const session = setAgentSession(ctx.user.id, ctx.channelId, 'general-assistant', role, workspacePath);
       const providerToClient: any = { 
         'cursor': 'cursor', 
-        'claude-cli': 'claude', 
+        'primary-cli': 'claude', 
         'gemini-api': 'antigravity', 
         'antigravity': 'antigravity', 
         'ollama': 'ollama',
