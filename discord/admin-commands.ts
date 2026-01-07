@@ -35,12 +35,13 @@ export async function getAdminCommands() {
                 setTimeout(async () => {
                     try {
                         if (target === "bot" || target === "all") {
-                            console.log("🚀 Executing restart-bot.sh in background...");
+                            console.log("🚀 Executing reboot.sh in background...");
                             
                             // Use a shell to run nohup in the background. 
                             // Explicitly call bash to avoid permission issues.
+                            // Use reboot.sh which runs bot in background and logs to bot.log
                             const command = new Deno.Command("bash", {
-                                args: ["-c", "nohup bash ./restart-bot.sh > bot_restart.log 2>&1 &"],
+                                args: ["-c", "nohup bash ./reboot.sh >> bot_restart.log 2>&1 &"],
                                 stdout: "inherit",
                                 stderr: "inherit"
                             });
