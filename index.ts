@@ -29,9 +29,9 @@ import { createShellHandlers, shellCommands } from "./shell/index.ts";
 import { createUtilsHandlers, utilsCommands } from "./util/index.ts";
 import { systemCommands, createSystemHandlers } from "./system/index.ts";
 import { helpCommand, createHelpHandlers } from "./help/index.ts";
-import { agentCommand, createAgentHandlers } from "./agent/index.ts";
+import { agentCommand, createAgentHandlers, handleSimpleCommand } from "./agent/index.ts";
 import { ProcessCrashHandler, setupGlobalErrorHandlers, ProcessHealthMonitor } from "./process/index.ts";
-import { createDiscordBot, handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed, getAdminCommands } from "./discord/index.ts";
+import { handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed, getAdminCommands } from "./discord/index.ts";
 import { SettingsPersistence } from "./util/settings-persistence.ts";
 import { WebServer } from "./server/index.ts";
 import { OSCManager } from "./osc/index.ts";
@@ -404,6 +404,62 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
   // Command handlers implementation
   const handlers: CommandHandlers = new Map([
+    ['run', {
+      execute: async (ctx: InteractionContext) => {
+        await handleSimpleCommand(ctx, 'run', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
+    ['kill', {
+      execute: async (ctx: InteractionContext) => {
+        await handleSimpleCommand(ctx, 'kill', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
+    ['sync', {
+      execute: async (ctx: InteractionContext) => {
+        await handleSimpleCommand(ctx, 'sync', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
+    ['run-adv', {
+      execute: async (ctx: InteractionContext) => {
+        await handleSimpleCommand(ctx, 'run-adv', {
+          workDir,
+          crashHandler,
+          sendClaudeMessages: async (messages) => {
+            if (claudeSender) {
+              await claudeSender(messages);
+            }
+          },
+          sessionManager: claudeSessionManager
+        });
+      }
+    }],
     ['claude', {
       execute: async (ctx: InteractionContext) => {
         const prompt = ctx.getString('prompt', true)!;

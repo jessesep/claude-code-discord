@@ -70,7 +70,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'code-reviewer': {
     name: 'Code Reviewer',
     description: 'Specialized in code review and quality analysis',
-    model: 'claude-sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are an expert code reviewer. Focus on code quality, security, performance, and best practices. Provide detailed feedback with specific suggestions for improvement.' + CONTEXT_NOTE,
     temperature: 0.3,
     maxTokens: 4096,
@@ -80,7 +80,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'architect': {
     name: 'Software Architect',
     description: 'Focused on system design and architecture decisions',
-    model: 'claude-sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are a senior software architect. Help design scalable, maintainable systems. Focus on architectural patterns, design principles, and technology choices.' + CONTEXT_NOTE,
     temperature: 0.5,
     maxTokens: 4096,
@@ -90,7 +90,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'debugger': {
     name: 'Debug Specialist',
     description: 'Expert at finding and fixing bugs',
-    model: 'claude-sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are a debugging expert. Help identify root causes of issues, suggest debugging strategies, and provide step-by-step solutions.' + CONTEXT_NOTE,
     temperature: 0.2,
     maxTokens: 4096,
@@ -100,7 +100,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'security-expert': {
     name: 'Security Analyst',
     description: 'Specialized in security analysis and vulnerability assessment',
-    model: 'claude-sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are a cybersecurity expert. Focus on identifying security vulnerabilities, suggesting secure coding practices, and analyzing potential threats.' + CONTEXT_NOTE,
     temperature: 0.1,
     maxTokens: 4096,
@@ -110,7 +110,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'performance-optimizer': {
     name: 'Performance Engineer',
     description: 'Expert in performance optimization and profiling',
-    model: 'claude-sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are a performance optimization expert. Help identify bottlenecks, suggest optimizations, and improve system performance.' + CONTEXT_NOTE,
     temperature: 0.3,
     maxTokens: 4096,
@@ -120,7 +120,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'devops-engineer': {
     name: 'DevOps Engineer',
     description: 'Specialized in deployment, CI/CD, and infrastructure',
-    model: 'claude-sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are a DevOps engineer. Help with deployment strategies, CI/CD pipelines, infrastructure as code, and operational best practices.' + CONTEXT_NOTE,
     temperature: 0.4,
     maxTokens: 4096,
@@ -130,7 +130,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'general-assistant': {
     name: 'General Development Assistant',
     description: 'General-purpose development assistant',
-    model: 'claude-sonnet-4',
+    model: 'sonnet-4.5',
     systemPrompt: 'You are a helpful development assistant. Provide clear, accurate, and practical help with programming tasks, answer questions, and offer suggestions.' + CONTEXT_NOTE,
     temperature: 0.7,
     maxTokens: 4096,
@@ -346,7 +346,12 @@ async function sendAgentUpdate(
   deps: AgentHandlerDeps, 
   options: { isFinal?: boolean } = {}
 ) {
-  if (!deps.sendClaudeMessages) return;
+  if (!deps.sendClaudeMessages) {
+    console.warn(`[AgentUpdate] SKIP: sendClaudeMessages not defined`);
+    return;
+  }
+
+  console.log(`[AgentUpdate] SENDING: ${content.length} chars (isFinal=${!!options.isFinal})`);
 
   const claudeMessages = [{
     type: 'text' as const,
@@ -364,12 +369,15 @@ async function sendAgentUpdate(
   const actionNeeded = actionNeededPatterns.some(p => textLower.includes(p));
   
   if ((actionNeeded || options.isFinal) && deps.targetUserId) {
+    console.log(`[AgentUpdate] ACTION_NEEDED or FINAL: adding mention for <@${deps.targetUserId}>`);
     // Prepend mention to the content for a ping
     const prefix = actionNeeded ? "⚠️ Action needed: " : "";
     (claudeMessages[0] as any).content = `<@${deps.targetUserId}> ${prefix}${content}`;
   }
 
-  await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+  await deps.sendClaudeMessages(claudeMessages).catch(err => { 
+    console.error(`[AgentUpdate] FAILED to send messages:`, err);
+  });
 }
 
 /**
@@ -380,6 +388,8 @@ export async function resolveChannelContext(ctx: any, deps?: AgentHandlerDeps) {
   // Use channel name if available (from real interaction)
   const channelName = ctx.channel?.name || '';
   
+  console.log(`[ResolveContext] START: channelName="${channelName}", channelContext=${JSON.stringify(channelContext)}`);
+
   // Try to find active session for this user/channel to get persisted context
   const userId = ctx.user?.id;
   const channelId = ctx.channelId || ctx.channel?.id;
@@ -391,6 +401,7 @@ export async function resolveChannelContext(ctx: any, deps?: AgentHandlerDeps) {
     if (activeSessionInfo) {
       sessionProjectPath = activeSessionInfo.session.projectPath;
       sessionRoleId = activeSessionInfo.session.roleId;
+      console.log(`[ResolveContext] FOUND_SESSION: agentName=${activeSessionInfo.session.agentName}, projectPath=${sessionProjectPath}, roleId=${sessionRoleId}`);
     }
   }
   
@@ -444,11 +455,15 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
       includeSystemInfo?: boolean,
       model?: string
     ) {
+      const startTime = Date.now();
+      console.log(`[AgentHandler] STARTED: action=${action}, agentName=${agentName}, user=${ctx.user?.username} (${ctx.user?.id}) in channel ${ctx.channelId}`);
       try {
         await ctx.deferReply();
 
         // Resolve context from channel/category
         const context = await resolveChannelContext(ctx, deps);
+        console.log(`[AgentHandler] CONTEXT_RESOLVED: projectPath=${context.workDir}, roleId=${context.roleId}`);
+        
         const effectiveDeps = { 
           ...deps, 
           workDir: context.workDir,
@@ -458,11 +473,13 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
 
         switch (action) {
           case 'list':
+            console.log(`[AgentHandler] ACTION: listAgents`);
             await listAgents(ctx);
             break;
 
           case 'select':
           case 'start':
+            console.log(`[AgentHandler] ACTION: startAgentSession (agentName=${agentName}, roleId=${context.roleId}, model=${model})`);
             if (!agentName) {
               await ctx.editReply({
                 content: 'Agent name is required for starting a session.',
@@ -475,6 +492,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             break;
 
           case 'chat':
+            console.log(`[AgentHandler] ACTION: chatWithAgent (message length=${message?.length})`);
             if (!message) {
               await ctx.editReply({
                 content: 'Message is required for chatting with agent.',
@@ -489,6 +507,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             break;
 
           case 'switch':
+            console.log(`[AgentHandler] ACTION: switchAgent (agentName=${agentName})`);
             if (!agentName) {
               await ctx.editReply({
                 content: 'Agent name is required for switching agents.',
@@ -500,14 +519,17 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             break;
 
           case 'status':
+            console.log(`[AgentHandler] ACTION: showAgentStatus`);
             await showAgentStatus(ctx);
             break;
 
           case 'end':
+            console.log(`[AgentHandler] ACTION: endAgentSession`);
             await endAgentSession(ctx);
             break;
 
           case 'info':
+            console.log(`[AgentHandler] ACTION: showAgentInfo (agentName=${agentName})`);
             if (!agentName) {
               await ctx.editReply({
                 content: 'Agent name is required for showing agent info.',
@@ -519,10 +541,12 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             break;
 
           case 'sync_models':
+            console.log(`[AgentHandler] ACTION: syncProviderModels`);
             await syncProviderModels(ctx);
             break;
 
           default:
+            console.error(`[AgentHandler] ERROR: Unknown action: ${action}`);
             await ctx.editReply({
               embeds: [{
                 color: 0xff0000,
@@ -532,7 +556,9 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
               }]
             });
         }
+        console.log(`[AgentHandler] COMPLETED: action=${action} in ${Date.now() - startTime}ms`);
       } catch (error) {
+        console.error(`[AgentHandler] FAILED: action=${action}:`, error);
         await crashHandler.reportCrash('agent', error instanceof Error ? error : new Error(String(error)), 'agent-command');
         throw error;
       }
@@ -1078,6 +1104,10 @@ export async function chatWithAgent(
     enhancedPrompt += `\n\nRelevant Files: ${contextFiles}`;
   }
 
+  const startTime = Date.now();
+  console.log(`[AgentChat] STARTED: Agent=${activeAgentName}, User=${ctx.user.username} (${ctx.user.id}), Channel=${ctx.channelId}`);
+  console.log(`[AgentChat] MESSAGE: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`);
+
   await ctx.editReply({
     embeds: [{
       color: 0xffff00,
@@ -1097,6 +1127,7 @@ export async function chatWithAgent(
   const isRateLimitError = (error: unknown): boolean => {
     if (!(error instanceof Error)) return false;
     const msg = error.message.toLowerCase();
+    console.log(`[AgentChat] CHECKING_RATE_LIMIT: ${msg}`);
     return (
       msg.includes('exit code 1') ||
       msg.includes('exited with code 1') ||
@@ -1126,7 +1157,7 @@ export async function chatWithAgent(
     // Try Claude first (if not explicitly set to cursor/antigravity)
     if (clientType === 'claude' || !clientType) {
       try {
-        console.log(`[Agent] Executing with primary client: claude`);
+        console.log(`[AgentChat] EXECUTING primary client: claude`);
         // Import the Claude CLI client (uses Claude subscription, no API key needed!)
         const { sendToClaudeCLI } = await import("../claude/cli-client.ts");
 
@@ -1145,15 +1176,18 @@ export async function chatWithAgent(
             const now = Date.now();
             if (now - lastUpdate >= UPDATE_INTERVAL && deps) {
               lastUpdate = now;
+              console.log(`[AgentChat] STREAM_UPDATE: ${currentChunk.length} bytes`);
               await sendAgentUpdate(currentChunk, deps);
               currentChunk = ""; // Reset after sending to avoid duplicates
             }
           }
         );
+        console.log(`[AgentChat] COMPLETED primary client: claude in ${Date.now() - startTime}ms`);
       } catch (claudeError) {
+        console.error(`[AgentChat] FAILED primary client: claude:`, claudeError);
         // If Claude fails due to rate limit/quota, try fallback providers
         if (isRateLimitError(claudeError)) {
-          console.log("⚠️ Claude rate limit/quota exceeded, trying fallback providers...");
+          console.log("[AgentChat] FALLBACK_TRIGGERED: Claude rate limit/quota exceeded");
           fallbackUsed = true;
           
           // Notify user about fallback
@@ -2661,10 +2695,12 @@ export async function loadRoleDocument(roleId: string, workDir: string): Promise
 }
 
 export async function handleSimpleCommand(ctx: any, commandName: string, deps: AgentHandlerDeps) {
+  console.log(`[SimpleCommand] RECEIVED: /${commandName} by ${ctx.user?.username} (${ctx.user?.id}) in channel ${ctx.channelId}`);
   // Map simple commands to agent actions
   const handlers = createAgentHandlers(deps);
   
   if (commandName === 'run' || commandName === 'run-adv') {
+    console.log(`[SimpleCommand] EXECUTING: /${commandName} (Step 1: Provider selection)`);
     // Advanced run command with multi-step selection
     await ctx.deferReply({ ephemeral: false });
     
@@ -2704,8 +2740,10 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
     
     return;
   } else if (commandName === 'kill') {
+    console.log(`[SimpleCommand] EXECUTING: /kill`);
     return await handlers.onAgent(ctx, 'end');
   } else if (commandName === 'sync') {
+    console.log(`[SimpleCommand] EXECUTING: /sync`);
     // Open conversation in IDE
     await ctx.deferReply({ ephemeral: true });
     

@@ -218,14 +218,19 @@ export async function createDiscordBot(
   
   // Command handler - completely generic
   async function handleCommand(interaction: CommandInteraction) {
-    console.log(`[handleCommand] Processing command: ${interaction.commandName} in channel ${interaction.channelId}`);
+    const startTime = Date.now();
+    console.log(`[InteractionCommand] STARTED: /${interaction.commandName} by ${interaction.user.tag} (${interaction.user.id}) in channel ${interaction.channelId}`);
+    
+    // Log options for better debugging
+    const options = interaction.options.data.map(opt => `${opt.name}: ${opt.value}`).join(', ');
+    if (options) console.log(`[InteractionCommand] OPTIONS: ${options}`);
     
     // Channel restriction: if routing is disabled, only respond to own channel
     // Exception: /restart, /run, and /run-adv commands should be allowed from any channel
     if (!enableChannelRouting) {
       const allowedCommands = ['restart', 'run', 'run-adv'];
       if (!allowedCommands.includes(interaction.commandName) && (!myChannel || interaction.channelId !== myChannel.id)) {
-        console.log(`[handleCommand] Ignoring command ${interaction.commandName}: Not in bot's channel (${myChannel?.id}) and routing disabled.`);
+        console.log(`[InteractionCommand] IGNORED: Not in bot's channel (${myChannel?.id}) and routing disabled.`);
         return;
       }
     }
@@ -234,6 +239,7 @@ export async function createDiscordBot(
     const handler = handlers.get(interaction.commandName);
     
     if (!handler) {
+      console.error(`[InteractionCommand] ERROR: No handler found for /${interaction.commandName}`);
       await ctx.reply({
         content: `Unknown command: ${interaction.commandName}`,
         ephemeral: true
@@ -242,9 +248,11 @@ export async function createDiscordBot(
     }
     
     try {
+      console.log(`[InteractionCommand] EXECUTING: /${interaction.commandName}`);
       await handler.execute(ctx);
+      console.log(`[InteractionCommand] COMPLETED: /${interaction.commandName} in ${Date.now() - startTime}ms`);
     } catch (error) {
-      console.error(`Error executing command ${interaction.commandName}:`, error);
+      console.error(`[InteractionCommand] FAILED: /${interaction.commandName}:`, error);
       // Try to send error message if possible
       try {
         if (interaction.deferred) {
@@ -257,17 +265,22 @@ export async function createDiscordBot(
             ephemeral: true
           });
         }
-      } catch {
-        // Ignore errors when sending error message
+      } catch (replyError) {
+        console.error(`[InteractionCommand] FAILED_TO_REPLY: ${replyError}`);
       }
     }
   }
   
   // Select menu handler
   async function handleSelectMenu(interaction: any) {
+    const startTime = Date.now();
+    console.log(`[InteractionSelect] STARTED: ID=${interaction.customId} by ${interaction.user.tag} in channel ${interaction.channelId}`);
+    console.log(`[InteractionSelect] VALUES: ${JSON.stringify(interaction.values)}`);
+
     // Channel restriction: if routing is disabled, only respond to own channel
     if (!enableChannelRouting) {
       if (!myChannel || interaction.channelId !== myChannel.id) {
+        console.log(`[InteractionSelect] IGNORED: Not in bot's channel and routing disabled.`);
         return;
       }
     }
@@ -1631,11 +1644,15 @@ export async function createDiscordBot(
     // Ignore own messages
     if (message.author.bot) return;
     
+    console.log(`[MessageCreate] RECEIVED: from ${message.author.tag} (${message.author.id}) in channel ${message.channelId}`);
+    console.log(`[MessageCreate] CONTENT: "${message.content.substring(0, 100)}${message.content.length > 100 ? '...' : ''}"`);
+
     // Get channel context for multi-project routing
     let channelContext = undefined;
     if (enableChannelRouting && message.channel) {
       try {
         const contextResult = await channelContextManager.getChannelContext(message.channel);
+        console.log(`[MessageCreate] CONTEXT_RESULT: ${JSON.stringify(contextResult)}`);
         
         // Check if category not found and needs user prompt
         if (contextResult && 'needsUserPrompt' in contextResult) {
