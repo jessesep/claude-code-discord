@@ -440,6 +440,18 @@ export async function chatWithAgent(
   if (sessionData?.session.modelOverride) agent.model = sessionData.session.modelOverride;
   if (effectiveDeps?.modelOverride) agent.model = effectiveDeps.modelOverride;
 
+  // Resolve model name to ensure it's valid (e.g., gemini-3-flash -> gemini-3-flash-preview)
+  try {
+    const { resolveModelName } = await import("../util/list-models.ts");
+    const resolvedModel = await resolveModelName(agent.model);
+    if (resolvedModel !== agent.model) {
+      console.log(`[Agent] Model resolved: ${agent.model} -> ${resolvedModel}`);
+      agent.model = resolvedModel;
+    }
+  } catch (err) {
+    console.warn('[Agent] Could not resolve model name:', err);
+  }
+
   // Check for client override from session (set by /run-adv) or deps
   const sessionClientOverride = (sessionData?.session as any)?.clientOverride;
   let clientType = effectiveDeps?.clientOverride || sessionClientOverride || agent.client || 'claude';

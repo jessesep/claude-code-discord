@@ -124,6 +124,16 @@ export async function handleStartup(
       const availableProviders = await AgentProviderRegistry.getAvailableProviders();
       const providerDetail = `${availableProviders.length}/${providers.length} available`;
       await updateStatus(2, availableProviders.length > 0 ? '✅' : '⚠️', providerDetail);
+      
+      // Initialize model cache (fetches available models from API)
+      try {
+        const { initModelCache, getLatestFlashModel } = await import("../util/list-models.ts");
+        await initModelCache();
+        const latestFlash = await getLatestFlashModel();
+        console.log(`[Startup] Latest Flash model: ${latestFlash}`);
+      } catch (err) {
+        console.warn('[Startup] Could not initialize model cache:', err);
+      }
 
       // Register Guild Commands
       const skipRegistration = Deno.env.get("SKIP_COMMAND_REGISTRATION") === "true";

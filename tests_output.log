@@ -254,3 +254,10 @@ Duration: 20152ms
 ✅ Tester connected as user-tester-bot#5126
 📂 Testing in channel: #e2e-basic (e2e-basic)
 📤 Spawning cursor-coder: "Create a file named "e2e_test_1767808072101.txt" w..."
+🧹 Cleaning up test context (ran for 121154ms)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: Timed out after 120s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

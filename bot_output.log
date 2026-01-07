@@ -1793,3 +1793,4 @@ Bot has started. Press Ctrl+C to stop.
 [MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
 [Commands] Skipping command registration (SKIP_COMMAND_REGISTRATION=true)
 [Startup] ✅ Startup complete in 1.2s
+[MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): 

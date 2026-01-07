@@ -146,3 +146,160 @@ export async function getModelsForAgents(): Promise<{
   
   return { manager, coder, architect };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Model Validation & Resolution
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get cached models or refresh if stale
+ */
+export async function getCachedModels(): Promise<AvailableModel[]> {
+  const now = Date.now();
+  
+  if (cachedModels.length === 0 || (now - lastFetchTime) > CACHE_TTL_MS) {
+    console.log('[ModelCache] Refreshing available models from API...');
+    cachedModels = await listAvailableModels();
+    lastFetchTime = now;
+    console.log(`[ModelCache] Found ${cachedModels.length} available models`);
+    
+    // Log the newest Flash models for visibility
+    const flashModels = cachedModels.filter(m => m.name.includes('flash')).slice(0, 5);
+    console.log(`[ModelCache] Latest Flash models: ${flashModels.map(m => m.name).join(', ')}`);
+  }
+  
+  return cachedModels;
+}
+
+/**
+ * Validate if a model name is available in the API
+ * Returns the exact valid model name or null if not found
+ */
+export async function validateModelName(modelName: string): Promise<string | null> {
+  const models = await getCachedModels();
+  
+  // Exact match
+  const exactMatch = models.find(m => m.name === modelName);
+  if (exactMatch) return exactMatch.name;
+  
+  // Case-insensitive match
+  const caseMatch = models.find(m => m.name.toLowerCase() === modelName.toLowerCase());
+  if (caseMatch) return caseMatch.name;
+  
+  return null;
+}
+
+/**
+ * Find the best matching model for a given name
+ * Tries exact match, then fuzzy matching, then returns newest in family
+ * 
+ * GOLDEN RULE: Never return an older model than requested
+ */
+export async function resolveModelName(requestedModel: string): Promise<string> {
+  const models = await getCachedModels();
+  
+  // 1. Try exact match first
+  const exactMatch = models.find(m => m.name === requestedModel);
+  if (exactMatch) return exactMatch.name;
+  
+  // 2. Case-insensitive match
+  const caseMatch = models.find(m => m.name.toLowerCase() === requestedModel.toLowerCase());
+  if (caseMatch) return caseMatch.name;
+  
+  // 3. Try adding common suffixes (e.g., gemini-3-flash -> gemini-3-flash-preview)
+  const withPreview = `${requestedModel}-preview`;
+  const previewMatch = models.find(m => m.name === withPreview);
+  if (previewMatch) {
+    console.log(`[ModelResolver] Resolved ${requestedModel} -> ${previewMatch.name} (added -preview)`);
+    return previewMatch.name;
+  }
+  
+  // 4. Try removing suffixes
+  const baseModel = requestedModel.replace(/-preview$|-latest$|-exp$/, '');
+  const baseMatch = models.find(m => m.name.startsWith(baseModel));
+  if (baseMatch) {
+    console.log(`[ModelResolver] Resolved ${requestedModel} -> ${baseMatch.name} (base match)`);
+    return baseMatch.name;
+  }
+  
+  // 5. Find newest model in the same family (e.g., gemini-3 -> newest gemini-3-*)
+  const familyMatch = requestedModel.match(/^(gemini-\d+)/);
+  if (familyMatch) {
+    const family = familyMatch[1];
+    const familyModels = models.filter(m => m.name.startsWith(family));
+    if (familyModels.length > 0) {
+      // Prefer flash models for speed, then sort by name (newer versions tend to be alphabetically later)
+      const flashInFamily = familyModels.find(m => m.name.includes('flash'));
+      if (flashInFamily) {
+        console.log(`[ModelResolver] Resolved ${requestedModel} -> ${flashInFamily.name} (family flash)`);
+        return flashInFamily.name;
+      }
+      console.log(`[ModelResolver] Resolved ${requestedModel} -> ${familyModels[0].name} (family first)`);
+      return familyModels[0].name;
+    }
+  }
+  
+  // 6. Last resort: return the original and let the API error (don't downgrade!)
+  console.warn(`[ModelResolver] Could not resolve ${requestedModel} - returning as-is (API will validate)`);
+  return requestedModel;
+}
+
+/**
+ * Check if model is available and log a warning if not
+ */
+export async function isModelAvailable(modelName: string): Promise<boolean> {
+  const resolved = await validateModelName(modelName);
+  if (!resolved) {
+    console.warn(`[ModelValidator] Model "${modelName}" not found in available models`);
+    const models = await getCachedModels();
+    const suggestions = models
+      .filter(m => m.name.includes(modelName.split('-')[1] || ''))
+      .slice(0, 3)
+      .map(m => m.name);
+    if (suggestions.length > 0) {
+      console.log(`[ModelValidator] Suggestions: ${suggestions.join(', ')}`);
+    }
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Get the latest Flash model available (for budget/fast operations)
+ */
+export async function getLatestFlashModel(): Promise<string> {
+  const models = await getCachedModels();
+  
+  // Prioritize by version number (higher is newer)
+  const flashModels = models
+    .filter(m => m.name.includes('flash') && m.supportsGenerateContent)
+    .sort((a, b) => {
+      // Extract version numbers and sort descending
+      const aVersion = a.name.match(/gemini-(\d+)/)?.[1] || '0';
+      const bVersion = b.name.match(/gemini-(\d+)/)?.[1] || '0';
+      return parseInt(bVersion) - parseInt(aVersion);
+    });
+  
+  if (flashModels.length > 0) {
+    return flashModels[0].name;
+  }
+  
+  // Fallback to known latest
+  return 'gemini-3-flash-preview';
+}
+
+/**
+ * Initialize model cache on startup
+ */
+export async function initModelCache(): Promise<void> {
+  console.log('[ModelCache] Initializing model cache...');
+  await getCachedModels();
+}
+
+/**
+ * Force refresh the model cache
+ */
+export async function refreshModelCache(): Promise<AvailableModel[]> {
+  lastFetchTime = 0; // Force refresh
+  return getCachedModels();
+}
