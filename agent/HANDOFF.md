@@ -1,7 +1,7 @@
 # Handoff: Discord Bot Reboot & Manager Agent Fix
 
-**Date:** 2026-01-06
-**Status:** Bot Running (PID 10073), Code Patched, Troubleshooting in Progress
+**Date:** 2026-01-07
+**Status:** Bot Running (PID 5501), Scripts Improved
 
 ## 1. Current State
 
@@ -13,9 +13,12 @@
 ## 2. Recent Accomplishments
 
 - **Documentation**: Created `agent/START_HERE.md` with clear setup/usage instructions.
-- **Security Fix**: Patched `agent/index.ts` to pass `authorized: true` to the Antigravity client. This fixes the authenticaion failure for the Manager agent when using local gcloud credentials.
-- **formatting**: Fixed string formatting in `manager.ts`.
-- **Startup**: Verified bot starts successfully from the root directory.
+- **Security Fix**: Patched `agent/index.ts` to pass `authorized: true` to the Antigravity client.
+- **Start Script Optimization**: Unified and improved `start-bot.sh`, `start.sh`, and `reboot.sh`.
+  - Added `APPLICATION_ID` validation.
+  - Removed hardcoded Deno paths.
+  - Improved `.env` loading and directory independence.
+- **Background Persistence**: Verified bot is running reliably in the background (PID 5501) with port 8000 active.
 
 ## 3. Current Issue: "Invalid Command"
 

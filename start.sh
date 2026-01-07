@@ -16,8 +16,6 @@ if [ -n "$PID" ]; then
   exit 0
 fi
 
-echo "🚀 Starting bot in background..."
-
 # Load environment variables
 if [ -f .env ]; then
   set -a
@@ -25,8 +23,23 @@ if [ -f .env ]; then
   set +a
 fi
 
+# Check for required environment variables
+if [ -z "$DISCORD_TOKEN" ]; then
+  echo "❌ Error: DISCORD_TOKEN is not set"
+  echo "Please set it in .env file or export DISCORD_TOKEN=your_token"
+  exit 1
+fi
+
+if [ -z "$APPLICATION_ID" ]; then
+  echo "❌ Error: APPLICATION_ID is not set"
+  echo "Please set it in .env file or export APPLICATION_ID=your_app_id"
+  exit 1
+fi
+
 # Ensure Deno is in the PATH
 export PATH="$HOME/.deno/bin:$PATH"
+
+echo "🚀 Starting bot in background..."
 
 # Start the bot
 nohup deno run --allow-all index.ts >> "$LOG_FILE" 2>&1 &

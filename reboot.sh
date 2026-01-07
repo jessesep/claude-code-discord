@@ -71,6 +71,11 @@ if [ -z "$DISCORD_TOKEN" ]; then
   exit 1
 fi
 
+if [ -z "$APPLICATION_ID" ]; then
+  echo "❌ Error: APPLICATION_ID is not set" | tee -a "$RESTART_LOG"
+  exit 1
+fi
+
 # Ensure Deno is in the PATH
 export PATH="$HOME/.deno/bin:$PATH"
 
