@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<handoff version="2" generated="2026-01-06T19:14:12Z" scope="auto" type="session-end" duration="0m">
+<handoff version="2" generated="2026-01-06T23:44:40Z" scope="auto" type="session-end" duration="0m">
 
   <project>
     <name>claude-code-discord</name>
@@ -9,7 +9,7 @@
   </project>
 
   <session>
-    <uncommitted-changes>14</uncommitted-changes>
+    <uncommitted-changes>47</uncommitted-changes>
     <staged-files>
 
     </staged-files>
@@ -17,23 +17,23 @@
 
   <changes>
     <commits count="5">
-d937104 fix: Remove duplicate channelId declaration
-8c0b05b fix: Move errorMessage declaration outside embed object
-f33b1d1 feat: Add multi-agent spawning and category names with repo info
-af46ade Milestone: Security fixes and utilities
-24a4974 Fix /run command: handle Discord.js select menu components
+09ad42f Fix: Update /run command to use provider selection flow and fix Gemini API key loading
+7b2973b docs: update project mission to reflect Gemini 3 Flash default
+2a3c54b fix: restore Gemini 3 Flash, refine agent orchestration, and update context guide
+a7a394a Implement independent role system and fix Ollama support
+0c59a75 feat: Add dynamic repository management with dropdown support
     </commits>
     <modified-files>
+.agent-context.md
+.gitignore
 .handoffs/current.xml
 .handoffs/previous.xml
 ARCHITECTURE.md
-FEATURES_SUMMARY.md
+CONTRIBUTING.md
+CURSOR-INTEGRATION-FIX-SUMMARY.md
 README.md
-agent/index.ts
-agent/manager.ts
-agent/providers/antigravity-provider.ts
-agent/providers/ollama-provider.ts
-bot.log
+WORKFLOW_MOODBOARD.md
+agent/AGENT_CONTEXT.md
     </modified-files>
   </changes>
 

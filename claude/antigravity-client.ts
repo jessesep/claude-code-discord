@@ -255,7 +255,8 @@ export async function sendToAntigravityCLI(
           // If response not OK, read error text
           const errText = await response.text();
           // Log but don't throw yet if we have an API key fallback
-          if (API_KEY) {
+          const apiKey = getApiKey();
+          if (apiKey) {
             console.warn(`[Antigravity] OAuth API error (${response.status}), trying API key fallback: ${errText}`);
           } else {
             throw new Error(`Gemini API Error (${response.status}): ${errText}`);
@@ -263,7 +264,8 @@ export async function sendToAntigravityCLI(
         }
       } catch (error) {
         // If OAuth fails, log but don't throw yet if we have an API key fallback
-        if (API_KEY) {
+        const apiKey = getApiKey();
+        if (apiKey) {
           console.warn("[Antigravity] OAuth authentication failed, trying API key fallback:", error);
         } else {
           throw error;

@@ -8,9 +8,10 @@ Your role is to understand user requests, decompose tasks, delegate to specializ
    - The repository path (if specified)
    - Any specific requirements or constraints
 2. **Decompose Tasks**: Break down high-level user requests into granular, actionable sub-tasks.
-3. **Delegate**: Assign sub-tasks to specialized agents (Coder, Architect, etc.) using \`spawn_agent\`.
-4. **Coordinate**: Pass context and outputs between agents. Ensure avoiding redundant work.
-5. **HITL (Human-In-The-Loop)**: Ask for user approval before making major architectural changes or spawning expensive agents.
+3. **Delegate**: Assign sub-tasks to specialized agents (Coder, Architect, etc.) using \`spawn_agent\` OR start a multi-agent workflow using \`spawn_swarm\`.
+4. **Swarm (Multi-Agent)**: For complex projects requiring multiple specialists, use \`spawn_swarm\` to create a dedicated category and channels for each agent.
+5. **Coordinate**: Pass context and outputs between agents. Ensure avoiding redundant work.
+6. **HITL (Human-In-The-Loop)**: Ask for user approval before making major architectural changes or spawning expensive agents.
 
 ## Instructions
 
@@ -20,6 +21,7 @@ Your role is to understand user requests, decompose tasks, delegate to specializ
 - **Task Complexity Assessment**:
   - If a task is complex, create a plan and spawn an **Architect** (\`ag-architect\`) to validate it first.
   - If a task involves coding, spawn the **Coder** (\`ag-coder\`).
+  - If a task is a large feature or refactor requiring multiple steps/agents, use \`spawn_swarm\`.
 - **Monitor Sub-agents**: Monitor the state of sub-agents and intervene if they get stuck.
 - **Status Updates**: Keep the user updated with high-level progress, not low-level logs. Provide concise summaries when sub-agents complete their work.
 
@@ -27,6 +29,7 @@ Your role is to understand user requests, decompose tasks, delegate to specializ
 
 - \`ag-coder\` (Antigravity Coder): Best for implementing features, writing code, and complex refactors. Capabilities: file-editing, terminal usage, autonomous execution.
 - \`ag-architect\` (Antigravity Architect): Best for planning, system design, and analyzing large codebases. Capabilities: file-reading, planning, architecture validation.
+- \`ag-security\` (Security Analyst): Specialized in security analysis and vulnerability assessment.
 
 ## MCP (Model Context Protocol) Tools
 
@@ -85,14 +88,29 @@ To switch to a specialized agent (which will take over the conversation), output
 }
 \`\`\`
 
-**Important**: When you output this JSON, the specified agent will be spawned and run concurrently with any other active agents. Multiple agents can work simultaneously on different tasks. The spawned agent will handle the specified task while you can continue coordinating. Only use this when the task clearly requires a specialized agent. For simple questions or clarifications, just reply directly.
+To start a multi-agent swarm in a new category and channels:
+\`\`\`json
+{
+  "action": "spawn_swarm",
+  "projectName": "FeatureName",
+  "agents": [
+    { "name": "ag-architect", "task": "Initial architecture plan for FeatureName" },
+    { "name": "ag-coder", "task": "Implementation of FeatureName components" }
+  ]
+}
+\`\`\`
+
+**Important**: When you output a JSON action, it MUST be the ONLY thing in your response (except for a brief intro text if needed). Multiple agents can work simultaneously.
 `;
 
 export interface ManagerAction {
-    action: 'spawn_agent' | 'reply' | 'create_github_issue';
+    action: 'spawn_agent' | 'spawn_swarm' | 'reply' | 'create_github_issue';
     agent_name?: string;
     task?: string;
     message?: string;
+    // For Swarm
+    projectName?: string;
+    agents?: Array<{ name: string; task: string }>;
     // For GitHub issue creation
     title?: string;
     body?: string;
@@ -112,6 +130,13 @@ export function parseManagerResponse(response: string): ManagerAction | null {
                     action: 'spawn_agent',
                     agent_name: data.agent_name,
                     task: data.task
+                };
+            }
+            if (data.action === 'spawn_swarm' && data.projectName && data.agents) {
+                return {
+                    action: 'spawn_swarm',
+                    projectName: data.projectName,
+                    agents: data.agents
                 };
             }
             if (data.action === 'create_github_issue' && data.title && data.body) {

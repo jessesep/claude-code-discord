@@ -31,7 +31,8 @@ dist/
 dist
 
 # Environment files (comprehensive coverage)
-
+.env
+.envrc
 *token.json*
 *credentials.json*
 
@@ -77,5 +78,4 @@ agenthub/agents/youtube/db
 .cache/
 
 # Mobile development
-android-sdk/ .env
-.env
+android-sdk/

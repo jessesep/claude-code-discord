@@ -17,15 +17,34 @@ export class AntigravityProvider implements AgentProvider {
   readonly providerId = 'antigravity';
   readonly providerName = 'Google Antigravity (Gemini)';
   readonly providerType = ProviderType.API;
-  readonly supportedModels = [
+  supportedModels = [
     'gemini-3-flash',
     'gemini-2.0-flash',
     'gemini-2.0-flash-thinking-exp',
+    'gemini-2.0-pro-exp',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
     'gemini-1.5-pro',
+    'gemini-1.5-pro-latest',
     'gemini-exp-1206',
+    'gemini-exp-1121',
+    'gemini-exp-1114',
   ];
+
+  async listModels(): Promise<string[]> {
+    try {
+      const { listAvailableModels } = await import('../../util/list-models.ts');
+      const models = await listAvailableModels();
+      const modelNames = models.map(m => m.name);
+      if (modelNames.length > 0) {
+        this.supportedModels = modelNames;
+      }
+      return this.supportedModels;
+    } catch (error) {
+      console.error('[Antigravity] Failed to list models:', error);
+      return this.supportedModels;
+    }
+  }
 
   async isAvailable(): Promise<boolean> {
     // Check for API key or gcloud credentials

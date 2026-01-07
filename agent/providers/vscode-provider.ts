@@ -49,7 +49,7 @@ export class VSCodeExtensionProvider implements AgentProvider {
   readonly providerId: string;
   readonly providerName: string;
   readonly providerType = ProviderType.IDE_EXTENSION;
-  readonly supportedModels: string[];
+  supportedModels: string[];
 
   private config: VSCodeExtensionConfig;
 
@@ -58,6 +58,10 @@ export class VSCodeExtensionProvider implements AgentProvider {
     this.providerId = `vscode-${config.extensionId.replace(/\./g, '-')}`;
     this.providerName = `VS Code: ${config.name}`;
     this.supportedModels = config.supportedModels || [];
+  }
+
+  async listModels(): Promise<string[]> {
+    return this.supportedModels;
   }
 
   async isAvailable(): Promise<boolean> {

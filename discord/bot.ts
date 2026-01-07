@@ -18,6 +18,7 @@ import { ChannelContextManager } from "../util/channel-context.ts";
 
 import { sanitizeChannelName, DISCORD_LIMITS, splitText } from "./utils.ts";
 import { handlePaginationInteraction } from "./pagination.ts";
+import { convertMessageContent } from "./formatting.ts";
 import type { 
   BotConfig, 
   CommandHandlers, 
@@ -28,80 +29,6 @@ import type {
 } from "./types.ts";
 
 
-// ================================
-// Helper Functions
-// ================================
-
-// deno-lint-ignore no-explicit-any
-function convertMessageContent(content: MessageContent): any {
-  // deno-lint-ignore no-explicit-any
-  const payload: any = {};
-  
-  if (content.content) payload.content = content.content;
-  
-  if (content.embeds) {
-    payload.embeds = content.embeds.map(e => {
-      const embed = new EmbedBuilder();
-      if (e.color !== undefined) embed.setColor(e.color);
-      if (e.title) embed.setTitle(e.title);
-      if (e.description) embed.setDescription(e.description);
-      if (e.fields) e.fields.forEach(f => embed.addFields(f));
-      if (e.footer) embed.setFooter(e.footer);
-      if (e.timestamp) embed.setTimestamp();
-      return embed;
-    });
-  }
-  
-  if (content.components) {
-    // Check if components are already in Discord.js format (ActionRowBuilder instances or toJSON() results)
-    // Discord.js ActionRowBuilder instances have a 'toJSON' method
-    // Discord.js serialized components have a 'type' property that's a number (1 for ActionRow, 3 for StringSelectMenu)
-    const isDiscordJSFormat = content.components.length > 0 && (
-      // Check if it's an ActionRowBuilder instance
-      (typeof content.components[0] === 'object' && 'toJSON' in content.components[0] && typeof (content.components[0] as any).toJSON === 'function') ||
-      // Check if it's a serialized Discord.js component (has numeric type property)
-      (typeof content.components[0] === 'object' && 'type' in content.components[0] && typeof (content.components[0] as any).type === 'number')
-    );
-    
-    if (isDiscordJSFormat) {
-      // Components are already in Discord.js format
-      // Convert ActionRowBuilder instances to serialized format for consistency
-      payload.components = content.components.map((comp: any) => {
-        // If it's an ActionRowBuilder instance, serialize it
-        if (comp && typeof comp === 'object' && 'toJSON' in comp && typeof comp.toJSON === 'function') {
-          return comp.toJSON();
-        }
-        // If it's already serialized (plain object), pass it through
-        return comp;
-      });
-    } else {
-      // Convert from MessageContent format (buttons only)
-      payload.components = content.components.map(row => {
-        const actionRow = new ActionRowBuilder<ButtonBuilder>();
-        row.components.forEach(comp => {
-          const button = new ButtonBuilder()
-            .setCustomId(comp.customId)
-            .setLabel(comp.label);
-          
-          switch (comp.style) {
-            case 'primary': button.setStyle(ButtonStyle.Primary); break;
-            case 'secondary': button.setStyle(ButtonStyle.Secondary); break;
-            case 'success': button.setStyle(ButtonStyle.Success); break;
-            case 'danger': button.setStyle(ButtonStyle.Danger); break;
-            case 'link': button.setStyle(ButtonStyle.Link); break;
-          }
-          
-          actionRow.addComponents(button);
-        });
-        return actionRow;
-      });
-    }
-  }
-  
-  return payload;
-}
-
-// ================================
 // Main Bot Creation Function
 // ================================
 
@@ -291,9 +218,14 @@ export async function createDiscordBot(
   
   // Command handler - completely generic
   async function handleCommand(interaction: CommandInteraction) {
+    console.log(`[handleCommand] Processing command: ${interaction.commandName} in channel ${interaction.channelId}`);
+    
     // Channel restriction: if routing is disabled, only respond to own channel
+    // Exception: /restart, /run, and /run-adv commands should be allowed from any channel
     if (!enableChannelRouting) {
-      if (!myChannel || interaction.channelId !== myChannel.id) {
+      const allowedCommands = ['restart', 'run', 'run-adv'];
+      if (!allowedCommands.includes(interaction.commandName) && (!myChannel || interaction.channelId !== myChannel.id)) {
+        console.log(`[handleCommand] Ignoring command ${interaction.commandName}: Not in bot's channel (${myChannel?.id}) and routing disabled.`);
         return;
       }
     }
@@ -586,21 +518,52 @@ export async function createDiscordBot(
       await ctx.deferUpdate();
       const provider = values[0];
       
-      // Step 2: Role selection (include provider in customId)
+      // Step 2: Workspace/Repo selection
       const { StringSelectMenuBuilder, ActionRowBuilder } = await import("npm:discord.js@14.14.1");
+      const { RepoManager } = await import("../repo/index.ts");
       
-      const roleMenu = new StringSelectMenuBuilder()
-        .setCustomId(`run-adv-role:${provider}`)
-        .setPlaceholder('Select a role...')
-        .addOptions([
-          { label: '🔨 Builder', description: 'Build and create code, implement features', value: 'builder' },
-          { label: '🧪 Tester', description: 'Test code, ensure quality, find bugs', value: 'tester' },
-          { label: '🔍 Investigator', description: 'Investigate issues, analyze systems', value: 'investigator' },
-          { label: '🏗️ Architect', description: 'Design systems, plan architecture', value: 'architect' },
-          { label: '👁️ Reviewer', description: 'Review code, provide feedback', value: 'reviewer' }
-        ]);
+      const repoManager = RepoManager.getInstance(workDir);
+      let repos = repoManager.getRepositories();
       
-      const roleRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(roleMenu);
+      // If no repos scanned yet, do a quick scan
+      if (repos.length === 0) {
+        repos = await repoManager.scanRepositories(1); // Shallow scan first
+      }
+      
+      // Create options for workspace selection
+      const workspaceOptions = [];
+      
+      // 1. Current workspace (from context or default)
+      const currentPath = ctx.channelContext?.projectPath || workDir;
+      const currentName = ctx.channelContext?.repoName || repoName || 'Current Workspace';
+      
+      workspaceOptions.push({
+        label: `📍 ${currentName} (Current)`,
+        description: currentPath.substring(0, 100),
+        value: currentPath
+      });
+      
+      // 2. Add other discovered repositories
+      repos.forEach(repo => {
+        // Skip current workspace as it's already added
+        if (repo.path === currentPath) return;
+        
+        workspaceOptions.push({
+          label: `📁 ${repo.name}`,
+          description: repo.path.substring(0, 100),
+          value: repo.path
+        });
+      });
+      
+      // Limit to 25 options
+      const finalOptions = workspaceOptions.slice(0, 25);
+      
+      const workspaceMenu = new StringSelectMenuBuilder()
+        .setCustomId(`run-adv-workspace:${provider}`)
+        .setPlaceholder('Select a workspace/repository...')
+        .addOptions(finalOptions);
+      
+      const workspaceRow = new ActionRowBuilder<any>().addComponents(workspaceMenu);
       
       const providerNames: Record<string, string> = {
         'cursor': '💻 Cursor',
@@ -614,7 +577,54 @@ export async function createDiscordBot(
         embeds: [{
           color: 0x5865F2,
           title: '🚀 Advanced Agent Runner',
-          description: `**Step 2 of 3: Select Role**\n\nProvider: **${providerNames[provider] || provider}**\n\nRoles are independent of provider - they define your agent's focus and load context from repository documents (e.g., \`.roles/builder.md\`).`,
+          description: `**Step 2 of 4: Select Workspace**\n\nProvider: **${providerNames[provider] || provider}**\n\nChoose the workspace or repository where the agent should spawn:`,
+          fields: [
+            { name: 'Current Workspace', value: `\`${currentPath}\``, inline: false },
+            { name: 'Discovered', value: `${repos.length} other repositories found`, inline: true }
+          ],
+          footer: { text: 'Select a workspace to continue' },
+          timestamp: true
+        }],
+        components: [workspaceRow]
+      });
+      return;
+    }
+
+    // Handle run-adv workspace selection
+    if (customId.startsWith('run-adv-workspace:') && values && values.length > 0) {
+      await ctx.deferUpdate();
+      const [, provider] = customId.split(':');
+      const workspacePath = values[0];
+      
+      // Step 3: Role selection (include provider and workspace in customId)
+      const { StringSelectMenuBuilder, ActionRowBuilder } = await import("npm:discord.js@14.14.1");
+      
+      const roleMenu = new StringSelectMenuBuilder()
+        .setCustomId(`run-adv-role:${provider}:${workspacePath}`)
+        .setPlaceholder('Select a role...')
+        .addOptions([
+          { label: '🔨 Builder', description: 'Build and create code, implement features', value: 'builder' },
+          { label: '🧪 Tester', description: 'Test code, ensure quality, find bugs', value: 'tester' },
+          { label: '🔍 Investigator', description: 'Investigate issues, analyze systems', value: 'investigator' },
+          { label: '🏗️ Architect', description: 'Design systems, plan architecture', value: 'architect' },
+          { label: '👁️ Reviewer', description: 'Review code, provide feedback', value: 'reviewer' }
+        ]);
+      
+      const roleRow = new ActionRowBuilder<any>().addComponents(roleMenu);
+      
+      const providerNames: Record<string, string> = {
+        'cursor': '💻 Cursor',
+        'claude-cli': '🤖 Claude CLI',
+        'gemini-api': '🚀 Gemini API',
+        'antigravity': '⚡ Antigravity',
+        'ollama': '🦙 Ollama'
+      };
+      
+      await ctx.editReply({
+        embeds: [{
+          color: 0x5865F2,
+          title: '🚀 Advanced Agent Runner',
+          description: `**Step 3 of 4: Select Role**\n\nProvider: **${providerNames[provider] || provider}**\nWorkspace: \`${workspacePath}\`\n\nRoles define your agent's focus and load context from repository documents (e.g., \`.roles/builder.md\`).`,
           fields: [
             { name: '🔨 Builder', value: 'Build and create code, implement features', inline: true },
             { name: '🧪 Tester', value: 'Test code, ensure quality, find bugs', inline: true },
@@ -633,7 +643,9 @@ export async function createDiscordBot(
     // Handle run-adv role selection
     if (customId.startsWith('run-adv-role:') && values && values.length > 0) {
       await ctx.deferUpdate();
-      const [, provider] = customId.split(':');
+      const parts = customId.split(':');
+      const provider = parts[1];
+      const workspacePath = parts.slice(2).join(':'); // Robust handling of paths with colons
       const role = values[0];
       
       // Import role definitions
@@ -653,8 +665,7 @@ export async function createDiscordBot(
         return;
       }
       
-      // Step 3: Go directly to model selection (no agent selection needed)
-      // The role is independent of the provider
+      // Step 4: Go directly to model selection
       const { listAvailableModels } = await import("../util/list-models.ts");
       
       let availableModels: Array<{ name: string; displayName: string }> = [];
@@ -665,21 +676,53 @@ export async function createDiscordBot(
           const allModels = await listAvailableModels();
           availableModels = allModels.map(m => ({ name: m.name, displayName: m.displayName }));
         } else if (provider === 'cursor') {
-          // Cursor uses its own models - show common ones
-          availableModels = [
-            { name: 'auto', displayName: 'Auto (Let Cursor choose)' },
-            { name: 'sonnet-4.5', displayName: 'Claude Sonnet 4.5' },
-            { name: 'sonnet-4.5-thinking', displayName: 'Claude Sonnet 4.5 Thinking' }
-          ];
+          // Fetch models from Cursor provider
+          const { AgentProviderRegistry } = await import("../agent/provider-interface.ts");
+          const cursorProvider = AgentProviderRegistry.getProvider('cursor');
+          if (cursorProvider) {
+            const models = await cursorProvider.listModels();
+            availableModels = models.map(name => {
+              // Create friendly display names
+              let displayName = name;
+              if (name === 'auto') {
+                displayName = 'Auto (Let Cursor choose)';
+              } else if (name === 'sonnet-4.5') {
+                displayName = 'Claude Sonnet 4.5';
+              } else if (name === 'sonnet-4.5-thinking') {
+                displayName = 'Claude Sonnet 4.5 Thinking';
+              } else if (name === 'opus-4.5') {
+                displayName = 'Claude Opus 4.5';
+              } else if (name === 'opus-4.5-thinking') {
+                displayName = 'Claude Opus 4.5 Thinking';
+              } else if (name === 'opus-4.1') {
+                displayName = 'Claude Opus 4.1';
+              } else if (name === 'gemini-3-pro') {
+                displayName = 'Gemini 3 Pro';
+              } else if (name === 'gemini-2.0-flash') {
+                displayName = 'Gemini 2.0 Flash';
+              } else if (name.startsWith('gpt-5')) {
+                displayName = name.toUpperCase().replace(/-/g, ' ');
+              } else {
+                // Default: capitalize and replace dashes/underscores with spaces
+                displayName = name.charAt(0).toUpperCase() + name.slice(1).replace(/[-_]/g, ' ');
+              }
+              return { name, displayName };
+            });
+          } else {
+            // Fallback if Cursor provider is not available
+            availableModels = [
+              { name: 'auto', displayName: 'Auto (Let Cursor choose)' },
+              { name: 'sonnet-4.5', displayName: 'Claude Sonnet 4.5' },
+              { name: 'sonnet-4.5-thinking', displayName: 'Claude Sonnet 4.5 Thinking' }
+            ];
+          }
         } else if (provider === 'claude-cli') {
-          // Claude CLI models
           availableModels = [
             { name: 'claude-sonnet-4', displayName: 'Claude Sonnet 4' },
             { name: 'claude-opus-4', displayName: 'Claude Opus 4' },
             { name: 'claude-haiku-4', displayName: 'Claude Haiku 4' }
           ];
         } else if (provider === 'ollama') {
-          // Fetch models from Ollama provider
           const { AgentProviderRegistry } = await import("../agent/provider-interface.ts");
           const ollamaProvider = AgentProviderRegistry.getProvider('ollama');
           if (ollamaProvider) {
@@ -690,15 +733,9 @@ export async function createDiscordBot(
                 name,
                 displayName: name.charAt(0).toUpperCase() + name.slice(1).replace(/[-_]/g, ' ')
               }));
-            } else {
-              // Fallback if Ollama is not available
-              availableModels = [
-                { name: 'llama3.2', displayName: 'Llama 3.2' },
-                { name: 'mistral', displayName: 'Mistral' },
-                { name: 'codellama', displayName: 'CodeLlama' }
-              ];
             }
-          } else {
+          }
+          if (availableModels.length === 0) {
             availableModels = [
               { name: 'llama3.2', displayName: 'Llama 3.2' },
               { name: 'mistral', displayName: 'Mistral' },
@@ -710,7 +747,6 @@ export async function createDiscordBot(
           availableModels = allModels.map(m => ({ name: m.name, displayName: m.displayName }));
         }
       } catch {
-        // Fallback models
         availableModels = [
           { name: 'gemini-3-flash', displayName: 'Gemini 3 Flash' },
           { name: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash' },
@@ -722,31 +758,39 @@ export async function createDiscordBot(
       
       const { StringSelectMenuBuilder: SMBuilder, ActionRowBuilder: ARBuilder, ButtonBuilder } = await import("npm:discord.js@14.14.1");
       
-      // Limit to 25 options (Discord limit)
       const modelOptions = availableModels.slice(0, 24).map(model => ({
         label: model.displayName.substring(0, 100),
         description: model.name,
         value: model.name
       }));
       
+      // Update customId to include workspacePath if available
+      const modelCustomId = workspacePath 
+        ? `run-adv-model:${provider}:${role}:${workspacePath}`
+        : `run-adv-model:${provider}:${role}`;
+      
       const modelMenu = new SMBuilder()
-        .setCustomId(`run-adv-model:${provider}:${role}`)
+        .setCustomId(modelCustomId)
         .setPlaceholder('Select a model or use auto-select...')
         .addOptions(modelOptions);
       
+      const autoSelectCustomId = workspacePath
+        ? `run-adv-auto:${provider}:${role}:${workspacePath}`
+        : `run-adv-auto:${provider}:${role}`;
+        
       const autoSelectButton = new ButtonBuilder()
-        .setCustomId(`run-adv-auto:${provider}:${role}`)
+        .setCustomId(autoSelectCustomId)
         .setLabel('✨ Auto-Select Best Model')
         .setStyle(1); // Primary style
       
-      const modelRow = new ARBuilder<SMBuilder>().addComponents(modelMenu);
-      const buttonRow = new ARBuilder<ButtonBuilder>().addComponents(autoSelectButton);
+      const modelRow = new ARBuilder<any>().addComponents(modelMenu);
+      const buttonRow = new ARBuilder<any>().addComponents(autoSelectButton);
       
       await ctx.editReply({
         embeds: [{
           color: 0x5865F2,
           title: '🚀 Advanced Agent Runner',
-          description: `**Step 3: Select Model**\n\nRole: **${roleDef.emoji} ${roleDef.name}**\nProvider: **${provider}**\n\nChoose a model or use auto-select:`,
+          description: `**Step 4 of 4: Select Model**\n\nRole: **${roleDef.emoji} ${roleDef.name}**\nProvider: **${provider}**\nWorkspace: \`${workspacePath || 'Default'}\`\n\nChoose a model or use auto-select:`,
           fields: [
             { name: 'Role Description', value: roleDef.description, inline: false },
             { name: 'Available Models', value: `${availableModels.length} models available`, inline: true },
@@ -780,12 +824,46 @@ export async function createDiscordBot(
           const allModels = await listAvailableModels();
           availableModels = allModels.map(m => ({ name: m.name, displayName: m.displayName }));
         } else if (provider === 'cursor') {
-          // Cursor uses its own models
-          availableModels = [
-            { name: 'auto', displayName: 'Auto (Let Cursor choose)' },
-            { name: 'sonnet-4.5', displayName: 'Claude Sonnet 4.5' },
-            { name: 'sonnet-4.5-thinking', displayName: 'Claude Sonnet 4.5 Thinking' }
-          ];
+          // Fetch models from Cursor provider
+          const { AgentProviderRegistry } = await import("../agent/provider-interface.ts");
+          const cursorProvider = AgentProviderRegistry.getProvider('cursor');
+          if (cursorProvider) {
+            const models = await cursorProvider.listModels();
+            availableModels = models.map(name => {
+              // Create friendly display names
+              let displayName = name;
+              if (name === 'auto') {
+                displayName = 'Auto (Let Cursor choose)';
+              } else if (name === 'sonnet-4.5') {
+                displayName = 'Claude Sonnet 4.5';
+              } else if (name === 'sonnet-4.5-thinking') {
+                displayName = 'Claude Sonnet 4.5 Thinking';
+              } else if (name === 'opus-4.5') {
+                displayName = 'Claude Opus 4.5';
+              } else if (name === 'opus-4.5-thinking') {
+                displayName = 'Claude Opus 4.5 Thinking';
+              } else if (name === 'opus-4.1') {
+                displayName = 'Claude Opus 4.1';
+              } else if (name === 'gemini-3-pro') {
+                displayName = 'Gemini 3 Pro';
+              } else if (name === 'gemini-2.0-flash') {
+                displayName = 'Gemini 2.0 Flash';
+              } else if (name.startsWith('gpt-5')) {
+                displayName = name.toUpperCase().replace(/-/g, ' ');
+              } else {
+                // Default: capitalize and replace dashes/underscores with spaces
+                displayName = name.charAt(0).toUpperCase() + name.slice(1).replace(/[-_]/g, ' ');
+              }
+              return { name, displayName };
+            });
+          } else {
+            // Fallback if Cursor provider is not available
+            availableModels = [
+              { name: 'auto', displayName: 'Auto (Let Cursor choose)' },
+              { name: 'sonnet-4.5', displayName: 'Claude Sonnet 4.5' },
+              { name: 'sonnet-4.5-thinking', displayName: 'Claude Sonnet 4.5 Thinking' }
+            ];
+          }
         } else if (provider === 'claude-cli') {
           // Claude CLI models
           availableModels = [
@@ -852,8 +930,8 @@ export async function createDiscordBot(
         .setLabel('✨ Auto-Select Best Model')
         .setStyle(1);
       
-      const modelRow = new ARBuilder<SMBuilder>().addComponents(modelMenu);
-      const buttonRow = new ARBuilder<ButtonBuilder>().addComponents(autoSelectButton);
+      const modelRow = new ARBuilder<any>().addComponents(modelMenu);
+      const buttonRow = new ARBuilder<any>().addComponents(autoSelectButton);
       
       const { ROLE_DEFINITIONS } = await import("../agent/index.ts");
       const roleDef = ROLE_DEFINITIONS[role];
@@ -882,7 +960,7 @@ export async function createDiscordBot(
       const parts = customId.split(':');
       const provider = parts[1];
       const role = parts[2];
-      // agentId is optional (old format had it, new format doesn't)
+      const workspacePath = parts.slice(3).join(':'); // Robust handling of paths with colons
       const model = values[0];
       
       // Start the agent session
@@ -906,8 +984,8 @@ export async function createDiscordBot(
       // Use general-assistant as base agent
       const agentId = 'general-assistant';
       
-      // Set the agent session with provider override
-      setAgentSession(userId, channelId, agentId, role);
+      // Set the agent session with provider and workspace override
+      setAgentSession(userId, channelId, agentId, role, workspacePath);
       
       // Get the agent and role definition
       const agent = PREDEFINED_AGENTS[agentId];
@@ -944,12 +1022,12 @@ export async function createDiscordBot(
         embeds: [{
           color: 0x00ff00,
           title: '✅ Agent Session Started',
-          description: `**Role:** ${roleDef?.emoji || ''} ${roleDef?.name || role}\n**Provider:** ${providerNames[provider] || provider}\n**Model:** ${model}\n\n${roleDef?.description || ''}\n\nYou can now chat with the agent!`,
+          description: `**Role:** ${roleDef?.emoji || ''} ${roleDef?.name || role}\n**Provider:** ${providerNames[provider] || provider}\n**Model:** ${model}\n**Workspace:** \`${workspacePath || 'Default'}\`\n\n${roleDef?.description || ''}\n\nYou can now chat with the agent!`,
           fields: [
             { name: 'Role', value: `${roleDef?.emoji || ''} ${roleDef?.name || role}`, inline: true },
             { name: 'Provider', value: providerNames[provider] || provider, inline: true },
             { name: 'Model', value: model, inline: true },
-            { name: 'Role Document', value: roleDef?.documentPath || 'Built-in', inline: false }
+            { name: 'Workspace', value: `\`${workspacePath || 'Default'}\``, inline: false }
           ],
           footer: { text: 'Start chatting to interact with the agent' },
           timestamp: true
@@ -1047,7 +1125,7 @@ export async function createDiscordBot(
       const parts = buttonId.split(':');
       const provider = parts[1];
       const role = parts[2];
-      // agentId no longer used (old format compatibility)
+      const workspacePath = parts.slice(3).join(':'); // Robust handling of paths with colons
       
       // Auto-select best model based on role
       let selectedModel = 'gemini-3-flash'; // Default
@@ -1125,8 +1203,8 @@ export async function createDiscordBot(
       // Use general-assistant as base agent
       const agentId = 'general-assistant';
       
-      // Set the agent session with provider override
-      setAgentSession(userId, channelId, agentId, role);
+      // Set the agent session with provider and workspace override
+      setAgentSession(userId, channelId, agentId, role, workspacePath);
       
       // Get the agent and role definition
       const agent = PREDEFINED_AGENTS[agentId];
@@ -1163,12 +1241,12 @@ export async function createDiscordBot(
         embeds: [{
           color: 0x00ff00,
           title: '✅ Agent Session Started (Auto-Selected)',
-          description: `**Role:** ${roleDef?.emoji || ''} ${roleDef?.name || role}\n**Provider:** ${providerNames[provider] || provider}\n**Model:** ${selectedModel} (auto-selected)\n\n${roleDef?.description || ''}\n\nYou can now chat with the agent!`,
+          description: `**Role:** ${roleDef?.emoji || ''} ${roleDef?.name || role}\n**Provider:** ${providerNames[provider] || provider}\n**Model:** ${selectedModel} (auto-selected)\n**Workspace:** \`${workspacePath || 'Default'}\`\n\n${roleDef?.description || ''}\n\nYou can now chat with the agent!`,
           fields: [
             { name: 'Role', value: `${roleDef?.emoji || ''} ${roleDef?.name || role}`, inline: true },
             { name: 'Provider', value: providerNames[provider] || provider, inline: true },
             { name: 'Model', value: selectedModel, inline: true },
-            { name: 'Role Document', value: roleDef?.documentPath || 'Built-in', inline: false }
+            { name: 'Workspace', value: `\`${workspacePath || 'Default'}\``, inline: false }
           ],
           footer: { text: 'Start chatting to interact with the agent' },
           timestamp: true
@@ -1194,6 +1272,47 @@ export async function createDiscordBot(
         if (crashHandler) {
           await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'pagination', 'Button interaction');
         }
+      }
+    }
+    
+    // Handle repo creation buttons
+    if (buttonId.startsWith('repo-create-') || buttonId.startsWith('repo-use-similar-') || 
+        buttonId.startsWith('repo-skip-desc-') || buttonId.startsWith('repo-github-') || 
+        buttonId.startsWith('repo-visibility-')) {
+      try {
+        await ctx.deferUpdate();
+        const { handleRepoCreationButton } = await import("../util/repo-creation-handler.ts");
+        const result = await handleRepoCreationButton(buttonId, ctx.user.id, ctx.channelId || '');
+        
+        if (result) {
+          if (result.complete) {
+            // Final step - update and invalidate channel cache
+            await ctx.editReply({
+              embeds: [result.embed],
+              components: result.components || []
+            });
+            // Invalidate cache so next message will use the new repo
+            channelContextManager.invalidateCache(ctx.channelId || '');
+          } else {
+            // Intermediate step - update with new prompt
+            await ctx.editReply({
+              embeds: [result.embed],
+              components: result.components || []
+            });
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('Error handling repo creation button:', error);
+        await ctx.editReply({
+          embeds: [{
+            color: 0xFF0000,
+            title: '❌ Error',
+            description: `Failed to process repository creation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            timestamp: true
+          }]
+        });
+        return;
       }
     }
     
@@ -1516,8 +1635,53 @@ export async function createDiscordBot(
     let channelContext = undefined;
     if (enableChannelRouting && message.channel) {
       try {
-        channelContext = await channelContextManager.getChannelContext(message.channel);
-        if (channelContext) {
+        const contextResult = await channelContextManager.getChannelContext(message.channel);
+        
+        // Check if category not found and needs user prompt
+        if (contextResult && 'needsUserPrompt' in contextResult) {
+          // Category not found - check if there's an active creation flow
+          const { hasActiveCreation, handleDescriptionMessage, getCreationState } = await import("../util/repo-creation-handler.ts");
+          
+          if (hasActiveCreation(message.channelId)) {
+            // Check if this is a description message (user is in description step)
+            const state = getCreationState(message.channelId);
+            if (state && state.step === 'description') {
+              const descResult = await handleDescriptionMessage(message.channelId, message.content);
+              if (descResult) {
+                await message.channel.send({
+                  embeds: [descResult.embed],
+                  components: descResult.components,
+                });
+                return;
+              }
+            }
+            // If not in description step, ignore the message (wait for button interaction)
+            return;
+          } else {
+            // Start repo creation flow only if this is the first message (not a regular chat)
+            // Only show prompt if there's no active session and no mention
+            const activeSession = getActiveSession(message.author.id, message.channelId);
+            const isMention = message.mentions.has(client.user!.id);
+            
+            if (!activeSession && !isMention) {
+              // Start repo creation flow
+              const { startRepoCreationFlow } = await import("../util/repo-creation-handler.ts");
+              const { embed, components } = await startRepoCreationFlow(
+                contextResult.categoryName,
+                message.channelId,
+                message.author.id,
+                contextResult.similarFolders
+              );
+              await message.channel.send({
+                embeds: [embed],
+                components,
+              });
+              return;
+            }
+            // If there's an active session or mention, continue with normal flow (will use default workDir)
+          }
+        } else if (contextResult && 'projectPath' in contextResult) {
+          channelContext = contextResult;
           console.log(`[MessageCreate] Channel context: ${channelContext.projectPath} (source: ${channelContext.source})`);
         }
       } catch (error) {
@@ -1576,7 +1740,67 @@ export async function createDiscordBot(
       }
 
       // Determine which agent to use: active session or default
-      const targetAgent = activeSession?.agentName || 'general-assistant';
+      // Check if user explicitly mentioned a provider in their message
+      const { getActiveAgents, PREDEFINED_AGENTS } = await import("../agent/index.ts");
+      const activeAgents = getActiveAgents(message.author.id, message.channelId);
+      
+      let targetAgent = activeSession?.agentName || 'general-assistant';
+      
+      // Detect provider mentions in message (case-insensitive)
+      const messageLower = prompt.toLowerCase();
+      const providerMentions: Record<string, { client: 'claude' | 'cursor' | 'antigravity' | 'ollama'; agentNames: string[] }> = {
+        'ollama': { client: 'ollama', agentNames: ['general-assistant'] },
+        'cursor': { client: 'cursor', agentNames: ['cursor-coder', 'cursor-refactor', 'cursor-debugger', 'cursor-fast'] },
+        'claude': { client: 'claude', agentNames: ['general-assistant', 'code-reviewer', 'architect'] },
+        'antigravity': { client: 'antigravity', agentNames: ['ag-coder', 'ag-manager', 'ag-architect'] },
+        'gemini': { client: 'antigravity', agentNames: ['ag-coder', 'ag-manager', 'ag-architect'] }
+      };
+      
+      // Check if user mentioned a provider
+      let detectedClient: 'claude' | 'cursor' | 'antigravity' | 'ollama' | undefined = undefined;
+      for (const [provider, config] of Object.entries(providerMentions)) {
+        if (messageLower.includes(provider)) {
+          detectedClient = config.client;
+          // First, try to find an active agent that already has the correct client configured
+          const matchingAgent = activeAgents.find(agentName => {
+            const agent = PREDEFINED_AGENTS[agentName];
+            if (!agent) return false;
+            // Check if agent's client matches the requested provider
+            return agent.client === config.client;
+          });
+          
+          if (matchingAgent) {
+            console.log(`[MessageHandler] User mentioned ${provider}, found matching agent with client=${config.client}: ${matchingAgent}`);
+            targetAgent = matchingAgent;
+            break;
+          }
+          
+          // If no agent with matching client, try to find by agent name
+          const nameMatchingAgent = activeAgents.find(agentName => {
+            return config.agentNames.includes(agentName);
+          });
+          
+          if (nameMatchingAgent) {
+            console.log(`[MessageHandler] User mentioned ${provider}, using agent: ${nameMatchingAgent}`);
+            targetAgent = nameMatchingAgent;
+            
+            // Note: We don't override the global agent config here anymore
+            // Instead we'll handle the client override in the mock interaction/ctx
+            // to avoid affecting other users/channels
+            if (provider === 'ollama') {
+              console.log(`[MessageHandler] Setting client override to ollama for this request`);
+            }
+            break;
+          }
+          
+          // If still no match and user wants Ollama, use general-assistant if available
+          if (provider === 'ollama' && activeAgents.includes('general-assistant')) {
+            console.log(`[MessageHandler] User mentioned Ollama, configuring general-assistant with Ollama client`);
+            targetAgent = 'general-assistant';
+            break;
+          }
+        }
+      }
 
       // Create mock interaction with proper reply/edit chain
       let replyMessage: any = null;
@@ -1599,12 +1823,13 @@ export async function createDiscordBot(
         }
       };
 
-      const mockCtx = {
+      const mockCtx: any = {
         user: message.author,
         channel: message.channel,
         channelId: message.channelId,
         guild: message.guild,
         channelContext, // Include channel context for multi-project routing
+        clientOverride: detectedClient,
         deferReply: async (opts?: any) => {
           isDeferred = true;
           replyMessage = await message.reply({

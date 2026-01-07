@@ -125,6 +125,7 @@ export async function getAgentCommand(deps?: AgentHandlerDeps) {
                 
                 const deps: any = {
                     workDir: effectiveWorkDir,
+                    targetUserId: ctx.user.id,
                     sendClaudeMessages: async (msgs: any[]) => {
                         const content = msgs[0]?.content || '';
                         if (!content) return;
@@ -177,7 +178,11 @@ export async function getAgentCommand(deps?: AgentHandlerDeps) {
                 // We need to update agent/index.ts first or safely pass it.
                 // Let's pass it as a property of deps for now if strictness allows in 'any' cast, OR update signature.
                 // Updating signature is cleaner. 
-                await chatWithAgent(ctx, message, agentName || undefined, undefined, false, { ...deps, includeGit });
+                await chatWithAgent(ctx, message, agentName || undefined, undefined, false, { 
+                    ...deps, 
+                    includeGit,
+                    clientOverride: ctx.clientOverride 
+                });
                 return;
             }
         },

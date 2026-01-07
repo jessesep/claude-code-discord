@@ -4,6 +4,8 @@ import * as path from "https://deno.land/std/path/mod.ts";
 import { MANAGER_SYSTEM_PROMPT, parseManagerResponse, parseGitHubIssueRequest, ManagerAction } from "./manager.ts";
 import { AgentRegistry } from "./registry.ts";
 import { DISCORD_LIMITS, splitText } from "../discord/utils.ts";
+import { convertMessageContent } from "../discord/formatting.ts";
+import { SwarmManager } from "../util/swarm-manager.ts";
 
 // Agent types and interfaces
 export interface AgentConfig {
@@ -40,6 +42,12 @@ export interface AgentSession {
   
   // Selected role for the session
   roleId?: string;
+
+  // Selected project path (workspace) for the session
+  projectPath?: string;
+  
+  // Selected model for the session (overrides agent default)
+  modelOverride?: string;
 }
 
 // Context note for all agents (context is automatically injected, no tool needed)
@@ -141,7 +149,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     capabilities: ['file-editing', 'code-generation', 'refactoring', 'autonomous'],
     riskLevel: 'high',
     client: 'cursor',
-    force: false, // Require approval for operations
+    force: true, // Allow autonomous operations
     sandbox: 'enabled'
   },
   'cursor-refactor': {
@@ -240,7 +248,8 @@ export const agentCommand = new SlashCommandBuilder()
         { name: 'Switch Agent', value: 'switch' },
         { name: 'Agent Status', value: 'status' },
         { name: 'End Session', value: 'end' },
-        { name: 'Agent Info', value: 'info' }
+        { name: 'Agent Info', value: 'info' },
+        { name: 'Sync Models', value: 'sync_models' }
       ))
   .addStringOption(option =>
     option.setName('agent_name')
@@ -263,6 +272,10 @@ export const agentCommand = new SlashCommandBuilder()
   .addBooleanOption(option =>
     option.setName('include_system_info')
       .setDescription('Include system information in context')
+      .setRequired(false))
+  .addStringOption(option =>
+    option.setName('model')
+      .setDescription('Override default model for the agent')
       .setRequired(false));
 
 export interface AgentHandlerDeps {
@@ -270,6 +283,11 @@ export interface AgentHandlerDeps {
   crashHandler: any;
   sendClaudeMessages: (messages: any[]) => Promise<void>;
   sessionManager: any;
+  clientOverride?: 'claude' | 'cursor' | 'antigravity' | 'ollama';
+  includeGit?: boolean;
+  channelContext?: import("../util/channel-context.ts").ChannelProjectContext;
+  targetUserId?: string; // User to mention when done or action needed
+  modelOverride?: string;
 }
 
 // In-memory storage for agent sessions (in production, would be persisted)
@@ -320,6 +338,99 @@ function removeActiveAgent(userId: string, channelId: string, agentName?: string
   }
 }
 
+/**
+ * Helper to send agent updates to Discord with optional user mention
+ */
+async function sendAgentUpdate(
+  content: string, 
+  deps: AgentHandlerDeps, 
+  options: { isFinal?: boolean } = {}
+) {
+  if (!deps.sendClaudeMessages) return;
+
+  const claudeMessages = [{
+    type: 'text' as const,
+    content: content,
+    timestamp: new Date().toISOString()
+  }];
+
+  // Detect if action is needed to mention the user early
+  const actionNeededPatterns = [
+    "please confirm", "need your input", "action required", 
+    "waiting for response", "provide more details", "should i continue",
+    "please provide", "waiting for"
+  ];
+  const textLower = content.toLowerCase();
+  const actionNeeded = actionNeededPatterns.some(p => textLower.includes(p));
+  
+  if ((actionNeeded || options.isFinal) && deps.targetUserId) {
+    // Prepend mention to the content for a ping
+    const prefix = actionNeeded ? "⚠️ Action needed: " : "";
+    (claudeMessages[0] as any).content = `<@${deps.targetUserId}> ${prefix}${content}`;
+  }
+
+  await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+}
+
+/**
+ * Resolves context based on channel and category information
+ */
+export async function resolveChannelContext(ctx: any, deps?: AgentHandlerDeps) {
+  const channelContext = ctx.channelContext || deps?.channelContext;
+  // Use channel name if available (from real interaction)
+  const channelName = ctx.channel?.name || '';
+  
+  // Try to find active session for this user/channel to get persisted context
+  const userId = ctx.user?.id;
+  const channelId = ctx.channelId || ctx.channel?.id;
+  let sessionProjectPath: string | undefined = undefined;
+  let sessionRoleId: string | undefined = undefined;
+  
+  if (userId && channelId) {
+    const activeSessionInfo = getActiveSession(userId, channelId);
+    if (activeSessionInfo) {
+      sessionProjectPath = activeSessionInfo.session.projectPath;
+      sessionRoleId = activeSessionInfo.session.roleId;
+    }
+  }
+  
+  // 1. Resolve workDir
+  let workDir = deps?.workDir || Deno.cwd();
+  if (sessionProjectPath) {
+    workDir = sessionProjectPath;
+  } else if (channelContext?.projectPath) {
+    workDir = channelContext.projectPath;
+  }
+  
+  // 2. Resolve Role
+  let roleId = sessionRoleId;
+  if (!roleId) {
+    const lowerChannelName = channelName.toLowerCase();
+    
+    // Mapping of keywords to role IDs
+    const roleKeywords: Record<string, string> = {
+      'builder': 'builder',
+      'tester': 'tester',
+      'investigator': 'investigator',
+      'architect': 'architect',
+      'reviewer': 'reviewer',
+      'dev': 'builder',
+      'debug': 'investigator',
+      'security': 'investigator',
+      'qa': 'tester'
+    };
+
+    for (const [kw, id] of Object.entries(roleKeywords)) {
+      if (lowerChannelName.includes(kw)) {
+        roleId = id;
+        break;
+      }
+    }
+  }
+  
+  return { workDir, roleId, channelContext };
+}
+
 export function createAgentHandlers(deps: AgentHandlerDeps) {
   const { workDir, crashHandler, sendClaudeMessages, sessionManager } = deps;
 
@@ -330,10 +441,20 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
       agentName?: string,
       message?: string,
       contextFiles?: string,
-      includeSystemInfo?: boolean
+      includeSystemInfo?: boolean,
+      model?: string
     ) {
       try {
         await ctx.deferReply();
+
+        // Resolve context from channel/category
+        const context = await resolveChannelContext(ctx, deps);
+        const effectiveDeps = { 
+          ...deps, 
+          workDir: context.workDir,
+          channelContext: context.channelContext,
+          modelOverride: model
+        };
 
         switch (action) {
           case 'list':
@@ -349,7 +470,8 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
               });
               return;
             }
-            await startAgentSession(ctx, agentName);
+            // Pass resolved roleId if starting a session
+            await startAgentSession(ctx, agentName, context.roleId, model);
             break;
 
           case 'chat':
@@ -360,7 +482,10 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
               });
               return;
             }
-            await chatWithAgent(ctx, message, agentName, contextFiles, includeSystemInfo, deps);
+            await chatWithAgent(ctx, message, agentName, contextFiles, includeSystemInfo, {
+              ...effectiveDeps,
+              clientOverride: ctx.clientOverride
+            });
             break;
 
           case 'switch':
@@ -391,6 +516,10 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
               return;
             }
             await showAgentInfo(ctx, agentName);
+            break;
+
+          case 'sync_models':
+            await syncProviderModels(ctx);
             break;
 
           default:
@@ -506,7 +635,7 @@ async function listAgents(ctx: any) {
   });
 }
 
-async function startAgentSession(ctx: any, agentName: string, roleId?: string) {
+async function startAgentSession(ctx: any, agentName: string, roleId?: string, modelOverride?: string) {
   const agent = AgentRegistry.getInstance().getAgent(agentName);
   if (!agent) {
     await ctx.editReply({
@@ -538,7 +667,7 @@ async function startAgentSession(ctx: any, agentName: string, roleId?: string) {
   }
 
   const channelId = ctx.channelId || ctx.channel?.id;
-  console.log(`[startSession] Creating session: userId=${userId}, channelId=${channelId}, agentName=${agentName}, roleId=${roleId}`);
+  console.log(`[startSession] Creating session: userId=${userId}, channelId=${channelId}, agentName=${agentName}, roleId=${roleId}, modelOverride=${modelOverride}`);
   addActiveAgent(userId, channelId, agentName);
 
   const session: AgentSession = {
@@ -552,7 +681,8 @@ async function startAgentSession(ctx: any, agentName: string, roleId?: string) {
     lastActivity: new Date(),
     status: 'active',
     history: [],
-    roleId
+    roleId,
+    modelOverride
   };
 
   agentSessions.push(session);
@@ -566,7 +696,7 @@ async function startAgentSession(ctx: any, agentName: string, roleId?: string) {
       embeds: [{
         color: riskColor,
         title: '🚀 Helper Agent Ready',
-        description: `**${agent.name}** is ready to help!\n\n👋 **Hey! What do you want to do?**\n\nJust type your request in this channel. Include:\n• What you want to accomplish\n• The repository path (if different from current)\n\nI'll analyze your request and launch the right agent to help you.`,
+        description: `**${agent.name}** is ready to help!\n\n👋 **Hey! What do you want to do?**\n\nJust type your request in this channel. Include:\n• What you want to accomplish\n• The repository path (if different from current)\n\nI'll analyze your request and launch the right agent to help you.${modelOverride ? `\n\n**Model Override**: \`${modelOverride}\`` : ''}`,
         fields: [
           { name: 'Session ID', value: `\`${session.id.substring(0, 12)}\``, inline: true },
           { name: 'Status', value: '✅ Active - Ready for input', inline: true }
@@ -584,6 +714,7 @@ async function startAgentSession(ctx: any, agentName: string, roleId?: string) {
           { name: 'Agent', value: agent.name, inline: true },
           { name: 'Risk Level', value: agent.riskLevel.toUpperCase(), inline: true },
           { name: 'Session ID', value: `\`${session.id.substring(0, 12)}\``, inline: true },
+          { name: 'Model', value: modelOverride || agent.model, inline: true },
           { name: 'Description', value: agent.description, inline: false },
           { name: 'Capabilities', value: agent.capabilities.join(', '), inline: false },
           { name: 'Usage', value: 'Just type your message in this channel to continue the conversation', inline: false }
@@ -668,14 +799,26 @@ export async function chatWithAgent(
   includeSystemInfo?: boolean,
   deps?: AgentHandlerDeps
 ) {
+  // Resolve effective context from channel/category
+  const resolvedContext = await resolveChannelContext(ctx, deps);
+  const workDir = resolvedContext.workDir;
+  
+  // Update deps with resolved workDir and channelContext
+  const effectiveDeps = { 
+    ...deps, 
+    workDir, 
+    channelContext: resolvedContext.channelContext 
+  } as AgentHandlerDeps;
+
   const userId = ctx.user.id;
   const channelId = ctx.channelId || ctx.channel?.id;
   // If agentName is provided, use it; otherwise get the first active agent for this user/channel
   const activeAgents = getActiveAgents(userId, channelId);
   const activeAgentName: string = agentName || (activeAgents.length > 0 ? activeAgents[0] || 'general-assistant' : 'general-assistant');
+  
   // ...
-  const agent = AgentRegistry.getInstance().getAgent(activeAgentName || '');
-  if (!agent) {
+  const agentRef = AgentRegistry.getInstance().getAgent(activeAgentName || '');
+  if (!agentRef) {
     await ctx.editReply({
       embeds: [{
         color: 0xff0000,
@@ -687,11 +830,28 @@ export async function chatWithAgent(
     return;
   }
 
-  // Use tested model if available
-  if (agent.client === 'antigravity') {
+  // Create a local copy to avoid modifying the registry
+  const agent = { ...agentRef };
+
+  // Use session-specific model override if available
+  const sessionData = getActiveSession(userId, channelId || '');
+  if (sessionData && sessionData.session && sessionData.session.modelOverride) {
+    agent.model = sessionData.session.modelOverride;
+  }
+  
+  // Use explicit model override from command if provided
+  if (effectiveDeps?.modelOverride) {
+    agent.model = effectiveDeps.modelOverride;
+  }
+
+  // Use override client if provided in deps
+  let clientType = effectiveDeps?.clientOverride || agent.client || 'claude';
+
+  // Use tested model if available (for Antigravity)
+  if (clientType === 'antigravity') {
     try {
       const { getBestAvailableModel } = await import("../util/model-tester.ts");
-      const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      const fallbackModels = ['gemini-3-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
       agent.model = getBestAvailableModel(agent.model, fallbackModels);
     } catch (error) {
       console.warn('[Agent] Could not get tested model, using configured model:', error);
@@ -701,14 +861,99 @@ export async function chatWithAgent(
   // --- MANAGER AGENT LOGIC ---
   if (agent.isManager) {
     console.log('[Manager] Handling manager interaction');
-    await handleManagerInteraction(ctx, message, agent, deps);
+    await handleManagerInteraction(ctx, message, agent, effectiveDeps);
+    return;
+  }
+  // ---------------------------
+
+  // --- CASUAL GREETING DETECTION ---
+  // Detect and handle casual greetings/simple messages to avoid poor AI responses
+  const isCasualGreeting = (text: string): boolean => {
+    const normalized = text.toLowerCase().trim();
+    
+    // Remove punctuation for matching
+    const cleanText = normalized.replace(/[?!.,;:]/g, '');
+    
+    const greetingPatterns = [
+      // Simple greetings
+      /^(hey|hi|hello|yo|sup|greetings|good\s+(morning|afternoon|evening))\s*$/i,
+      // "what's up" variations
+      /^(what'?s|whats)\s+up\s*$/i,
+      // "you up" variations
+      /^(are\s+)?you\s+up\s*$/i,
+      // "how are you" variations
+      /^how\s+(are\s+you|you\s+doing|it'?s?\s+going|things)\s*$/i,
+      // "hey you" variations
+      /^(hey|hi|hello)\s+(you|there|buddy|friend|mate|dude|pal)\s*$/i,
+      // "hey you up" variations (catches "hey you up?")
+      /^(hey|hi|hello)\s+(you\s+)?up\s*$/i,
+      /^(hey|hi|hello)\s+you\s+(up|doing|there)\s*$/i,
+    ];
+    
+    // Check if message matches greeting patterns
+    if (greetingPatterns.some(pattern => pattern.test(cleanText))) {
+      return true;
+    }
+    
+    // Check if message is very short and contains only greeting words
+    if (normalized.length <= 25) {
+      const greetingWords = ['hey', 'hi', 'hello', 'yo', 'sup', 'whats', "what's", 'up', 'how', 'are', 'you', 'doing', 'going', 'things', 'good', 'morning', 'afternoon', 'evening', 'greetings', 'there', 'buddy', 'friend', 'mate', 'dude', 'pal'];
+      const words = cleanText.split(/\s+/).filter(w => w.length > 0);
+      
+      // If all words are greeting words and message is short, it's likely a greeting
+      const allGreetingWords = words.every(w => {
+        return greetingWords.includes(w);
+      });
+      
+      if (allGreetingWords && words.length <= 6) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  if (isCasualGreeting(message)) {
+    console.log('[Agent] Detected casual greeting, responding directly');
+    
+    // Still add to history for context
+    const sessionData = getActiveSession(userId, channelId || '');
+    if (sessionData && sessionData.session) {
+      sessionData.session.history.push({ role: 'user', content: message });
+      sessionData.session.messageCount++;
+      sessionData.session.lastActivity = new Date();
+    }
+    
+    // Provide a friendly, helpful response
+    const responses = [
+      `Hey! 👋 I'm ${agent.name}, ready to help with your development tasks. What would you like to work on?`,
+      `Hi there! 👋 I'm ${agent.name}. How can I assist you today?`,
+      `Hello! 👋 I'm ${agent.name}. What can I help you with?`,
+      `Hey! 👋 Ready to help. What do you need?`,
+    ];
+    const response = responses[Math.floor(Math.random() * responses.length)];
+    
+    // Add to history
+    if (sessionData && sessionData.session) {
+      sessionData.session.history.push({ role: 'model', content: response });
+    }
+    
+    await ctx.editReply({
+      embeds: [{
+        color: 0x00ff00,
+        title: `👋 ${agent.name}`,
+        description: response,
+        fields: [
+          { name: '💡 Tip', value: 'Just describe what you want to do, and I\'ll help you get it done!', inline: false }
+        ],
+        timestamp: new Date().toISOString()
+      }]
+    });
     return;
   }
   // ---------------------------
 
   // Get active session and add message to history
-  const sessionData = getActiveSession(userId, channelId || '');
-  
   if (sessionData && sessionData.session) {
     // Add user message to history
     sessionData.session.history.push({ role: 'user', content: message });
@@ -876,11 +1121,12 @@ export async function chatWithAgent(
     let fallbackUsed = false;
 
     // Determine which client to use based on agent configuration
-    const clientType = agent.client || 'claude'; // Default to Claude
+    // Use the clientType determined at the beginning of chatWithAgent
 
     // Try Claude first (if not explicitly set to cursor/antigravity)
     if (clientType === 'claude' || !clientType) {
       try {
+        console.log(`[Agent] Executing with primary client: claude`);
         // Import the Claude CLI client (uses Claude subscription, no API key needed!)
         const { sendToClaudeCLI } = await import("../claude/cli-client.ts");
 
@@ -897,17 +1143,9 @@ export async function chatWithAgent(
 
             // Send updates to Discord periodically
             const now = Date.now();
-            if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+            if (now - lastUpdate >= UPDATE_INTERVAL && deps) {
               lastUpdate = now;
-
-              // Send the accumulated text as a message
-              const claudeMessages = [{
-                type: 'text' as const,
-                content: currentChunk,
-                timestamp: new Date().toISOString()
-              }];
-
-              await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+              await sendAgentUpdate(currentChunk, deps);
               currentChunk = ""; // Reset after sending to avoid duplicates
             }
           }
@@ -922,14 +1160,15 @@ export async function chatWithAgent(
           await ctx.editReply({
             embeds: [{
               color: 0xffaa00,
-              title: `⚠️ ${agent.name} - Using Fallback Provider`,
-              description: 'Claude API limit reached. Trying alternative providers (Cursor → Antigravity)...',
+              title: `⚠️ ${agent.name} - Claude Limit Reached`,
+              description: 'Claude API limit reached. Switching to **Cursor Agent** fallback...',
               timestamp: new Date().toISOString()
             }]
           }).catch(() => {});
 
           // Try Cursor as first fallback
           try {
+            console.log(`[Agent] Attempting fallback 1: cursor`);
             const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
             let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
 
@@ -953,31 +1192,39 @@ export async function chatWithAgent(
               {
                 model: agent.model,
                 workspace: deps?.workDir || Deno.cwd(),
+                force: agent.force !== false, // Default to true for fallbacks to ensure autonomy
                 streamJson: true,
               },
               async (chunk) => {
                 currentChunk += chunk;
                 const now = Date.now();
-                if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+                if (now - lastUpdate >= UPDATE_INTERVAL && deps) {
                   lastUpdate = now;
-                  const claudeMessages = [{
-                    type: 'text' as const,
-                    content: currentChunk,
-                    timestamp: new Date().toISOString()
-                  }];
-                  await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+                  await sendAgentUpdate(currentChunk, deps);
                   currentChunk = "";
                 }
               }
             );
+            clientType = 'cursor';
             console.log("✅ Successfully used Cursor as fallback");
           } catch (cursorError) {
             // If Cursor also fails, try Antigravity as final fallback
             if (isRateLimitError(cursorError)) {
-              console.log("⚠️ Cursor also hit limits, trying Antigravity (Gemini) as final fallback...");
+              console.log("⚠️ Cursor also hit limits, trying Antigravity (Gemini) as fallback...");
             }
             
+            // Notify user about fallback to Antigravity
+            await ctx.editReply({
+              embeds: [{
+                color: 0xffaa00,
+                title: `⚠️ ${agent.name} - Cursor Fallback Failed`,
+                description: 'Cursor Agent unavailable. Switching to **Antigravity (Gemini)** fallback...',
+                timestamp: new Date().toISOString()
+              }]
+            }).catch(() => {});
+
             try {
+              console.log(`[Agent] Attempting fallback 2: antigravity`);
               const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
               let fullPrompt = `${agent.systemPrompt}\n\nTask: ${message}`;
 
@@ -1010,28 +1257,78 @@ export async function chatWithAgent(
                 async (chunk) => {
                   currentChunk += chunk;
                   const now = Date.now();
-                  if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+                  if (now - lastUpdate >= UPDATE_INTERVAL && deps) {
                     lastUpdate = now;
-                    const claudeMessages = [{
-                      type: 'text' as const,
-                      content: currentChunk,
-                      timestamp: new Date().toISOString()
-                    }];
-                    await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+                    await sendAgentUpdate(currentChunk, deps);
                     currentChunk = "";
                   }
                 }
               );
+              clientType = 'antigravity';
               console.log("✅ Successfully used Antigravity (Gemini) as fallback");
             } catch (antigravityError) {
-              // All fallbacks failed
-              throw new Error(
-                `All providers failed:\n` +
-                `- Claude: ${claudeError instanceof Error ? claudeError.message : String(claudeError)}\n` +
-                `- Cursor: ${cursorError instanceof Error ? cursorError.message : String(cursorError)}\n` +
-                `- Antigravity: ${antigravityError instanceof Error ? antigravityError.message : String(antigravityError)}\n\n` +
-                `Please wait a moment and try again, or check your API keys/quotas.`
-              );
+              // Try Ollama as final local fallback
+              try {
+                console.log(`[Agent] Attempting fallback 3: ollama`);
+                
+                // Notify user about fallback to Ollama
+                await ctx.editReply({
+                  embeds: [{
+                    color: 0xffaa00,
+                    title: `⚠️ ${agent.name} - Cloud Providers Failed`,
+                    description: 'All cloud providers failed. Switching to **Local Ollama** fallback...',
+                    timestamp: new Date().toISOString()
+                  }]
+                }).catch(() => {});
+
+                const { AgentProviderRegistry } = await import("./provider-interface.ts");
+                const ollamaProvider = AgentProviderRegistry.getProvider('ollama');
+                
+                if (!ollamaProvider) throw new Error("Ollama provider not found");
+                if (!await ollamaProvider.isAvailable()) throw new Error("Ollama server not running");
+
+                const englishInstruction = "\n\nIMPORTANT: Always respond in English. Do not respond in Chinese or any other language. All responses must be in English only.";
+                const systemPromptWithLanguage = safeSystemPrompt + englishInstruction + (roleContext ? `\n\n${roleContext}` : '') + gitContext + (contextContent ? contextContent : '');
+                const userMessage = historyPrompt ? `${historyPrompt}\n\n<user_query>${safeMessage}</user_query>` : `<user_query>${safeMessage}</user_query>`;
+                const fullPrompt = `System: ${systemPromptWithLanguage}\n\nTask: ${userMessage}`;
+
+                const ollamaResult = await ollamaProvider.execute(
+                  fullPrompt,
+                  {
+                    model: agent.model,
+                    temperature: agent.temperature,
+                    maxTokens: agent.maxTokens,
+                  },
+                  async (chunk) => {
+                    currentChunk += chunk;
+                    const now = Date.now();
+          if (now - lastUpdate >= UPDATE_INTERVAL && deps) {
+            lastUpdate = now;
+            await sendAgentUpdate(currentChunk, deps);
+            currentChunk = "";
+          }
+                  },
+                  controller.signal
+                );
+
+                result = {
+                  response: ollamaResult.response,
+                  duration: ollamaResult.timing?.duration,
+                  modelUsed: ollamaResult.modelUsed,
+                };
+                clientType = 'ollama';
+                console.log("✅ Successfully used Ollama as final fallback");
+              } catch (ollamaError) {
+                // All fallbacks failed
+                throw new Error(
+                  `All providers failed:\n` +
+                  `- Claude: ${claudeError instanceof Error ? claudeError.message : String(claudeError)}\n` +
+                  `- Cursor: ${cursorError instanceof Error ? cursorError.message : String(cursorError)}\n` +
+                  `- Antigravity: ${antigravityError instanceof Error ? antigravityError.message : String(antigravityError)}\n` +
+                  `- Ollama: ${ollamaError instanceof Error ? ollamaError.message : String(ollamaError)}\n\n` +
+                  `Please wait a moment and try again, or check your API keys/quotas/local server.`
+                );
+              }
             }
           }
         } else {
@@ -1040,6 +1337,7 @@ export async function chatWithAgent(
         }
       }
     } else if (clientType === 'cursor') {
+      console.log(`[Agent] Executing with explicit client: cursor`);
       // Import Cursor CLI client
       const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
 
@@ -1091,17 +1389,9 @@ export async function chatWithAgent(
 
           // Send updates to Discord periodically
           const now = Date.now();
-          if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+          if (now - lastUpdate >= UPDATE_INTERVAL && deps) {
             lastUpdate = now;
-
-            // Send the accumulated text as a message
-            const claudeMessages = [{
-              type: 'text' as const,
-              content: currentChunk,
-              timestamp: new Date().toISOString()
-            }];
-
-            await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+            await sendAgentUpdate(currentChunk, deps);
             currentChunk = ""; // Reset after sending to avoid duplicates
           }
         }
@@ -1132,6 +1422,7 @@ export async function chatWithAgent(
         }
       }
     } else if (clientType === 'antigravity') {
+      console.log(`[Agent] Executing with explicit client: antigravity`);
       // Import Antigravity CLI client
       const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
 
@@ -1228,21 +1519,15 @@ export async function chatWithAgent(
           currentChunk += chunk;
 
           const now = Date.now();
-          if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+          if (now - lastUpdate >= UPDATE_INTERVAL && deps) {
             lastUpdate = now;
-
-            const claudeMessages = [{
-              type: 'text' as const,
-              content: currentChunk,
-              timestamp: new Date().toISOString()
-            }];
-
-            await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+            await sendAgentUpdate(currentChunk, deps);
             currentChunk = "";
           }
         }
       );
     } else if (clientType === 'ollama') {
+      console.log(`[Agent] Executing with explicit client: ollama`);
       // Import Ollama provider
       const { AgentProviderRegistry } = await import("./provider-interface.ts");
       const ollamaProvider = AgentProviderRegistry.getProvider('ollama');
@@ -1258,7 +1543,13 @@ export async function chatWithAgent(
       }
 
       // Build full prompt with history
-      let fullPrompt = enhancedPrompt;
+      // Format for Ollama: "System: <system prompt>\n\nTask: <user message>"
+      // CRITICAL: Add explicit English language instruction for Chinese models like deepseek-r1:1.5b
+      // Without this, Chinese models default to responding in Chinese
+      const englishInstruction = "\n\nIMPORTANT: Always respond in English. Do not respond in Chinese or any other language. All responses must be in English only.";
+      const systemPromptWithLanguage = safeSystemPrompt + englishInstruction + (roleContext ? `\n\n${roleContext}` : '') + gitContext + (contextContent ? contextContent : '');
+      const userMessage = historyPrompt ? `${historyPrompt}\n\n<user_query>${safeMessage}</user_query>` : `<user_query>${safeMessage}</user_query>`;
+      const fullPrompt = `System: ${systemPromptWithLanguage}\n\nTask: ${userMessage}`;
 
       // Call Ollama provider with streaming
       const ollamaResult = await ollamaProvider.execute(
@@ -1272,16 +1563,9 @@ export async function chatWithAgent(
           currentChunk += chunk;
 
           const now = Date.now();
-          if (now - lastUpdate >= UPDATE_INTERVAL && deps?.sendClaudeMessages) {
+          if (now - lastUpdate >= UPDATE_INTERVAL && deps) {
             lastUpdate = now;
-
-            const claudeMessages = [{
-              type: 'text' as const,
-              content: currentChunk,
-              timestamp: new Date().toISOString()
-            }];
-
-            await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+            await sendAgentUpdate(currentChunk, deps);
             currentChunk = "";
           }
         },
@@ -1296,21 +1580,22 @@ export async function chatWithAgent(
     }
 
     // Send final chunk if there's any remaining content
-    if (currentChunk && deps?.sendClaudeMessages) {
-      const claudeMessages = [{
-        type: 'text' as const,
-        content: currentChunk,
-        timestamp: new Date().toISOString()
-      }];
-      await deps.sendClaudeMessages(claudeMessages).catch(() => { });
+    if (currentChunk && deps) {
+      await sendAgentUpdate(currentChunk, deps);
     }
+
+    // Determine client display name for logging and UI
+    const clientEmojiMap: Record<string, string> = {
+      'cursor': '🖱️ Cursor',
+      'antigravity': '🌌 Antigravity',
+      'ollama': '🦙 Ollama',
+      'claude': '🤖 Claude'
+    };
+    const clientValue = clientEmojiMap[clientType] || '🤖 Claude';
 
     // Notify user if fallback was used (before processing response)
     if (fallbackUsed && result?.response) {
-      const providerUsed = result.modelUsed?.includes('Cursor') || result.modelUsed?.includes('cursor') ? 'Cursor' : 
-                          result.modelUsed?.includes('Gemini') || result.modelUsed?.includes('gemini') ? 'Antigravity (Gemini 2.0 Flash)' : 
-                          result.modelUsed || 'Fallback Provider';
-      console.log(`✅ Successfully completed using ${providerUsed} as fallback provider`);
+      console.log(`[Agent] ✅ Successfully completed using ${clientValue} as fallback provider`);
     }
 
     // Check for GitHub issue creation request before processing response
@@ -1429,10 +1714,15 @@ export async function chatWithAgent(
 
     // Send completion message
     const completionFields = [
-      { name: 'Client', value: clientType === 'cursor' ? '🖱️ Cursor' : clientType === 'antigravity' ? '🌌 Antigravity' : '🤖 Claude', inline: true },
+      { name: 'Client', value: clientValue, inline: true },
       { name: 'Model', value: result.modelUsed || agent.model, inline: true },
       { name: 'Duration', value: result.duration ? `${(result.duration / 1000).toFixed(1)}s` : 'N/A', inline: true },
     ];
+
+    // Add fallback indicator if a fallback was used
+    if (fallbackUsed) {
+      completionFields.push({ name: '⚠️ Fallback Active', value: `This response was generated using **${clientValue}** because the primary provider failed.`, inline: false });
+    }
 
     // Add cost for Claude (not applicable to Cursor)
     if (clientType === 'claude' && 'cost' in result && typeof result.cost === 'number') {
@@ -1479,14 +1769,18 @@ export async function chatWithAgent(
       componentRows = [row];
     }
 
+    // Mention user if requested
+    const content = deps?.targetUserId ? `<@${deps.targetUserId}>` : undefined;
+
     await ctx.editReply({
+      content,
       embeds: [embedData],
       components: componentRows
     });
 
   } catch (error) {
-    const clientType = agent.client || 'claude';
-    console.error(`[Agent] Error calling ${clientType}:`, error);
+    const errorClientType = deps?.clientOverride || agent.client || 'claude';
+    console.error(`[Agent] Error calling ${errorClientType}:`, error);
     
     // Provide user-friendly error messages
     let errorMessage = String(error);
@@ -1505,9 +1799,9 @@ export async function chatWithAgent(
     }
     
     // Get proper client display name
-    const clientDisplayName = clientType === 'cursor' ? 'Cursor' : 
-                             clientType === 'ollama' ? 'Ollama' : 
-                             clientType === 'antigravity' ? 'Antigravity' : 
+    const clientDisplayName = errorClientType === 'cursor' ? 'Cursor' : 
+                             errorClientType === 'ollama' ? 'Ollama' : 
+                             errorClientType === 'antigravity' ? 'Antigravity' : 
                              'Claude';
     
     await ctx.editReply({
@@ -1591,6 +1885,71 @@ async function showAgentInfo(ctx: any, agentName: string) {
   });
 }
 
+/**
+ * Sync all provider models dynamically
+ */
+async function syncProviderModels(ctx: any) {
+  try {
+    const { AgentProviderRegistry } = await import('./provider-interface.ts');
+    const providers = AgentProviderRegistry.getAllProviders();
+    
+    const results: { name: string, models: number, status: string }[] = [];
+    
+    await ctx.editReply({
+      embeds: [{
+        color: 0x5865F2,
+        title: '🔄 Syncing Provider Models...',
+        description: 'Querying all available providers for updated model lists...',
+        timestamp: new Date().toISOString()
+      }]
+    });
+
+    for (const provider of providers) {
+      const isAvailable = await provider.isAvailable();
+      if (!isAvailable) {
+        results.push({ name: provider.providerName, models: 0, status: '❌ Unavailable' });
+        continue;
+      }
+
+      try {
+        if (provider.listModels) {
+          const models = await provider.listModels();
+          results.push({ name: provider.providerName, models: models.length, status: '✅ Synced' });
+        } else {
+          results.push({ name: provider.providerName, models: provider.supportedModels.length, status: 'ℹ️ Static' });
+        }
+      } catch (error) {
+        results.push({ name: provider.providerName, models: 0, status: `⚠️ Error: ${error instanceof Error ? error.message : String(error)}` });
+      }
+    }
+
+    const fields = results.map(r => ({
+      name: r.name,
+      value: `Models: **${r.models}**\nStatus: ${r.status}`,
+      inline: true
+    }));
+
+    await ctx.editReply({
+      embeds: [{
+        color: 0x00ff00,
+        title: '✅ Model Sync Complete',
+        description: 'Successfully queried all providers and updated available model lists.',
+        fields,
+        timestamp: new Date().toISOString()
+      }]
+    });
+  } catch (error) {
+    await ctx.editReply({
+      embeds: [{
+        color: 0xff0000,
+        title: '❌ Sync Failed',
+        description: `Error syncing models: ${error instanceof Error ? error.message : String(error)}`,
+        timestamp: new Date().toISOString()
+      }]
+    });
+  }
+}
+
 async function switchAgent(ctx: any, agentName: string) {
   const agent = PREDEFINED_AGENTS[agentName];
   if (!agent) {
@@ -1669,7 +2028,7 @@ async function endAgentSession(ctx: any) {
 
 // (Removed duplicate getActiveSession)
 
-export function setAgentSession(userId: string, channelId: string, agentName: string, roleId?: string) {
+export function setAgentSession(userId: string, channelId: string, agentName: string, roleId?: string, projectPath?: string) {
   addActiveAgent(userId, channelId, agentName);
   const session: AgentSession = {
     id: `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1682,7 +2041,8 @@ export function setAgentSession(userId: string, channelId: string, agentName: st
     lastActivity: new Date(),
     status: 'active',
     history: [],
-    roleId
+    roleId,
+    projectPath
   };
   agentSessions.push(session);
 }
@@ -1929,18 +2289,19 @@ export async function handleManagerInteraction(
             sessionData.session.history.push({ role: 'model', content: successMessage });
           }
 
-          await ctx.editReply({
-            embeds: [{
-              color: 0x00ff00,
-              title: '✅ Manager - GitHub Issue Created',
-              description: successMessage,
-              fields: [
-                { name: 'Issue Number', value: `#${issueResult.issueNumber}`, inline: true },
-                { name: 'Title', value: action.title, inline: false }
-              ],
-              timestamp: new Date().toISOString()
-            }]
-          });
+      await ctx.editReply({
+        content: deps?.targetUserId ? `<@${deps.targetUserId}>` : undefined,
+        embeds: [{
+          color: 0x00ff00,
+          title: '✅ Manager - GitHub Issue Created',
+          description: successMessage,
+          fields: [
+            { name: 'Issue Number', value: `#${issueResult.issueNumber}`, inline: true },
+            { name: 'Title', value: action.title, inline: false }
+          ],
+          timestamp: new Date().toISOString()
+        }]
+      });
         } else {
           const errorMessage = `❌ **Failed to Create GitHub Issue**\n\n` +
             `Error: ${issueResult.error || 'Unknown error'}\n\n` +
@@ -1983,6 +2344,7 @@ export async function handleManagerInteraction(
       }
 
       await ctx.editReply({
+        content: deps?.targetUserId ? `<@${deps.targetUserId}>` : undefined,
         embeds: [{
           color: 0x00cc99, // Teal for direct reply
           title: '💬 Manager',
@@ -2047,6 +2409,7 @@ export async function handleManagerInteraction(
 
       // Notify user that agent is spawning (not switching)
       await ctx.editReply({
+        content: deps?.targetUserId ? `<@${deps.targetUserId}>` : undefined,
         embeds: [{
           color: 0x00cc99,
           title: '🚀 Spawning Agent',
@@ -2064,7 +2427,102 @@ export async function handleManagerInteraction(
       const agentMessage = `${subAgentTask}\n\nOriginal request: ${userMessage}`;
       
       // Call chatWithAgent with the new agent
-      await chatWithAgent(ctx, agentMessage, subAgentName, undefined, false, deps);
+      const effectiveDeps: AgentHandlerDeps = {
+        workDir: deps?.workDir || Deno.cwd(),
+        crashHandler: deps?.crashHandler,
+        sendClaudeMessages: deps?.sendClaudeMessages || (async () => {}),
+        sessionManager: deps?.sessionManager,
+        targetUserId: deps?.targetUserId,
+        ...deps,
+        clientOverride: ctx.clientOverride
+      };
+
+      await chatWithAgent(ctx, agentMessage, subAgentName, undefined, false, effectiveDeps);
+      return;
+    } else if (action.action === 'spawn_swarm' && action.projectName && action.agents) {
+      // Start a multi-agent swarm in a new category and channels
+      const projectName = action.projectName;
+      const swarmAgents = action.agents;
+
+      await ctx.editReply({
+        embeds: [{
+          color: 0x00cc99,
+          title: '🐝 Spawning Swarm',
+          description: `Creating a new category and channels for **${projectName}** with **${swarmAgents.length}** agents.`,
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+      try {
+        const swarmResult = await SwarmManager.spawnSwarm(ctx, {
+          projectName,
+          agents: swarmAgents
+        });
+
+        await ctx.editReply({
+          embeds: [{
+            color: 0x00cc99,
+            title: '✅ Swarm Initialized',
+            description: `Swarm category and channels created for **${projectName}**. Spawning agents...`,
+            fields: [
+              { name: 'Category', value: projectName, inline: true },
+              { name: 'Agents', value: swarmAgents.map(a => a.name).join(', '), inline: true }
+            ],
+            timestamp: new Date().toISOString()
+          }]
+        });
+
+        // Spawn each agent in its respective channel
+        for (const swarmAgent of swarmAgents) {
+          const channelInfo = swarmResult.channels.find(c => c.name === swarmAgent.name);
+          if (!channelInfo) continue;
+
+          const targetChannel = await ctx.guild.channels.fetch(channelInfo.id);
+          if (targetChannel && targetChannel.isTextBased()) {
+            await targetChannel.send({
+              content: `🚀 **Swarm Agent Initialized**\n**Agent:** ${swarmAgent.name}\n**Task:** ${swarmAgent.task}`
+            });
+            
+            // Create a pseudo-interaction context for this channel
+            // We cast to any to bypass strict type checking for the mock context
+            const swarmCtx: any = {
+              ...ctx,
+              channelId: targetChannel.id,
+              channel: targetChannel,
+              // Override reply methods to send to the new channel
+              async reply(content: any) { return await targetChannel.send(convertMessageContent(content)); },
+              async editReply(content: any) { return await targetChannel.send(convertMessageContent(content)); },
+              async followUp(content: any) { return await targetChannel.send(convertMessageContent(content)); },
+              async deferReply() { return Promise.resolve(); },
+              async deferUpdate() { return Promise.resolve(); }
+            };
+            
+            // Start the agent processing in background (don't await)
+            const agentMessage = `${swarmAgent.task}\n\nProject: ${projectName}`;
+            
+            // We need to ensure dependencies are passed correctly
+            const swarmDeps: AgentHandlerDeps = {
+              ...deps,
+              workDir: ctx.channelContext?.projectPath || deps?.workDir || Deno.cwd(),
+              crashHandler: deps?.crashHandler,
+              sendClaudeMessages: deps?.sendClaudeMessages || (async () => {}),
+              sessionManager: deps?.sessionManager,
+              targetUserId: deps?.targetUserId,
+              clientOverride: ctx.clientOverride
+            };
+            
+            // Start the agent - this will run in the background
+            chatWithAgent(swarmCtx, agentMessage, swarmAgent.name, undefined, false, swarmDeps).catch(err => {
+              console.error(`[Swarm] Error in agent ${swarmAgent.name}:`, err);
+            });
+          }
+        }
+      } catch (swarmError) {
+        console.error("Swarm Error:", swarmError);
+        await ctx.editReply({
+          content: `Failed to spawn swarm: ${swarmError}`
+        });
+      }
       return;
     }
   } catch (error) {
@@ -2224,13 +2682,13 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
         { label: '🦙 Ollama', description: 'Local Ollama LLM server', value: 'ollama' }
       ]);
     
-    const providerRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(providerMenu);
+    const providerRow = new ActionRowBuilder<any>().addComponents(providerMenu);
     
     await ctx.editReply({
       embeds: [{
         color: 0x5865F2,
         title: '🚀 Start Helper Agent',
-        description: '**Step 1 of 3: Select Provider**\n\nChoose which provider you want to use:',
+        description: '**Step 1 of 4: Select Provider**\n\nChoose which provider you want to use:',
         fields: [
           { name: '💻 Cursor', value: 'Direct integration with Cursor IDE', inline: true },
           { name: '🤖 Claude CLI', value: 'Anthropic Claude via CLI', inline: true },

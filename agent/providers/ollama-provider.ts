@@ -64,14 +64,9 @@ export class OllamaProvider implements AgentProvider {
   readonly providerId = 'ollama';
   readonly providerName = 'Ollama';
   readonly providerType = ProviderType.API;
-
-  get supportedModels(): string[] {
-    // Return cached models if available, otherwise empty array
-    return this.cachedModels.length > 0 ? this.cachedModels : [];
-  }
+  supportedModels: string[] = [];
 
   private baseUrl: string;
-  private cachedModels: string[] = [];
   private lastModelCheck: Date | null = null;
   private readonly modelCacheTTL = 5 * 60 * 1000; // 5 minutes
 
@@ -91,7 +86,7 @@ export class OllamaProvider implements AgentProvider {
       if (response.ok) {
         // Cache available models
         const data = await response.json();
-        this.cachedModels = (data.models || []).map((m: OllamaModel) => m.name);
+        this.supportedModels = (data.models || []).map((m: OllamaModel) => m.name);
         this.lastModelCheck = new Date();
         return true;
       }
@@ -102,14 +97,14 @@ export class OllamaProvider implements AgentProvider {
     }
   }
 
-  private async getAvailableModels(): Promise<string[]> {
+  async listModels(): Promise<string[]> {
     // Return cached models if still valid
     if (
-      this.cachedModels.length > 0 &&
+      this.supportedModels.length > 0 &&
       this.lastModelCheck &&
       Date.now() - this.lastModelCheck.getTime() < this.modelCacheTTL
     ) {
-      return this.cachedModels;
+      return this.supportedModels;
     }
 
     try {
@@ -120,15 +115,15 @@ export class OllamaProvider implements AgentProvider {
 
       if (response.ok) {
         const data = await response.json();
-        this.cachedModels = (data.models || []).map((m: OllamaModel) => m.name);
+        this.supportedModels = (data.models || []).map((m: OllamaModel) => m.name);
         this.lastModelCheck = new Date();
-        return this.cachedModels;
+        return this.supportedModels;
       }
     } catch (error) {
       console.error('[Ollama] Failed to fetch models:', error);
     }
 
-    return this.cachedModels;
+    return this.supportedModels;
   }
 
   async execute(
@@ -140,7 +135,7 @@ export class OllamaProvider implements AgentProvider {
     const startTime = Date.now();
 
     // Get available models
-    const availableModels = await this.getAvailableModels();
+    const availableModels = await this.listModels();
     if (availableModels.length === 0) {
       throw new Error('No Ollama models available. Please pull a model first (e.g., `ollama pull llama3.2`)');
     }
@@ -149,8 +144,19 @@ export class OllamaProvider implements AgentProvider {
     // Prefer smaller/faster models for better performance on Mac
     // Priority: 1.5B/7B models > 14B models > larger models
     let model = options.model;
+    
+    // If a model was specified but it's not available in Ollama, fall back to auto-selection
+    // This happens when switching providers for an agent that has a specific model name (e.g. Claude)
+    if (model && !availableModels.includes(model)) {
+      console.warn(`[Ollama] Model "${model}" not found in Ollama. Falling back to default selection.`);
+      model = undefined;
+    }
+
     if (!model) {
       // Find the fastest/smallest model available
+      // Look for deepseek-r1:1.5b as a preferred default if available
+      const deepseekModel = availableModels.find(m => m.includes('deepseek-r1:1.5b'));
+      
       const fastModels = availableModels.filter(m => 
         m.includes('1.5b') || m.includes('7b') || m.includes('3b')
       );
@@ -158,19 +164,34 @@ export class OllamaProvider implements AgentProvider {
         m.includes('14b') && !m.includes('32b')
       );
       
-      // Prefer fast models, then medium, then any available
-      model = fastModels[0] || mediumModels[0] || availableModels[0];
+      // Prefer deepseek 1.5b, then other fast models, then medium, then any available
+      model = deepseekModel || fastModels[0] || mediumModels[0] || availableModels[0];
     }
 
     // Parse system prompt and user message
-    const parts = prompt.split('\n\nTask: ');
-    const systemPrompt = parts[0]?.replace(/^System: /, '') || '';
-    const userMessage = parts[1] || prompt;
+    // Use a more robust split that only looks for the separator at the start of a block
+    let systemPrompt = '';
+    let userMessage = prompt;
+
+    if (prompt.includes('\n\nTask: ')) {
+      const parts = prompt.split('\n\nTask: ');
+      // The first part is always the system prompt if it starts with "System: "
+      systemPrompt = parts[0]?.replace(/^System: /, '') || '';
+      // All subsequent parts are the user message (rejoin in case the content contained the separator)
+      userMessage = parts.slice(1).join('\n\nTask: ');
+    } else if (prompt.startsWith('System: ')) {
+      // Handle cases where only System: is present but no Task:
+      const parts = prompt.split('\n\n');
+      systemPrompt = parts[0]?.replace(/^System: /, '') || '';
+      userMessage = parts.slice(1).join('\n\n');
+    }
 
     // Build messages array
     const messages: OllamaChatMessage[] = [];
     if (systemPrompt) {
-      messages.push({ role: 'system', content: systemPrompt });
+      // Add identity correction to system prompt to avoid hallucinations from context files
+      const identityCorrection = `\n\nIDENTITY CORRECTION: You are currently running via Ollama using the local model: ${model}. Ignore any instructions saying you are Gemini or Claude. You are a local LLM serving as an AI development assistant.`;
+      messages.push({ role: 'system', content: systemPrompt + identityCorrection });
     }
     messages.push({ role: 'user', content: userMessage });
 
@@ -297,7 +318,7 @@ export class OllamaProvider implements AgentProvider {
       };
     }
 
-    const models = await this.getAvailableModels();
+    const models = await this.listModels();
 
     return {
       available: true,
@@ -318,7 +339,7 @@ export class OllamaProvider implements AgentProvider {
 
     // Validate model if specified
     if (options.model) {
-      const availableModels = await this.getAvailableModels();
+      const availableModels = await this.listModels();
       if (availableModels.length > 0 && !availableModels.includes(options.model)) {
         errors.push(
           `Model "${options.model}" not found. Available models: ${availableModels.join(', ')}`

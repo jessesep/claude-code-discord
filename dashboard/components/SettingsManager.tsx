@@ -91,7 +91,7 @@ const SettingsManager: React.FC<SettingsManagerProps> = ({ settings, onUpdate })
               <div className="space-y-2">
                 <label className="text-xs font-black text-zinc-500 uppercase tracking-widest">Primary Model Engine</label>
                 <select 
-                  value={settings.defaultModel || 'claude-sonnet-4'}
+                  value={settings.defaultModel || 'gemini-3-flash'}
                   onChange={(e) => handleChange('defaultModel', e.target.value)}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all appearance-none text-zinc-300"
                 >

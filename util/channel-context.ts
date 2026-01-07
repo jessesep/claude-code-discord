@@ -17,6 +17,12 @@ export interface ChannelProjectContext {
   source: 'topic' | 'category' | 'config' | 'default';
 }
 
+export interface CategoryNotFoundResult {
+  categoryName: string;
+  similarFolders: string[];
+  needsUserPrompt: true;
+}
+
 export class ChannelContextManager {
   private channelCache = new Map<string, ChannelProjectContext>();
   private defaultWorkDir: string;
@@ -27,8 +33,9 @@ export class ChannelContextManager {
 
   /**
    * Extract project context from a Discord channel
+   * Returns null if not found, or CategoryNotFoundResult if category doesn't exist (needs user prompt)
    */
-  async getChannelContext(channel: any): Promise<ChannelProjectContext | null> {
+  async getChannelContext(channel: any): Promise<ChannelProjectContext | CategoryNotFoundResult | null> {
     if (!channel || !channel.id) {
       return null;
     }
@@ -46,10 +53,14 @@ export class ChannelContextManager {
     }
 
     // 3. Try to extract from category name
-    const categoryContext = await this.extractFromCategory(channel);
-    if (categoryContext) {
-      this.channelCache.set(channel.id, categoryContext);
-      return categoryContext;
+    const categoryResult = await this.extractFromCategory(channel);
+    if (categoryResult && 'needsUserPrompt' in categoryResult) {
+      // Category not found, return result with similar folders
+      return categoryResult;
+    }
+    if (categoryResult) {
+      this.channelCache.set(channel.id, categoryResult);
+      return categoryResult;
     }
 
     // 4. Try config file mapping
@@ -116,15 +127,37 @@ export class ChannelContextManager {
   /**
    * Extract context from category name
    * Format: "categoryName (repoName)" or just "repoName"
+   * 
+   * Priority:
+   * 1. Try category name directly as folder in repos directory (e.g., category "my-project" -> /Users/jessesep/repos/my-project)
+   * 2. Parse "categoryName (repoName)" format and use repoName
+   * 3. Use category name as-is and search common locations
+   * 4. If not found, return CategoryNotFoundResult with similar folders
    */
-  private async extractFromCategory(channel: any): Promise<ChannelProjectContext | null> {
+  private async extractFromCategory(channel: any): Promise<ChannelProjectContext | CategoryNotFoundResult | null> {
     if (!channel.parent) {
       return null;
     }
 
     try {
       const categoryName = channel.parent.name;
-      // Parse: "categoryName (repoName)" or just "repoName"
+      
+      // First, try using the category name directly as a folder in the repos directory
+      // This allows categories like "my-project" to map to /Users/jessesep/repos/my-project
+      const categoryBasedPath = await this.findCategoryBasedPath(categoryName);
+      if (categoryBasedPath) {
+        return {
+          channelId: channel.id,
+          channelName: channel.name || 'unknown',
+          categoryName: categoryName,
+          projectPath: categoryBasedPath,
+          repoName: categoryName, // Use category name as repo name
+          branchName: channel.name || 'main', // Channel name is usually branch name
+          source: 'category'
+        };
+      }
+
+      // Fallback: Parse: "categoryName (repoName)" or just "repoName"
       const match = categoryName.match(/^(.+?)\s*\((.+?)\)$|^(.+)$/);
 
       if (match) {
@@ -144,6 +177,17 @@ export class ChannelContextManager {
           };
         }
       }
+
+      // Category not found - check for similar folders and return result for user prompt
+      const { findSimilarFolders } = await import("./repo-initializer.ts");
+      const reposBaseDir = this.getReposBaseDir();
+      const similarFolders = await findSimilarFolders(categoryName, reposBaseDir);
+      
+      return {
+        categoryName,
+        similarFolders,
+        needsUserPrompt: true,
+      };
     } catch (error) {
       console.warn(`[ChannelContext] Error parsing category: ${error}`);
     }
@@ -197,6 +241,33 @@ export class ChannelContextManager {
   }
 
   /**
+   * Find project path based on category name
+   * Tries category name directly as folder in repos directory
+   * Supports environment variable REPOS_BASE_DIR (defaults to ~/repos or /Users/jessesep/repos)
+   */
+  private async findCategoryBasedPath(categoryName: string): Promise<string | null> {
+    // Get base repos directory from environment or default
+    const reposBaseDir = Deno.env.get('REPOS_BASE_DIR') || 
+                         Deno.env.get('REPOS_DIR') ||
+                         (Deno.env.get('HOME') ? `${Deno.env.get('HOME')}/repos` : null) ||
+                         '/Users/jessesep/repos';
+    
+    // Try category name directly as folder name
+    const categoryPath = `${reposBaseDir}/${categoryName}`;
+    try {
+      const stat = await Deno.stat(categoryPath);
+      if (stat.isDirectory) {
+        console.log(`[ChannelContext] Found category-based path: ${categoryPath}`);
+        return categoryPath;
+      }
+    } catch {
+      // Not found, continue to other methods
+    }
+
+    return null;
+  }
+
+  /**
    * Find project path for a repository name
    * Tries common locations and environment variables
    */
@@ -205,9 +276,11 @@ export class ChannelContextManager {
       Deno.env.get('PROJECTS_DIR'),
       Deno.env.get('REPOS_DIR'),
       Deno.env.get('REPOSITORIES_DIR'),
+      Deno.env.get('REPOS_BASE_DIR'), // Also check REPOS_BASE_DIR
       Deno.env.get('HOME') ? `${Deno.env.get('HOME')}/repos` : null,
       Deno.env.get('HOME') ? `${Deno.env.get('HOME')}/projects` : null,
       Deno.env.get('HOME') ? `${Deno.env.get('HOME')}/code` : null,
+      '/Users/jessesep/repos', // Explicit fallback for jessesep/repos
     ].filter((p): p is string => p !== null && p !== undefined);
 
     for (const basePath of commonPaths) {
@@ -255,5 +328,15 @@ export class ChannelContextManager {
    */
   getDefaultWorkDir(): string {
     return this.defaultWorkDir;
+  }
+
+  /**
+   * Get repos base directory
+   */
+  private getReposBaseDir(): string {
+    return Deno.env.get('REPOS_BASE_DIR') || 
+           Deno.env.get('REPOS_DIR') ||
+           (Deno.env.get('HOME') ? `${Deno.env.get('HOME')}/repos` : null) ||
+           '/Users/jessesep/repos';
   }
 }

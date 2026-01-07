@@ -1,0 +1,18 @@
+# Discord Configuration
+export DISCORD_TOKEN=""
+export APPLICATION_ID=""
+
+# AI Provider Keys
+export GEMINI_API_KEY=""
+# export GOOGLE_API_KEY=""
+# export ANTHROPIC_API_KEY=""
+
+# Optional Configuration
+# export OWNER_ID=""
+# export DEFAULT_MENTION_USER_ID=""
+# export CATEGORY_NAME=""
+# export ENABLE_CHANNEL_ROUTING="false"
+
+# Local Service URLs
+# export OLLAMA_BASE_URL="http://localhost:11434"
+# export CLAUDE_MEM_WORKER_URL="http://localhost:37777"

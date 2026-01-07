@@ -98,8 +98,11 @@ export interface AgentProvider {
   /** Provider type classification */
   readonly providerType: ProviderType;
 
-  /** List of supported models/agents */
-  readonly supportedModels: string[];
+  /** List of supported models/agents (can be updated dynamically) */
+  supportedModels: string[];
+
+  /** Optional: Dynamically refresh/list available models from the provider */
+  listModels?(): Promise<string[]>;
 
   /** Check if provider is available (installed, configured, etc.) */
   isAvailable(): Promise<boolean>;

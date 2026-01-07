@@ -47,6 +47,38 @@ export const gitCommands = [
         .setRequired(true)),
 ];
 
+export const githubCommands = [
+  new SlashCommandBuilder()
+    .setName('github')
+    .setDescription('GitHub repository operations')
+    .addStringOption(option =>
+      option.setName('action')
+        .setDescription('Action to perform')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Clone Repository', value: 'clone' },
+          { name: 'Change Repository', value: 'repo' },
+          { name: 'Create Issue', value: 'issue' },
+          { name: 'Workflow Status', value: 'actions' }
+        ))
+    .addStringOption(option =>
+      option.setName('url_or_name')
+        .setDescription('Repository URL (for clone) or Name (for repo)')
+        .setRequired(false))
+    .addStringOption(option =>
+      option.setName('custom_name')
+        .setDescription('Custom directory name for clone')
+        .setRequired(false))
+    .addStringOption(option =>
+      option.setName('issue_title')
+        .setDescription('Title for GitHub issue')
+        .setRequired(false))
+    .addStringOption(option =>
+      option.setName('issue_body')
+        .setDescription('Body content for GitHub issue')
+        .setRequired(false)),
+];
+
 export interface GitHandlerDeps {
   workDir: string;
   actualCategoryName: string;
@@ -122,6 +154,33 @@ export function createGitHandlers(deps: GitHandlerDeps) {
       const { getGitStatus } = await import("./handler.ts");
       const gitStatusInfo = await getGitStatus(workDir);
       return gitStatusInfo;
+    }
+  };
+}
+
+export function createGitHubHandlers(deps: GitHandlerDeps) {
+  const { workDir } = deps;
+
+  return {
+    // deno-lint-ignore no-explicit-any
+    async onClone(ctx: any, url: string, customName?: string, onProgress?: (percentage: number, stage: string) => void) {
+      const { cloneGitHubRepo } = await import("./github.ts");
+      // Use parent directory of workDir as base for clones if not specified otherwise
+      // This assumes projects are sibling directories
+      const baseDir = workDir.split('/').slice(0, -1).join('/');
+      return await cloneGitHubRepo(baseDir, url, customName, onProgress);
+    },
+
+    // deno-lint-ignore no-explicit-any
+    async onCreateIssue(_ctx: any, title: string, body: string) {
+      const { createGitHubIssueWithCLI } = await import("../util/github-issues.ts");
+      return await createGitHubIssueWithCLI({ title, body });
+    },
+
+    // deno-lint-ignore no-explicit-any
+    async onGetActions(_ctx: any, limit?: number) {
+      const { getGitHubWorkflowRuns } = await import("./github.ts");
+      return await getGitHubWorkflowRuns(limit);
     }
   };
 }

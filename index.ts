@@ -31,10 +31,13 @@ import { systemCommands, createSystemHandlers } from "./system/index.ts";
 import { helpCommand, createHelpHandlers } from "./help/index.ts";
 import { agentCommand, createAgentHandlers } from "./agent/index.ts";
 import { ProcessCrashHandler, setupGlobalErrorHandlers, ProcessHealthMonitor } from "./process/index.ts";
-import { handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed } from "./discord/index.ts";
+import { createDiscordBot, handlePaginationInteraction, cleanupPaginationStates, formatShellOutput, formatGitOutput, formatError, createFormattedEmbed, getAdminCommands } from "./discord/index.ts";
 import { SettingsPersistence } from "./util/settings-persistence.ts";
 import { WebServer } from "./server/index.ts";
 import { OSCManager } from "./osc/index.ts";
+import { repoCommands, createRepoHandlers } from "./repo/index.ts";
+import { githubCommands, createGitHubHandlers } from "./git/index.ts";
+import { simpleCommands } from "./agent/index.ts";
 
 
 
@@ -76,8 +79,28 @@ export { sendToClaudeCode } from "./claude/index.ts";
 export async function createClaudeCodeBot(config: BotConfig) {
   const { discordToken, applicationId, workDir, repoName, branchName, categoryName, defaultMentionUserId } = config;
 
-  // Determine category name (use repository name if not specified)
-  const actualCategoryName = categoryName || repoName;
+  // Determine category name (include repo name for visibility)
+  // Format: "categoryName (repoName)" if categoryName provided, otherwise just "repoName"
+  const actualCategoryName = categoryName ? `${categoryName} (${repoName})` : repoName;
+
+  // Initialize agent providers
+  try {
+    const { initializeProviders } = await import("./agent/providers/index.ts");
+    await initializeProviders();
+  } catch (error) {
+    console.error("[Startup] Failed to initialize agent providers:", error);
+  }
+
+  // Initialize conversation sync system (for /sync command and conversation persistence)
+  try {
+    const { initializeConversationSync } = await import("./util/conversation-sync.ts");
+    const syncResult = await initializeConversationSync();
+    if (!syncResult.success) {
+      console.warn("[Startup] Conversation sync initialization failed:", syncResult.error);
+    }
+  } catch (error) {
+    console.warn("[Startup] Could not initialize conversation sync:", error);
+  }
 
   // Claude Code session management
   let claudeController: AbortController | null = null;
@@ -251,6 +274,25 @@ export async function createClaudeCodeBot(config: BotConfig) {
     worktreeBotManager
   });
 
+  const githubHandlers = createGitHubHandlers({
+    workDir,
+    actualCategoryName,
+    discordToken,
+    applicationId,
+    botSettings,
+    worktreeBotManager
+  });
+
+  const repoHandlers = createRepoHandlers({
+    workDir,
+    repoName,
+    branchName,
+    actualCategoryName,
+    discordToken,
+    applicationId,
+    botSettings,
+    worktreeBotManager
+  });
   const shellHandlers = createShellHandlers({
     shellManager
   });
@@ -685,6 +727,153 @@ export async function createClaudeCodeBot(config: BotConfig) {
               timestamp: true
             }]
           });
+        }
+      }
+    }],
+    ['github', {
+      execute: async (ctx: InteractionContext) => {
+        const action = ctx.getString('action', true)!;
+        const urlOrName = ctx.getString('url_or_name');
+        const customName = ctx.getString('custom_name');
+        const issueTitle = ctx.getString('issue_title');
+        const issueBody = ctx.getString('issue_body');
+
+        await ctx.deferReply();
+
+        if (action === 'clone') {
+          if (!urlOrName) {
+            await ctx.editReply({ content: "Please provide a repository URL for cloning." });
+            return;
+          }
+          try {
+            const { createProgressBar } = await import("./git/index.ts");
+            
+            // Initial progress message
+            await ctx.editReply({
+              embeds: [{
+                color: 0x5865F2,
+                title: '📥 Cloning Repository...',
+                description: `Starting clone of **${urlOrName}**\n\n${createProgressBar(0)}`,
+                timestamp: true
+              }]
+            });
+
+            const result = await githubHandlers.onClone(ctx, urlOrName, customName || undefined, async (percentage, stage) => {
+              // Throttle updates or only update on significant changes if needed
+              // For now, we'll try to update regularly
+              try {
+                await ctx.editReply({
+                  embeds: [{
+                    color: 0x5865F2,
+                    title: '📥 Cloning Repository...',
+                    description: `Cloning **${urlOrName}**\nStage: **${stage}**\n\n${createProgressBar(percentage)}`,
+                    timestamp: true
+                  }]
+                });
+              } catch (err) {
+                // Ignore potential rate limit or interaction expiration errors during progress updates
+              }
+            });
+
+            if (result.success) {
+              await ctx.editReply({
+                embeds: [{
+                  color: 0x00ff00,
+                  title: '✅ Repository Cloned',
+                  description: `Successfully cloned **${result.repoName}**`,
+                  fields: [
+                    { name: 'Path', value: `\`${result.fullPath}\``, inline: false },
+                    { name: 'URL', value: urlOrName, inline: false }
+                  ],
+                  timestamp: true
+                }]
+              });
+            } else {
+              await ctx.editReply({
+                embeds: [{
+                  color: 0xff0000,
+                  title: '❌ Clone Failed',
+                  description: result.error || "Unknown error during clone",
+                  fields: result.output ? [{ name: 'Output', value: `\`\`\`\n${result.output}\n\`\`\``, inline: false }] : [],
+                  timestamp: true
+                }]
+              });
+            }
+          } catch (error) {
+            await ctx.editReply({ content: `Error: ${error instanceof Error ? error.message : String(error)}` });
+          }
+        } else if (action === 'repo') {
+          if (!urlOrName) {
+            await ctx.editReply({ content: "Please provide a repository name to switch to." });
+            return;
+          }
+          await repoHandlers.onRepo(ctx, 'load', urlOrName);
+        } else if (action === 'issue') {
+          if (!issueTitle || !issueBody) {
+            await ctx.editReply({ content: "Please provide both `issue_title` and `issue_body`." });
+            return;
+          }
+          try {
+            const result = await githubHandlers.onCreateIssue(ctx, issueTitle, issueBody);
+            if (result.success) {
+              await ctx.editReply({
+                embeds: [{
+                  color: 0x00ff00,
+                  title: '✅ GitHub Issue Created',
+                  description: `Successfully created issue #${result.issueNumber}`,
+                  fields: [{ name: 'Title', value: issueTitle, inline: false }],
+                  timestamp: true
+                }]
+              });
+            } else {
+              await ctx.editReply({
+                embeds: [{
+                  color: 0xff0000,
+                  title: '❌ Issue Creation Failed',
+                  description: result.error || "Unknown error",
+                  timestamp: true
+                }]
+              });
+            }
+          } catch (error) {
+            await ctx.editReply({ content: `Error: ${error instanceof Error ? error.message : String(error)}` });
+          }
+        } else if (action === 'actions') {
+          try {
+            const result = await githubHandlers.onGetActions(ctx);
+            if (result.success) {
+              if (result.runs.length === 0) {
+                await ctx.editReply({ content: "No recent workflow runs found." });
+                return;
+              }
+
+              const fields = result.runs.map(run => ({
+                name: `${run.workflowName} (${run.headBranch})`,
+                value: `Status: **${run.status}**${run.conclusion ? ` (${run.conclusion})` : ''}\nCreated: ${new Date(run.createdAt).toLocaleString()}\n[View Run](${run.url})`,
+                inline: false
+              }));
+
+              await ctx.editReply({
+                embeds: [{
+                  color: 0x0099ff,
+                  title: '📊 Recent GitHub Actions',
+                  fields: fields.slice(0, 5),
+                  timestamp: true
+                }]
+              });
+            } else {
+              await ctx.editReply({
+                embeds: [{
+                  color: 0xff0000,
+                  title: '❌ Failed to Fetch Actions',
+                  description: result.error || "Unknown error",
+                  timestamp: true
+                }]
+              });
+            }
+          } catch (error) {
+            await ctx.editReply({ content: `Error: ${error instanceof Error ? error.message : String(error)}` });
+          }
         }
       }
     }],
@@ -1323,7 +1512,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const message = ctx.getString('message');
         const contextFiles = ctx.getString('context_files');
         const includeSystemInfo = ctx.getBoolean('include_system_info');
-        await agentHandlers.onAgent(ctx, action, agentName || undefined, message || undefined, contextFiles || undefined, includeSystemInfo || undefined);
+        const model = ctx.getString('model');
+        await agentHandlers.onAgent(ctx, action, agentName || undefined, message || undefined, contextFiles || undefined, includeSystemInfo || undefined, model || undefined);
       }
     }],
     ['output-settings', {
@@ -1338,23 +1528,41 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const model = ctx.getString('model', true)!;
         await advancedSettingsHandlers.onQuickModel(ctx, model);
       }
+    }],
+    ['restart', {
+      execute: async (ctx: InteractionContext) => {
+        const adminCmds = await getAdminCommands();
+        const restartCmd = adminCmds.find(c => c.data.name === 'restart');
+        if (restartCmd) {
+          await restartCmd.execute(ctx);
+        }
+      }
     }]
   ]);
 
   // Create dependencies object
+  // Simplified interface: Only register /run, /kill, and /help
+  // Old commands are still available via handlers for power users, but not shown in Discord
+  const adminCommands = await getAdminCommands();
   const dependencies: BotDependencies = {
     commands: [
-      ...claudeCommands,
-      ...enhancedClaudeCommands, // claude-templates already removed from source
-      ...additionalClaudeCommands,
-      ...advancedSettingsCommands,
-      ...unifiedSettingsCommands,
-      agentCommand,
-      ...gitCommands,
-      ...shellCommands,
-      ...utilsCommands,
-      ...systemCommands,
-      helpCommand,
+      ...simpleCommands, // /run and /kill
+      helpCommand, // /help
+      agentCommand, // /agent
+      ...githubCommands, // /github
+      ...adminCommands.map(c => c.data), // /restart
+      // Old commands commented out to simplify Discord interface
+      // They can still be accessed programmatically if needed
+      // ...claudeCommands,
+      // ...enhancedClaudeCommands,
+      // ...additionalClaudeCommands,
+      // ...advancedSettingsCommands,
+      // ...unifiedSettingsCommands,
+      // agentCommand,
+      // ...gitCommands,
+      // ...shellCommands,
+      // ...utilsCommands,
+      // ...systemCommands,
     ],
     cleanSessionId,
     botSettings

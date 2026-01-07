@@ -17,7 +17,7 @@ export class ClaudeCliProvider implements AgentProvider {
   readonly providerId = 'claude-cli';
   readonly providerName = 'Claude CLI';
   readonly providerType = ProviderType.CLI;
-  readonly supportedModels = [
+  supportedModels = [
     'sonnet',
     'opus',
     'haiku',
@@ -25,6 +25,10 @@ export class ClaudeCliProvider implements AgentProvider {
     'claude-sonnet-4-20250514',
     'claude-opus-4-20250514',
   ];
+
+  async listModels(): Promise<string[]> {
+    return this.supportedModels;
+  }
 
   async isAvailable(): Promise<boolean> {
     try {

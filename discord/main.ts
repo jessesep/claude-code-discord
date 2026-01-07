@@ -4,6 +4,7 @@ import { PREDEFINED_AGENTS, createAgentHandlers } from "../agent/index.ts";
 import { Collection } from "npm:discord.js@14.14.1";
 import type { CommandHandlers, ButtonHandlers, BotDependencies } from "./types.ts";
 import { getAgentCommand, setAgentHandlers } from "./commands.ts";
+import { getAdminCommands } from "./admin-commands.ts";
 
 // Main Execution
 if (import.meta.main) {
@@ -56,9 +57,15 @@ if (import.meta.main) {
     const agentCmd = await getAgentCommand(agentDeps);
     commandHandlers.set(agentCmd.data.name, agentCmd);
 
+    // Register admin commands
+    const adminCmds = await getAdminCommands();
+    for (const cmd of adminCmds) {
+        commandHandlers.set(cmd.data.name, cmd);
+    }
+
     // Setup Dependencies
     const dependencies: BotDependencies = {
-        commands: [agentCmd.data],
+        commands: [agentCmd.data, ...adminCmds.map(c => c.data)],
         botSettings: {
             mentionEnabled: true,
             mentionUserId: null

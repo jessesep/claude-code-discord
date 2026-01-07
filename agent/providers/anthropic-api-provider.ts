@@ -18,7 +18,7 @@ export class AnthropicApiProvider implements AgentProvider {
   readonly providerId = 'anthropic-api';
   readonly providerName = 'Anthropic Messages API';
   readonly providerType = ProviderType.API;
-  readonly supportedModels = [
+  supportedModels = [
     'claude-3-5-sonnet-20241022',
     'claude-3-5-sonnet-20240620',
     'claude-3-5-haiku-20241022',
@@ -27,6 +27,10 @@ export class AnthropicApiProvider implements AgentProvider {
     'claude-sonnet-4-20250514',
     'claude-opus-4-20250514',
   ];
+
+  async listModels(): Promise<string[]> {
+    return this.supportedModels;
+  }
 
   private apiKey: string | undefined;
   private baseUrl = 'https://api.anthropic.com/v1';

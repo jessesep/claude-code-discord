@@ -1,4 +1,11 @@
+import { 
+  EmbedBuilder, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle 
+} from "npm:discord.js@14.14.1";
 import { DISCORD_LIMITS } from "./utils.ts";
+import type { MessageContent } from "./types.ts";
 
 // Enhanced formatting utilities for Discord messages
 export interface FormatOptions {
@@ -357,6 +364,70 @@ export function needsFormatting(content: string): {
 }
 
 // Create a well-formatted embed with automatic formatting detection
+// deno-lint-ignore no-explicit-any
+export function convertMessageContent(content: MessageContent): any {
+  // deno-lint-ignore no-explicit-any
+  const payload: any = {};
+  
+  if (content.content) payload.content = content.content;
+  
+  if (content.embeds) {
+    payload.embeds = content.embeds.map(e => {
+      const embed = new EmbedBuilder();
+      if (e.color !== undefined) embed.setColor(e.color);
+      if (e.title) embed.setTitle(e.title);
+      if (e.description) embed.setDescription(e.description);
+      if (e.fields) e.fields.forEach(f => embed.addFields(f));
+      if (e.footer) embed.setFooter(e.footer);
+      if (e.timestamp) embed.setTimestamp();
+      return embed;
+    });
+  }
+  
+  if (content.components) {
+    // Check if components are already in Discord.js format
+    const isDiscordJSFormat = content.components.length > 0 && (
+      (typeof content.components[0] === 'object' && 'toJSON' in content.components[0] && typeof (content.components[0] as any).toJSON === 'function') ||
+      (typeof content.components[0] === 'object' && 'type' in content.components[0] && typeof (content.components[0] as any).type === 'number')
+    );
+    
+    if (isDiscordJSFormat) {
+      payload.components = content.components.map((comp: any) => {
+        if (comp && typeof comp === 'object' && 'toJSON' in comp && typeof comp.toJSON === 'function') {
+          return comp.toJSON();
+        }
+        return comp;
+      });
+    } else {
+      payload.components = content.components.map(row => {
+        const actionRow = new ActionRowBuilder<ButtonBuilder>();
+        row.components.forEach(comp => {
+          const button = new ButtonBuilder()
+            .setCustomId(comp.customId)
+            .setLabel(comp.label);
+          
+          switch (comp.style) {
+            case 'primary': button.setStyle(ButtonStyle.Primary); break;
+            case 'secondary': button.setStyle(ButtonStyle.Secondary); break;
+            case 'success': button.setStyle(ButtonStyle.Success); break;
+            case 'danger': button.setStyle(ButtonStyle.Danger); break;
+            case 'link': button.setStyle(ButtonStyle.Link); break;
+          }
+          
+          actionRow.addComponents(button);
+        });
+        return actionRow;
+      });
+    }
+  }
+  
+  return payload;
+}
+
+export function formatMention(userId: string): string {
+  return `<@${userId}>`;
+}
+
 export function createFormattedEmbed(
   title: string,
   content: string,

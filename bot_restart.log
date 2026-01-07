@@ -1,0 +1,59 @@
+🛑 Stopping any running bot instances...
+✅ All bot processes stopped
+
+🚀 Starting bot...
+Loading environment variables from .env file...
+Starting bot with Deno...
+[Providers] Initializing agent provider registry...
+[Registry] Registered provider: claude-cli (Claude CLI)
+[Registry] Registered provider: cursor (Cursor Agent)
+[Registry] Registered provider: antigravity (Google Antigravity (Gemini))
+[Registry] Registered provider: anthropic-api (Anthropic Messages API)
+[Registry] Registered provider: ollama (Ollama)
+[Registry] Registered provider: vscode-continue-continue (VS Code: Continue.dev)
+[Registry] Registered provider: vscode-codeium-codeium (VS Code: Codeium)
+[Registry] Registered provider: vscode-aider-aider (VS Code: Aider)
+[Providers] Registered 8 providers
+[Providers] 4 providers are available:
+  ✓ Claude CLI (claude-cli) - 2.0.76 (Claude Code)
+  ✓ Cursor Agent (cursor) - 2.3.23
+655ee705c6c7b6da1da481d0fdf13191d5e3e980
+arm64
+  ✓ Google Antigravity (Gemini) (antigravity)
+  ✓ Ollama (ollama)
+[Providers] 4 providers are unavailable:
+  ✗ Anthropic Messages API - ANTHROPIC_API_KEY not set
+  ✗ VS Code: Continue.dev - Continue.dev not found or not configured
+  ✗ VS Code: Codeium - Codeium not found or not configured
+  ✗ VS Code: Aider - Aider not found or not configured
+[Providers] Initialization complete
+[ConversationSync] Initializing...
+[ConversationSync] Initialized. 1 valid, 0 invalid conversations.
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458093359162986620)
+Clearing global commands...
+Bot has started. Press Ctrl+C to stop.
+Clearing old guild commands for guild 1457712106399862786...
+Registering new slash commands for guild 1457712106399862786...
+Commands to register: run, kill, sync, run-adv, help, agent, restart
+✅ Successfully registered 7 guild commands
+[InteractionCreate] Received interaction: 2, isCommand: true
+[InteractionCreate] Received interaction: 3, isCommand: false
+[InteractionCreate] Received interaction: 3, isCommand: false
+[InteractionCreate] Received interaction: 3, isCommand: false
+Received SIGTERM, initiating graceful shutdown...
+
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...
+Received SIGTERM, initiating graceful shutdown...
+
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...

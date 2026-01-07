@@ -41,6 +41,8 @@ export interface InteractionContext {
   guild?: any; // Discord.js Guild object
   // Channel project context (for multi-project routing)
   channelContext?: import("../util/channel-context.ts").ChannelProjectContext;
+  // Optional client override (e.g. from provider mentions)
+  clientOverride?: 'claude' | 'cursor' | 'antigravity' | 'ollama';
 }
 
 export interface BotConfig {

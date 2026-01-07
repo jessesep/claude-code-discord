@@ -17,15 +17,32 @@ export class CursorProvider implements AgentProvider {
   readonly providerId = 'cursor';
   readonly providerName = 'Cursor Agent';
   readonly providerType = ProviderType.IDE_EXTENSION;
-  readonly supportedModels = [
-    'sonnet-4',
+  supportedModels = [
+    'auto',
+    'composer-1',
     'sonnet-4.5',
-    'sonnet-4-thinking',
     'sonnet-4.5-thinking',
-    'opus-4',
-    'gpt-4',
-    'gpt-5',
+    'opus-4.5',
+    'opus-4.5-thinking',
+    'opus-4.1',
+    'gemini-3-pro',
+    'gemini-2.0-flash',
+    'gpt-5.2',
+    'gpt-5.1',
+    'gpt-5.2-high',
+    'gpt-5.1-high',
+    'gpt-5.1-codex',
+    'gpt-5.1-codex-high',
+    'gpt-5.1-codex-max',
+    'gpt-5.1-codex-max-high',
+    'grok',
   ];
+
+  async listModels(): Promise<string[]> {
+    // Cursor CLI doesn't have a direct model list command yet, 
+    // but we can try to find them in the help output or just return the known list
+    return this.supportedModels;
+  }
 
   async isAvailable(): Promise<boolean> {
     try {

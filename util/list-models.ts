@@ -76,6 +76,7 @@ export async function listAvailableModels(): Promise<AvailableModel[]> {
     { name: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash', supportsGenerateContent: true },
     { name: 'gemini-2.0-flash-exp', displayName: 'Gemini 2.0 Flash (Experimental)', supportsGenerateContent: true },
     { name: 'gemini-2.0-flash-thinking-exp', displayName: 'Gemini 2.0 Flash Thinking', supportsGenerateContent: true },
+    { name: 'gemini-2.0-pro-exp', displayName: 'Gemini 2.0 Pro (Experimental)', supportsGenerateContent: true },
     { name: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash', supportsGenerateContent: true },
     { name: 'gemini-1.5-flash-latest', displayName: 'Gemini 1.5 Flash (Latest)', supportsGenerateContent: true },
     { name: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro', supportsGenerateContent: true },
