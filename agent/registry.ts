@@ -1,4 +1,4 @@
-import { AgentConfig, PREDEFINED_AGENTS } from './index.ts';
+import { AgentConfig, PREDEFINED_AGENTS } from './types.ts';
 
 /**
  * Agent Registry

@@ -217,9 +217,17 @@ deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User
 
 ### Agent System (3)
 
-- `/agent` with 7 specialized agents:
-  - Code Reviewer, Software Architect, Debug Specialist
-  - Security Analyst, Performance Engineer, DevOps Engineer, General Assistant
+- `/agent` with specialized AI agents:
+  - **ag-manager**: Main orchestrator agent (Gemini 3 Flash)
+  - **ag-coder**: Autonomous coding agent (Antigravity)
+  - **ag-architect**: System design and planning (Antigravity)
+  - **ag-security**: Security analyst (Antigravity)
+  - **cursor-coder**: Autonomous coder (Cursor Sonnet)
+  - **cursor-refactor**: Refactoring specialist (Cursor Sonnet)
+  - **cursor-fast**: Quick edits agent (Cursor Sonnet)
+  - **code-reviewer**: Quality and security review (Claude Sonnet)
+  - **architect**: Architecture review (Claude Sonnet)
+  - **general-assistant**: Helpful AI assistant (Gemini 3 Flash)
 
 #### Thinking Mode Options ✨
 
@@ -311,12 +319,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to add new agents.
 #### `/agent` Command ✨
 
 - **Specialized AI agents** for different development tasks:
+  - Gemini Manager - Main orchestrator
+  - Antigravity Coder - Autonomous coding
+  - Antigravity Architect - System design
+  - Antigravity Security - Vulnerability assessment
+  - Cursor Autonomous Coder - File editing
+  - Cursor Refactoring Specialist - Code improvement
+  - Cursor Fast Agent - Quick targeted changes
   - Code Reviewer - Quality analysis and security
-  - Software Architect - System design and architecture
-  - Debug Specialist - Bug analysis and troubleshooting
-  - Security Analyst - Vulnerability assessment
-  - Performance Engineer - Optimization and profiling
-  - DevOps Engineer - Deployment and infrastructure
+  - Software Architect - System design review
   - General Assistant - Multi-purpose development help
 - **Risk levels** - Low/Medium/High risk classification
 - **Session management** - Persistent agent conversations

@@ -21,8 +21,17 @@ To act as the "Brain" and "Kernel" of the system. This compartment manages the l
 ## 📜 Conventions
 
 - **Session State**: Use the `AgentSession` interface. History should be a list of role/content pairs.
-- **Agent Definitions**: All agents must be defined in the `PREDEFINED_AGENTS` constant in `index.ts`.
+- **Agent Definitions**: All agents must be defined in the `PREDEFINED_AGENTS` constant in `agent/types.ts`.
 - **Headless Execution**: Use `runAgentTask` for spawned subagents (no Discord context).
+- **Concurrency**: The system supports multiple agents running simultaneously in the same channel, tracked by `userId:channelId` composite keys.
+
+## 🚀 Multi-Agent Architecture
+
+The system uses a **Manager-Subagent** pattern where a central Manager (Gemini) can spawn specialized subagents to perform tasks.
+
+- **Concurrent Execution**: Multiple agents can be active in the same channel concurrently.
+- **Registry**: Use `AgentRegistry` to manage and access agent configurations dynamically.
+- **Session Tracking**: Sessions are persisted and can be listed via `/agents-status`.
 
 ## 💡 Code Example: Headless Agent Task
 
@@ -87,3 +96,12 @@ const providerToClient = {
 - `agent/handlers.ts` - providerOptions for /run-adv
 - `discord/event-handlers.ts` - model selection logic
 - `agent/providers/index.ts` - provider registration
+
+### Bug #111: Cursor provider had fabricated model names
+**Cause**: `cursor-provider.ts` contained model names like `gemini-2.0-flash`, `sonnet-4.5`, `gpt-5.2` which don't exist in Cursor CLI.
+**Lesson**: 
+- **Each provider has its own model naming scheme** - don't mix them!
+- Cursor uses: `auto`, `sonnet-4`, `sonnet-4-thinking`, `opus-4`, `gpt-5`, `gpt-4o`
+- Gemini API uses: `gemini-3-flash-preview`, `gemini-2.0-flash`, etc.
+- **Always verify model names** with `<tool> --help` or official docs
+- **Don't speculatively create model lists** - test them

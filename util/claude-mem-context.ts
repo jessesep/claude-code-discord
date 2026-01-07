@@ -1,24 +1,7 @@
-/**
- * Claude-Mem Context Injection Utility
- * 
- * Provides functions to query and inject claude-mem context into agent prompts.
- * Works with all agent types: Claude Code, Cursor, and Antigravity.
- */
+import { claudeMemService } from "./claude-mem-service.ts";
+import { ClaudeMemMemory } from "./claude-mem-types.ts";
 
-export interface ClaudeMemMemory {
-  id: string;
-  summary: string;
-  content: string;
-  timestamp: string;
-  tags?: string[];
-  relevance?: number;
-}
-
-export interface ClaudeMemSearchResult {
-  memories: ClaudeMemMemory[];
-  query: string;
-  total: number;
-}
+export { type ClaudeMemMemory };
 
 /**
  * Query claude-mem for relevant memories
@@ -35,47 +18,7 @@ export async function queryClaudeMemContext(
   agentName?: string,
   limit: number = 5
 ): Promise<ClaudeMemMemory[]> {
-  try {
-    const workerUrl = Deno.env.get("CLAUDE_MEM_WORKER_URL") || "http://localhost:37777";
-    
-    const searchPayload: any = {
-      query,
-      limit,
-    };
-    
-    if (workspace) {
-      searchPayload.workspace = workspace;
-    }
-    
-    if (agentName) {
-      searchPayload.tags = [`agent:${agentName}`];
-    }
-    
-    const response = await fetch(`${workerUrl}/api/search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(searchPayload),
-      signal: AbortSignal.timeout(5000), // 5 second timeout
-    });
-    
-    if (!response.ok) {
-      console.warn(`Claude-mem API returned ${response.status}: ${response.statusText}`);
-      return [];
-    }
-    
-    const result: ClaudeMemSearchResult = await response.json();
-    return result.memories || [];
-  } catch (error) {
-    // Silently fail if claude-mem is not available
-    if (error instanceof Error && error.name === "AbortError") {
-      console.warn("Claude-mem query timed out");
-    } else {
-      console.warn("Failed to query claude-mem context:", error instanceof Error ? error.message : String(error));
-    }
-    return [];
-  }
+  return await claudeMemService.queryContext(query, workspace, agentName, limit);
 }
 
 /**
@@ -116,35 +59,8 @@ export async function injectClaudeMemContext(
   agentName?: string,
   query?: string
 ): Promise<string> {
-  // Check if worker is available
-  const workerUrl = Deno.env.get("CLAUDE_MEM_WORKER_URL") || "http://localhost:37777";
-  
-  try {
-    // Quick health check
-    const healthCheck = await fetch(`${workerUrl}/health`, {
-      signal: AbortSignal.timeout(2000),
-    });
-    
-    if (!healthCheck.ok) {
-      // Worker not available, return original prompt
-      return prompt;
-    }
-  } catch {
-    // Worker not available, return original prompt
-    return prompt;
-  }
-  
-  // Query for relevant memories
   const searchQuery = query || prompt;
-  const memories = await queryClaudeMemContext(searchQuery, workspace, agentName);
-  
-  if (memories.length === 0) {
-    return prompt;
-  }
-  
-  // Format and inject context
-  const context = formatMemoryContext(memories);
-  return `${prompt}\n${context}`;
+  return await claudeMemService.injectContext(searchQuery, workspace, agentName);
 }
 
 /**
@@ -153,13 +69,5 @@ export async function injectClaudeMemContext(
  * @returns true if worker is available
  */
 export async function isClaudeMemAvailable(): Promise<boolean> {
-  try {
-    const workerUrl = Deno.env.get("CLAUDE_MEM_WORKER_URL") || "http://localhost:37777";
-    const response = await fetch(`${workerUrl}/health`, {
-      signal: AbortSignal.timeout(2000),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
+  return await claudeMemService.isAvailable();
 }

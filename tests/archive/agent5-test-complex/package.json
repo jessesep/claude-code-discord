@@ -1,0 +1,10 @@
+{
+  "name": "agent5-math-lib",
+  "version": "1.0.0",
+  "description": "Mathematical utility library created by Agent 5",
+  "author": "Agent 5 Integration Test",
+  "license": "MIT",
+  "exports": {
+    ".": "./math.ts"
+  }
+}

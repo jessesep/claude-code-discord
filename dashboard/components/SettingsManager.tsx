@@ -91,14 +91,14 @@ const SettingsManager: React.FC<SettingsManagerProps> = ({ settings, onUpdate })
               <div className="space-y-2">
                 <label className="text-xs font-black text-zinc-500 uppercase tracking-widest">Primary Model Engine</label>
                 <select 
-                  value={settings.defaultModel || 'gemini-3-flash'}
+                  value={settings.defaultModel || 'gemini-2.0-flash'}
                   onChange={(e) => handleChange('defaultModel', e.target.value)}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all appearance-none text-zinc-300"
                 >
                   <option value="claude-sonnet-4">Claude 3.5 Sonnet</option>
                   <option value="claude-opus-4">Claude 3 Opus</option>
                   <option value="claude-haiku-4">Claude 3 Haiku</option>
-                  <option value="gemini-3-flash">Gemini 3 Flash</option>
+                  <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Default)</option>
                   <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
                   <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
                 </select>

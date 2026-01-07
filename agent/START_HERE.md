@@ -45,7 +45,25 @@ deno run --allow-net --allow-read --allow-write --allow-env --allow-run --allow-
 
 The bot uses **Slash Commands** on Discord.
 
-### Core Commands
+### Quick Start Commands
+
+-   `/run`
+    -   Quick start with the general-assistant agent using default settings.
+
+-   `/run-adv`
+    -   **Advanced runner** with multi-step selection:
+        1. **Provider**: Choose from Gemini API, Antigravity (gcloud OAuth), Cursor, Ollama, or Claude CLI
+        2. **Workspace**: Select project directory
+        3. **Role**: Builder, Tester, Investigator, Architect, or Reviewer
+        4. **Model**: Provider-specific models or auto-select
+
+-   `/kill`
+    -   Stop the current active agent session.
+
+-   `/sync`
+    -   Export conversation to markdown for IDE continuation.
+
+### Agent Commands
 
 -   `/agent start agent_name:[name]`
     -   Starts a new session with a specific agent.

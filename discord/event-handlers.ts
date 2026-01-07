@@ -100,7 +100,13 @@ export async function handleButton(
   crashHandler?: any
 ) {
   if (!enableChannelRouting) {
-    if (!myChannel || interaction.channelId !== myChannel.id) return;
+    const allowedPrefixes = ['run-adv-', 'pagination:', 'repo-create-', 'repo-use-similar-', 'repo-skip-desc-', 'repo-github-', 'repo-visibility-', 'agent_spawn_'];
+    const isAllowedInteraction = allowedPrefixes.some(p => interaction.customId.startsWith(p));
+    const activeSession = getActiveSession(interaction.user.id, interaction.channelId);
+    
+    if (!isAllowedInteraction && !activeSession && (!myChannel || interaction.channelId !== myChannel.id)) {
+      return;
+    }
   }
   
   let channelContext = undefined;
@@ -312,7 +318,13 @@ export async function handleSelectMenu(
   const actualCategoryName = botConfig.categoryName ? `${botConfig.categoryName} (${repoName})` : repoName;
 
   if (!enableChannelRouting) {
-    if (!myChannel || interaction.channelId !== myChannel.id) return;
+    const allowedPrefixes = ['run-adv-', 'repo-select-load', 'select-agent-model', 'select-ide-sync'];
+    const isAllowedInteraction = allowedPrefixes.some(p => interaction.customId.startsWith(p));
+    const activeSession = getActiveSession(interaction.user.id, interaction.channelId);
+    
+    if (!isAllowedInteraction && !activeSession && (!myChannel || interaction.channelId !== myChannel.id)) {
+      return;
+    }
   }
   
   let channelContext = undefined;
@@ -408,7 +420,10 @@ export async function handleSelectMenu(
     if (provider === 'cursor') {
       const { AgentProviderRegistry } = await import("../agent/provider-interface.ts");
       const cursorProvider = AgentProviderRegistry.getProvider('cursor');
-      const cursorModels = cursorProvider?.supportedModels || ['auto', 'composer-1', 'sonnet-4.5', 'opus-4.5'];
+      // Correct Cursor model names per CLI docs: cursor-agent --model <model>
+      const cursorModels = cursorProvider?.supportedModels || [
+        'auto', 'sonnet-4', 'sonnet-4-thinking', 'opus-4', 'gpt-5', 'gpt-4o', 'o1', 'gemini-2.5-pro'
+      ];
       modelOptions = cursorModels.map(m => ({ label: m, value: m }));
     } else if (provider === 'claude-cli') {
       modelOptions = [

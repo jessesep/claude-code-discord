@@ -17,25 +17,20 @@ export class CursorProvider implements AgentProvider {
   readonly providerId = 'cursor';
   readonly providerName = 'Cursor Agent';
   readonly providerType = ProviderType.IDE_EXTENSION;
+  // Cursor model names per CLI docs: cursor-agent --model <model>
+  // Models are accessed through Cursor subscription, not direct API names
   supportedModels = [
-    'auto',
-    'composer-1',
-    'sonnet-4.5',
-    'sonnet-4.5-thinking',
-    'opus-4.5',
-    'opus-4.5-thinking',
-    'opus-4.1',
-    'gemini-3-pro',
-    'gemini-2.0-flash',
-    'gpt-5.2',
-    'gpt-5.1',
-    'gpt-5.2-high',
-    'gpt-5.1-high',
-    'gpt-5.1-codex',
-    'gpt-5.1-codex-high',
-    'gpt-5.1-codex-max',
-    'gpt-5.1-codex-max-high',
-    'grok',
+    'auto',              // Let Cursor choose the best model
+    'sonnet-4',          // Claude Sonnet 4
+    'sonnet-4-thinking', // Claude Sonnet 4 with extended thinking
+    'opus-4',            // Claude Opus 4
+    'gpt-5',             // OpenAI GPT-5
+    'gpt-4o',            // OpenAI GPT-4o
+    'o1',                // OpenAI o1
+    'o3-mini',           // OpenAI o3-mini
+    'gemini-2.5-pro',    // Google Gemini 2.5 Pro (Cursor naming)
+    'gemini-2.5-flash',  // Google Gemini 2.5 Flash (Cursor naming)
+    'grok-3',            // xAI Grok 3
   ];
 
   async listModels(): Promise<string[]> {

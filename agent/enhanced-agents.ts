@@ -18,7 +18,7 @@ export const ENHANCED_AGENTS: Record<string, EnhancedAgentConfig> = {
     name: 'Gemini Manager',
     description: 'Main orchestrator agent that manages other agents and interacts with the user',
     providerId: 'antigravity',
-    model: 'gemini-3-flash',
+    model: 'gemini-3-flash-preview',
     systemPrompt: `You are the Manager Agent. Your role is to interact with users and orchestrate work.
 
 **Core Responsibilities**:
@@ -220,7 +220,7 @@ Provide detailed, actionable feedback with specific suggestions.
     name: 'Antigravity Coder',
     description: 'Google Antigravity agent for autonomous coding tasks',
     providerId: 'antigravity',
-    model: 'gemini-3-flash',
+    model: 'gemini-3-flash-preview',
     systemPrompt: `You are an autonomous coding agent powered by Google Antigravity.
 - Plan, execute, and verify complex coding tasks
 - Use available tools effectively
@@ -243,7 +243,7 @@ Provide detailed, actionable feedback with specific suggestions.
     name: 'Antigravity Architect',
     description: 'High-level system design and planning agent',
     providerId: 'antigravity',
-    model: 'gemini-3-flash',
+    model: 'gemini-3-flash-preview',
     systemPrompt: `You are a software architect agent.
 - Analyze requirements
 - Design systems and architecture

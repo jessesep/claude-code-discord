@@ -40,6 +40,9 @@ export interface AgentSession {
   
   // Selected model for the session (overrides agent default)
   modelOverride?: string;
+
+  // Claude-mem session ID for persistent memory
+  memorySessionId?: string;
 }
 
 // Context note for all agents

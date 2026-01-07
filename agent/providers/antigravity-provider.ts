@@ -18,7 +18,7 @@ export class AntigravityProvider implements AgentProvider {
   readonly providerName = 'Google Antigravity (Gemini)';
   readonly providerType = ProviderType.API;
   supportedModels = [
-    'gemini-3-flash',
+    'gemini-3-flash-preview',
     'gemini-2.0-flash',
     'gemini-2.0-flash-thinking-exp',
     'gemini-2.0-pro-exp',
@@ -83,7 +83,7 @@ export class AntigravityProvider implements AgentProvider {
     // Build Antigravity options
     // SECURITY: Default to authorized=true (gcloud OAuth) unless explicitly disabled
     const antigravityOptions = {
-      model: options.model || 'gemini-3-flash',
+      model: options.model || 'gemini-3-flash-preview',
       workspace: options.workspace,
       streamJson: options.streaming !== false,
       force: options.force,

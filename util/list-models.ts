@@ -72,7 +72,7 @@ export async function listAvailableModels(): Promise<AvailableModel[]> {
   
   // Fallback: Return known working models if API call fails
   return [
-    { name: 'gemini-3-flash', displayName: 'Gemini 3 Flash', supportsGenerateContent: true },
+    { name: 'gemini-3-flash-preview', displayName: 'Gemini 3 Flash Preview', supportsGenerateContent: true },
     { name: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash', supportsGenerateContent: true },
     { name: 'gemini-2.0-flash-exp', displayName: 'Gemini 2.0 Flash (Experimental)', supportsGenerateContent: true },
     { name: 'gemini-2.0-flash-thinking-exp', displayName: 'Gemini 2.0 Flash Thinking', supportsGenerateContent: true },

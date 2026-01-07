@@ -68,18 +68,20 @@ export function handleMessageCreate(
       }
     }
     
-    // Channel restriction
-    if (!enableChannelRouting) {
-      if (!myChannel || message.channelId !== myChannel.id) return;
-    } else {
-      if (!channelContext && (!myChannel || message.channelId !== myChannel.id)) {
-        return;
-      }
-    }
-
     // Check for active agent session
     const activeSession = getActiveSession(message.author.id, message.channelId);
     const isMention = message.mentions.has(client.user!.id);
+
+    // Channel restriction
+    if (!enableChannelRouting) {
+      // Allow if it's the bot's channel OR there's an active session OR it's a mention
+      if (!activeSession && !isMention && (!myChannel || message.channelId !== myChannel.id)) return;
+    } else {
+      // If routing enabled, allow if we have channel context OR it's the bot's channel OR active session/mention
+      if (!channelContext && !activeSession && !isMention && (!myChannel || message.channelId !== myChannel.id)) {
+        return;
+      }
+    }
 
     if (!activeSession && !isMention) return;
 

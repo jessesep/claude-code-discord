@@ -21,6 +21,7 @@ export interface AntigravityOptions {
   force?: boolean;
   sandbox?: "enabled" | "disabled";
   authorized?: boolean;
+  memorySessionId?: string;
 }
 
 // Environment variable for API Key
@@ -171,7 +172,7 @@ export async function sendToAntigravityCLI(
   onChunk?: (text: string) => void
 ): Promise<AntigravityResponse> {
   const startTime = Date.now();
-  const modelName = options.model || "gemini-3-flash"; // Default to latest and fastest model
+  const modelName = options.model || "gemini-3-flash-preview"; // Default to latest and fastest model
 
   // SECURITY: Prefer gcloud OAuth over API keys for better security and auditability
   // 1. Try gcloud OAuth Strategy (REST) - PREFERRED METHOD
@@ -207,11 +208,13 @@ export async function sendToAntigravityCLI(
           let fullText = "";
 
           if (options.streamJson && onChunk) {
-            // Parse SSE stream
+            // Robust SSE parsing
             const reader = response.body?.getReader();
             if (!reader) throw new Error("No response body");
 
             const decoder = new TextDecoder();
+            let buffer = "";
+
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
@@ -219,30 +222,65 @@ export async function sendToAntigravityCLI(
                 reader.releaseLock();
                 break;
               }
-              const chunk = decoder.decode(value, { stream: true });
+              
+              // Append new chunk to buffer
+              buffer += decoder.decode(value, { stream: true });
 
-              // SSE parsing is complex (data: {...}), simplified here assuming standard Gemini SSE format
-              // Usually: 'data: ' + JSON
-              const lines = chunk.split("\n");
-              for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                  try {
-                    const json = JSON.parse(line.substring(6));
-                    // Extract text from candidates
-                    const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (part) {
-                      fullText += part;
-                      onChunk(part);
+              // SSE messages are separated by double newlines
+              const messages = buffer.split("\n\n");
+              // Keep the last partial message in the buffer
+              buffer = messages.pop() || "";
+
+              for (const message of messages) {
+                // A message can have multiple lines (data:, event:, id:, etc.)
+                const lines = message.split("\n");
+                for (const line of lines) {
+                  if (line.startsWith("data: ")) {
+                    const data = line.substring(6).trim();
+                    if (data === "[DONE]") continue;
+                    
+                    try {
+                      const json = JSON.parse(data);
+                      // Extract text from candidates (Gemini format)
+                      const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                      if (part) {
+                        fullText += part;
+                        onChunk(part);
+                      }
+                    } catch (e) {
+                      // Silently ignore invalid JSON within a data field
+                      // or handle multi-line data if necessary
                     }
-                  } catch (e) {
-                    // ignore incomplete json
                   }
                 }
               }
             }
+            
+            // Handle any remaining data in buffer
+            if (buffer.startsWith("data: ")) {
+              try {
+                const data = buffer.substring(6).trim();
+                const json = JSON.parse(data);
+                const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (part) {
+                  fullText += part;
+                  onChunk(part);
+                }
+              } catch {}
+            }
           } else {
             const json = await response.json();
             fullText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          }
+
+          // Save observation if memory session is active
+          if (options.memorySessionId) {
+            try {
+              const { claudeMemService } = await import("../util/claude-mem-service.ts");
+              await claudeMemService.savePromptResponse(options.memorySessionId, prompt, fullText);
+            } catch (err) {
+              console.warn("[Antigravity] Failed to save memory observation:", err);
+            }
           }
 
           return {
@@ -298,6 +336,17 @@ export async function sendToAntigravityCLI(
       }
 
       console.warn("[Antigravity] Using API key fallback (OAuth preferred for security)");
+      
+      // Save observation if memory session is active
+      if (options.memorySessionId) {
+        try {
+          const { claudeMemService } = await import("../util/claude-mem-service.ts");
+          await claudeMemService.savePromptResponse(options.memorySessionId, prompt, fullText);
+        } catch (err) {
+          console.warn("[Antigravity] Failed to save memory observation:", err);
+        }
+      }
+
       return {
         response: fullText,
         duration: Date.now() - startTime,
