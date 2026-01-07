@@ -213,3 +213,35 @@ Message: Timed out after 120s
     at [0m[1m[3mgetBudgetPrompt[0m ([0m[2m[38;5;245mfile:///Users/jessesep/repos/claude-code-discord/[0m[0m[36mtests/e2e-utils.ts[0m:[0m[33m137[0m:[0m[33m15[0m)
     at [0m[1m[3mrunE2ETest[0m ([0m[2m[38;5;245mfile:///Users/jessesep/repos/claude-code-discord/[0m[0m[36mtests/e2e-tester-bot.ts[0m:[0m[33m29[0m:[0m[33m22[0m)
     at async [0m[2m[38;5;245mfile:///Users/jessesep/repos/claude-code-discord/[0m[0m[36mtests/e2e-tester-bot.ts[0m:[0m[33m90[0m:[0m[33m18[0m
+[0m[33mWarning[0m "exports" field should be specified when specifying a "name".
+    at file:///Users/jessesep/repos/claude-code-discord/deno.json
+🧪 Starting E2E Tester Bot Suite...
+   Using dedicated testing channel (not main)
+
+✅ Test context created for #e2e-basic (e2e-basic)
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #e2e-basic (e2e-basic)
+📤 Spawning cursor-coder: "Create a file named "e2e_test_1767807745416.txt" w..."
+📩 Message from Master-Remote#8819: (embed)
+   Embed Title: 🤖 Processing..., Desc: Starting agent conversation......
+🔄 Update from Master-Remote#8819: (embed)
+   Embed Title: 🤖 one coder (autonomous) Processing..., Desc: undefined...
+📩 Message from Master-Remote#8819: (embed)
+   Embed Title: 🤖 Processing..., Desc: Starting agent conversation......
+🔄 Update from Master-Remote#8819: (embed)
+   Embed Title: 🤖 one coder (autonomous) Processing..., Desc: undefined...
+📩 Message from Master-Remote#8819: (embed)
+📩 Message from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+   Embed Title: ✅ one coder (autonomous) - Completed, Desc: I have completed the task. I read the mandatory co...
+✅ Agent finished in 20152ms. Verifying file: e2e_test_1767807745416.txt
+✅ File verification passed.
+🧹 Cleaned up test file: e2e_test_1767807745416.txt
+🧹 Cleaning up test context (ran for 20692ms)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ✅ PASSED
+Message: Basic file creation test passed
+Duration: 20152ms
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

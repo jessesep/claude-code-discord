@@ -20,7 +20,7 @@ export interface OSCConfig {
  */
 export interface OSCDependencies {
   gitHandlers?: any;
-  primaryHandlers?: any; // Formerly claudeHandlers
+  primaryHandlers?: any;
   agentHandlers?: any;
   shellHandlers?: any;
   utilsHandlers?: any;
@@ -28,14 +28,18 @@ export interface OSCDependencies {
 
 /**
  * OSC Manager Class
- * Acts as a bridge between TouchOSC control surfaces and one agent discord.
+ * Acts as a bridge between TouchOSC control surfaces and the One Agent bot system.
+ * Uses Deno's native UDP (listenDatagram) for reliable binding.
  */
 export class OSCManager {
-  private osc: any;
+  private listener: any;
   private port: number;
   private remoteHosts: string[];
   private remotePort: number;
   private deps: OSCDependencies;
+  private handlers: Map<string, (message: any) => void> = new Map();
+  private wildcardHandlers: ((message: any) => void)[] = [];
+  private isRunning: boolean = false;
 
   constructor(config: OSCConfig, deps: OSCDependencies = {}) {
     this.port = config.port;
@@ -43,104 +47,69 @@ export class OSCManager {
     this.remotePort = config.remotePort || 9001;
     this.deps = deps;
     
-    this.osc = new OSC({
-      plugin: new OSC.DatagramPlugin({
-        port: this.port,
-        host: '0.0.0.0'
-      })
-    });
-
     this.setupListeners();
   }
 
   /**
-   * Initialize OSC message listeners
+   * Register internal handlers
    */
   private setupListeners() {
-    this.osc.on('*', (message: any) => {
+    this.on('*', (message: any) => {
       console.log(`[OSC] Received: ${message.address}`, message.args);
       
-      // Handle wildcard agent selection: /agent/select/<key>
       if (message.address.startsWith('/agent/select/')) {
         const agentKey = message.address.split('/').pop();
         this.handleAgentSelect(agentKey);
       }
     });
 
-    /**
-     * Heartbeat / Connection Test
-     */
-    this.osc.on('/ping', () => {
-      this.sendFeedback('/pong', ['One Agent is Active']);
+    this.on('/ping', () => {
+      this.sendFeedback('/pong', ['one agent discord is active']);
       this.sendFeedback('/label/console', ['Connection Verified']);
     });
 
-    /**
-     * Git Status Command
-     */
-    this.osc.on('/git/status', async (message: any) => {
-      // Debounce: Buttons send 1 on press, 0 on release. We only care about 1.
+    this.on('/git/status', async (message: any) => {
       if (message.args[0] === 0) return;
-
       if (this.deps.gitHandlers) {
         try {
-          console.log('[OSC] Requesting Git Status...');
           this.sendFeedback('/label/console', ['Fetching Git Status...']);
           const status = await this.deps.gitHandlers.getStatus();
-          
           this.sendFeedback('/label/git_branch', [status.branch]);
           const cleanStatus = status.status.replace(/\n/g, ' ').substring(0, 50);
           this.sendFeedback('/label/console', [`Git: ${cleanStatus}...`]);
         } catch (err) {
-          console.error('[OSC] Git status error:', err);
           this.sendFeedback('/label/console', [`Git Error: ${(err as Error).message}`]);
         }
       }
     });
 
-    /**
-     * GitHub Sync Command (Pull -> Push)
-     */
-    this.osc.on('/github/sync', async (message: any) => {
+    this.on('/github/sync', async (message: any) => {
       if (message.args[0] === 0) return;
-
       if (this.deps.gitHandlers) {
         try {
-          console.log('[OSC] GitHub Sync sequence initiated');
           this.sendFeedback('/label/console', ['Syncing: git pull...']);
           await this.deps.gitHandlers.onGit(null, "pull");
-          
           this.sendFeedback('/label/console', ['Syncing: git push...']);
           await this.deps.gitHandlers.onGit(null, "push");
-          
           this.sendFeedback('/label/console', ['GitHub Sync Complete!']);
-          
-          // Refresh metadata
           const status = await this.deps.gitHandlers.getStatus();
           this.sendFeedback('/label/git_branch', [status.branch]);
         } catch (err) {
-          console.error('[OSC] Sync error:', err);
           this.sendFeedback('/label/console', [`Sync Failed: ${(err as Error).message}`]);
         }
       }
     });
 
-    /**
-     * GitHub Issue Creation
-     */
-    this.osc.on('/github/issue/new', async (message: any) => {
+    this.on('/github/issue/new', async (message: any) => {
       if (message.args[0] === 0) return;
-
       try {
         const title = (message.args && typeof message.args[1] === 'string') 
           ? message.args[1] 
           : "Bug Report: Mobile Dashboard";
         
-        console.log(`[OSC] Creating GitHub issue: ${title}`);
         this.sendFeedback('/label/console', [`Creating Issue...`]);
-
         const cmd = new Deno.Command("gh", {
-          args: ["issue", "create", "--title", title, "--body", "Created via One Agent Mobile Dashboard."],
+          args: ["issue", "create", "--title", title, "--body", "Created via one agent discord mobile dashboard."],
           stdout: "piped",
           stderr: "piped"
         });
@@ -155,20 +124,28 @@ export class OSCManager {
           this.sendFeedback('/label/console', ['GH CLI Issue Failed']);
         }
       } catch (err) {
-        console.error('[OSC] Issue creation error:', err);
         this.sendFeedback('/label/console', [`Error: ${(err as Error).message}`]);
       }
     });
   }
 
   /**
+   * Helper to register message handlers
+   */
+  public on(address: string, handler: (message: any) => void) {
+    if (address === '*') {
+      this.wildcardHandlers.push(handler);
+    } else {
+      this.handlers.set(address, handler);
+    }
+  }
+
+  /**
    * Handle Agent Selection
-   * Maps UI keys to the new One Agent Registry keys.
    */
   private async handleAgentSelect(agentKey: string | undefined) {
     if (!agentKey) return;
     
-    // Mapping table for TouchOSC keys to Registry IDs
     const registryMapping: Record<string, string> = {
       'manager': 'ag-manager',
       'coder': 'ag-coder',
@@ -183,11 +160,8 @@ export class OSCManager {
     const targetAgentId = registryMapping[agentKey] || agentKey;
     const displayName = agentKey.charAt(0).toUpperCase() + agentKey.slice(1).replace('-', ' ');
     
-    console.log(`[OSC] Deploying Agent: ${targetAgentId}`);
-    
     if (this.deps.agentHandlers) {
       try {
-        // Create a compliant InteractionContext for the agent handler
         const mockCtx = {
           user: { id: "osc-remote", username: "Dashboard" },
           channelId: "osc-control-surface",
@@ -210,11 +184,9 @@ export class OSCManager {
         };
 
         await this.deps.agentHandlers.onAgent(mockCtx, 'select', targetAgentId);
-        
         this.sendFeedback('/label/agent_name', [displayName]);
         this.sendFeedback('/label/console', [`Deployed: ${displayName}`]);
       } catch (err) {
-        console.error('[OSC] Deployment error:', err);
         this.sendFeedback('/label/console', [`Deploy Error: ${(err as Error).message}`]);
       }
     } else {
@@ -224,29 +196,88 @@ export class OSCManager {
   }
 
   /**
-   * Open the OSC Server
+   * Open the native UDP socket and start the receive loop
    */
   public async start() {
+    if (this.isRunning) return;
+    
     try {
-      await this.osc.open();
-      console.log(`[OSC] Mobile Bridge started on port ${this.port}`);
-      console.log(`[OSC] Feedback Targets: ${this.remoteHosts.join(', ')}:${this.remotePort}`);
+      // Use Deno's native UDP listener
+      // Requires --unstable-net flag
+      this.listener = (Deno as any).listenDatagram({
+        port: this.port,
+        transport: "udp",
+        hostname: "0.0.0.0"
+      });
+      
+      this.isRunning = true;
+      console.log(`[OSC] Native bridge active on port ${this.port}`);
+      console.log(`[OSC] Feedback targets: ${this.remoteHosts.join(', ')}:${this.remotePort}`);
+
+      // Start receive loop
+      this.receiveLoop();
     } catch (error) {
-      console.error('[OSC] Startup Error:', error);
+      console.error('[OSC] Native binding failed. Ensure --unstable-net flag is used:', error);
     }
   }
 
   /**
-   * Send Feedback to Remote Control Surfaces
+   * The infinite receive loop
    */
-  public sendFeedback(address: string, args: any[] = []) {
-    for (const host of this.remoteHosts) {
+  private async receiveLoop() {
+    for await (const [data, _remoteAddr] of this.listener) {
       try {
-        const message = new OSC.Message(address, ...args);
-        this.osc.send(message, { host, port: this.remotePort });
-      } catch (error) {
-        // Host unreachable
+        const message = new OSC.Message();
+        message.unpack(new DataView(data.buffer), 0);
+        
+        // Trigger specific handlers
+        const handler = this.handlers.get(message.address);
+        if (handler) handler(message);
+        
+        // Trigger wildcard handlers
+        for (const wh of this.wildcardHandlers) {
+          wh(message);
+        }
+      } catch (err) {
+        console.error('[OSC] Failed to decode packet:', err);
       }
+    }
+  }
+
+  /**
+   * Send Feedback to Remote Control Surfaces using native Deno UDP
+   */
+  public async sendFeedback(address: string, args: any[] = []) {
+    if (!this.isRunning || !this.listener) return;
+
+    try {
+      const message = new OSC.Message(address, ...args);
+      const binary = message.pack();
+
+      for (const host of this.remoteHosts) {
+        try {
+          await this.listener.send(binary, {
+            transport: "udp",
+            port: this.remotePort,
+            hostname: host
+          });
+        } catch (error) {
+          // Host unreachable or other send error
+        }
+      }
+    } catch (err) {
+      console.error('[OSC] Failed to pack or send feedback:', err);
+    }
+  }
+
+  /**
+   * Stop the bridge
+   */
+  public stop() {
+    this.isRunning = false;
+    if (this.listener) {
+      this.listener.close();
+      this.listener = null;
     }
   }
 }
