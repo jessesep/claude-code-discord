@@ -3,7 +3,7 @@ import {
   UNIFIED_DEFAULT_SETTINGS, 
   THINKING_MODES, 
   OPERATION_MODES, 
-  ANTHROPIC_RATE_LIMITS 
+  PROVIDER_RATE_LIMITS 
 } from "./unified-settings.ts";
 import { CLAUDE_MODELS } from "../provider-clients/enhanced-client.ts";
 
@@ -690,7 +690,7 @@ async function completeTodo(ctx: any, todoId: string) {
 
 async function showRateStatus(ctx: any, rateTier?: string) {
   const tier = rateTier || 'basic';
-  const limits = ANTHROPIC_RATE_LIMITS[tier];
+  const limits = PROVIDER_RATE_LIMITS[tier];
   
   if (!limits) {
     await ctx.editReply({

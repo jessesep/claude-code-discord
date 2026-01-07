@@ -9,7 +9,7 @@ import {
   UNIFIED_DEFAULT_SETTINGS,
   THINKING_MODES,
   OPERATION_MODES,
-  ANTHROPIC_RATE_LIMITS,
+  PROVIDER_RATE_LIMITS,
   unifiedSettingsCommands
 } from "./settings/unified-settings.ts";
 
@@ -87,7 +87,7 @@ function testOperationModes() {
 function testRateLimitTiers() {
   console.log("\n🧪 Testing rate limit tiers...");
   
-  const tiers = Object.keys(ANTHROPIC_RATE_LIMITS);
+  const tiers = Object.keys(PROVIDER_RATE_LIMITS);
   const expectedTiers = ['free', 'basic', 'pro', 'enterprise', 'exceeds_200k_tokens'];
   
   for (const tier of expectedTiers) {
@@ -95,7 +95,7 @@ function testRateLimitTiers() {
       throw new Error(`Missing rate limit tier: ${tier}`);
     }
     
-    const tierConfig = ANTHROPIC_RATE_LIMITS[tier];
+    const tierConfig = PROVIDER_RATE_LIMITS[tier];
     if (!tierConfig.name || !tierConfig.tokensPerMinute) {
       throw new Error(`Invalid configuration for rate limit tier: ${tier}`);
     }

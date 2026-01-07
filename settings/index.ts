@@ -19,7 +19,7 @@ export {
   UNIFIED_DEFAULT_SETTINGS,
   THINKING_MODES,
   OPERATION_MODES,
-  ANTHROPIC_RATE_LIMITS
+  PROVIDER_RATE_LIMITS
 } from "./unified-settings.ts";
 export { createUnifiedSettingsHandlers } from "./unified-handlers.ts";
 export type {
