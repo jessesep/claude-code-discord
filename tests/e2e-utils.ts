@@ -34,7 +34,7 @@
  * // For future utilities that need to spawn agents programmatically
  * const prompt = buildAgentPrompt({
  *   agent: 'cursor-coder',
- *   model: 'gemini-3-flash',
+ *   model: 'gemini-3-flash-preview',
  *   task: 'Your task here'
  * });
  * // The bot will create an Agent Instance ID on receipt
@@ -91,7 +91,7 @@ export const AGENT_CONFIGS = {
     displayName: 'one coder (autonomous)',
     description: 'Autonomous coding agent with file editing capabilities',
     recommendedModel: 'sonnet-4.5',
-    budgetModel: 'gemini-3-flash',
+    budgetModel: 'gemini-3-flash-preview',
     capabilities: ['file-editing', 'code-generation', 'shell-commands'],
     defaultTimeout: 180000, // 3 minutes
   },
@@ -100,7 +100,7 @@ export const AGENT_CONFIGS = {
     displayName: 'one architect',
     description: 'System design and architecture planning',
     recommendedModel: 'gemini-2.5-pro',
-    budgetModel: 'gemini-3-flash',
+    budgetModel: 'gemini-3-flash-preview',
     capabilities: ['planning', 'architecture', 'documentation'],
     defaultTimeout: 120000,
   },
@@ -109,7 +109,7 @@ export const AGENT_CONFIGS = {
     displayName: 'one tester',
     description: 'Test writing and validation',
     recommendedModel: 'gemini-2.0-flash',
-    budgetModel: 'gemini-3-flash',
+    budgetModel: 'gemini-3-flash-preview',
     capabilities: ['testing', 'validation', 'qa'],
     defaultTimeout: 120000,
   },
@@ -118,7 +118,7 @@ export const AGENT_CONFIGS = {
     displayName: 'one reviewer',
     description: 'Code review and feedback',
     recommendedModel: 'gemini-2.0-flash',
-    budgetModel: 'gemini-3-flash',
+    budgetModel: 'gemini-3-flash-preview',
     capabilities: ['review', 'feedback', 'best-practices'],
     defaultTimeout: 90000,
   },
@@ -130,7 +130,7 @@ export type AgentType = keyof typeof AGENT_CONFIGS;
  * Model tiers for cost management
  */
 export const MODEL_TIERS = {
-  budget: 'gemini-3-flash',
+  budget: 'gemini-3-flash-preview',
   standard: 'gemini-2.0-flash',
   premium: 'gemini-2.5-pro',
   autonomous: 'sonnet-4.5',
@@ -253,7 +253,7 @@ export interface AgentPromptOptions {
  *   task: 'Create a hello.txt file',
  *   useBudget: true
  * });
- * // Returns: "<@BOT_ID> using cursor-coder, with model="gemini-3-flash", Create a hello.txt file"
+ * // Returns: "<@BOT_ID> using cursor-coder, with model="gemini-3-flash-preview", Create a hello.txt file"
  */
 export function buildAgentPrompt(options: AgentPromptOptions): string {
   const { agent, task, model, useBudget = true, flags = [] } = options;
