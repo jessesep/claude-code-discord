@@ -41,11 +41,17 @@ export async function sendToCursorCLI(
   try {
     // Apply testing mode overrides
     const { getEffectiveSandbox, getEffectiveForce, isTestingMode } = await import("../util/testing-mode.ts");
+    const { resolveModelForClient } = await import("../util/list-models.ts");
     const effectiveOptions = { ...options };
     
     if (isTestingMode()) {
       effectiveOptions.sandbox = getEffectiveSandbox(options.sandbox);
       effectiveOptions.force = getEffectiveForce(options.force);
+    }
+    
+    // Resolve model name for Cursor CLI (uses different naming than Gemini API)
+    if (effectiveOptions.model) {
+      effectiveOptions.model = resolveModelForClient(effectiveOptions.model, 'cursor');
     }
     
     // Build Cursor CLI command arguments

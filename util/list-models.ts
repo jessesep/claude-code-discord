@@ -244,6 +244,74 @@ export async function resolveModelName(requestedModel: string): Promise<string> 
   return requestedModel;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Client-Specific Model Mapping
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Model name mappings for different clients
+ * Key: universal model name -> Value: client-specific model name
+ */
+export const CLIENT_MODEL_MAPPINGS: Record<string, Record<string, string>> = {
+  cursor: {
+    // Gemini models - Cursor uses different naming
+    'gemini-3-flash-preview': 'gemini-3-flash',
+    'gemini-3-pro-preview': 'gemini-3-pro',
+    'gemini-2.5-pro': 'gemini-2.5-pro',
+    'gemini-2.0-flash': 'gemini-2.0-flash',
+    // Anthropic models
+    'claude-sonnet-4': 'sonnet-4.5',
+    'claude-opus-4': 'opus-4.5',
+    'sonnet-4.5': 'sonnet-4.5',
+    'opus-4.5': 'opus-4.5',
+    // OpenAI models
+    'gpt-4o': 'gpt-5.1',
+    'gpt-5': 'gpt-5.1',
+  },
+  antigravity: {
+    // Antigravity uses the Gemini API model names directly
+    // No mapping needed - use original names
+  },
+  claude: {
+    // Claude Code CLI uses Anthropic model names
+    'sonnet-4.5': 'claude-sonnet-4-20250514',
+    'opus-4.5': 'claude-opus-4-20250514',
+  },
+};
+
+/**
+ * Resolve a model name for a specific client
+ * Returns the client-specific model name or the original if no mapping exists
+ */
+export function resolveModelForClient(modelName: string, client: string): string {
+  const clientMappings = CLIENT_MODEL_MAPPINGS[client.toLowerCase()];
+  
+  if (clientMappings && clientMappings[modelName]) {
+    const resolved = clientMappings[modelName];
+    console.log(`[ModelMapper] Mapped ${modelName} -> ${resolved} for ${client}`);
+    return resolved;
+  }
+  
+  // No mapping found - return original
+  return modelName;
+}
+
+/**
+ * Get recommended model for a client
+ */
+export function getRecommendedModel(client: string): string {
+  switch (client.toLowerCase()) {
+    case 'cursor':
+      return 'gemini-3-flash'; // Fast and capable
+    case 'antigravity':
+      return 'gemini-3-flash-preview'; // Gemini API naming
+    case 'claude':
+      return 'claude-sonnet-4-20250514';
+    default:
+      return 'gemini-3-flash-preview';
+  }
+}
+
 /**
  * Check if model is available and log a warning if not
  */

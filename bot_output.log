@@ -1953,3 +1953,225 @@ Bot has started. Press Ctrl+C to stop.
 [Startup] ✅ Startup complete in 1.8s
 [MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): 
 [MessageHandler] Received message from jessesep (367705631014256641): touch
+Received SIGTERM, initiating graceful shutdown...
+
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[0m[33mWarning[0m "exports" field should be specified when specifying a "name".
+    at file:///Users/jessesep/repos/claude-code-discord/deno.json
+[Providers] Initializing agent provider registry...
+[Registry] Registered provider: primary-cli (Primary CLI)
+[Registry] Registered provider: cursor (Cursor Agent)
+[Registry] Registered provider: antigravity (Google Antigravity (Gemini))
+[Registry] Registered provider: anthropic-api (Anthropic Messages API)
+[Registry] Registered provider: ollama (Ollama)
+[Registry] Registered provider: openai (OpenAI API)
+[Registry] Registered provider: groq (Groq)
+[Registry] Registered provider: vscode-continue-continue (VS Code: Continue.dev)
+[Registry] Registered provider: vscode-codeium-codeium (VS Code: Codeium)
+[Registry] Registered provider: vscode-aider-aider (VS Code: Aider)
+[Providers] Registered 10 providers
+[Providers] 4 providers are available:
+  ✓ Primary CLI (primary-cli) - 2.0.76 (Claude Code)
+  ✓ Cursor Agent (cursor) - 2.3.23
+655ee705c6c7b6da1da481d0fdf13191d5e3e980
+arm64
+  ✓ Google Antigravity (Gemini) (antigravity)
+  ✓ Ollama (ollama)
+[Providers] 6 providers are unavailable:
+  ✗ Anthropic Messages API - ANTHROPIC_API_KEY not set
+  ✗ OpenAI API - OpenAI API key not found. Set OPENAI_API_KEY environment variable.
+  ✗ Groq - Groq API key not found. Set GROQ_API_KEY environment variable.
+  ✗ VS Code: Continue.dev - Continue.dev not found or not configured
+  ✗ VS Code: Codeium - Codeium not found or not configured
+  ✗ VS Code: Aider - Aider not found or not configured
+[Providers] Initialization complete
+[ConversationSync] Initializing...
+[ConversationSync] Initialized. 1 valid, 0 invalid conversations.
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
+[OSC] Native binding failed. Ensure --unstable-net flag is used: TypeError: Deno.listenDatagram is not a function
+    at OSCManager.start (file:///Users/jessesep/repos/claude-code-discord/osc/index.ts:207:37)
+    at createOneAgentBot (file:///Users/jessesep/repos/claude-code-discord/index.ts:401:16)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async file:///Users/jessesep/repos/claude-code-discord/index.ts:2128:5
+Bot has started. Press Ctrl+C to stop.
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458093359162986620)
+[Startup] Sending initial status message...
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[ModelCache] Initializing model cache...
+[ModelCache] Refreshing available models from API...
+[ModelCache] Found 33 available models
+[ModelCache] Latest Flash models: gemini-2.0-flash, gemini-2.0-flash-001, gemini-2.0-flash-exp, gemini-2.0-flash-lite, gemini-2.0-flash-lite-001
+[Startup] Latest Flash model: gemini-3-flash-preview
+⚠️  [TESTING MODE] ENABLED - All restrictions bypassed!
+⚠️  [TESTING MODE] Do NOT use in production!
+[Startup] ⚠️ TESTING MODE ENABLED
+[Startup] Config: autoApprove=true, sandbox=false, force=true
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[Commands] Skipping command registration (SKIP_COMMAND_REGISTRATION=true)
+[Startup] ✅ Startup complete in 1.2s
+[MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): <@1457705423137275914> using ag-manager, with mode
+🧪 [TESTING] Channel restrictions bypassed for message in #e2e-orchestration
+[MessageHandler] Detected model override in prompt: gemini-3-flash-preview
+[MessageHandler] Processing prompt: "using ag-manager, with , I have a task for you: Cr..."
+[MessageHandler] Detected agent mention: ag-manager
+[MessageHandler] Detected provider mention: gemini (client: antigravity)
+[MessageHandler] Final target agent: ag-manager
+[MessageHandler] Deferring reply...
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[ModelTester] No test results available, using preferred model
+[MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): 
+[MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): <@1457705423137275914> using cursor-coder, with mo
+🧪 [TESTING] Channel restrictions bypassed for message in #e2e-basic
+[MessageHandler] Detected model override in prompt: gemini-3-flash-preview
+[MessageHandler] Processing prompt: "using cursor-coder, with , Create a file named "e2..."
+[MessageHandler] Detected agent mention: cursor-coder
+[MessageHandler] Detected provider mention: cursor (client: cursor)
+[MessageHandler] Final target agent: cursor-coder
+[MessageHandler] Deferring reply...
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+🧪 [TESTING] Sandbox disabled (testing mode override)
+🧪 [TESTING] Force mode enabled (testing mode override)
+[Cursor CLI] Executing command: cursor agent --print --output-format stream-json --stream-partial-output --model gemini-3-flash-preview --workspace /Users/jessesep/repos/claude-code-discord --force --sandbox disabled You are an autonomous coding agent.
+- Read, write, and modify code files
+- Write clean, maintainable code
+- Follow best practices
+- Test your changes
+
+
+
+> **Mandatory Context Read**: Every repository contains a root `.agent-context.md` defining "Golden Standards" and improvement tasks. Your VERY FIRST action MUST be to use the `view_file` tool to read this file. This ensures you are aligned with the project mission and standards. Additionally, all repos include a `CLAUDE.md` with `agent-mem` memory shortcuts—use them for historical context.
+
+Task: using cursor-coder, with , Create a file named "e2e_test_1767808922384.txt" with the text "E2E TEST PASSED" and then show me the contents of that file.
+[Cursor CLI] Prompt: You are an autonomous coding agent.
+- Read, write, and modify code files
+- Write clean, maintainable code
+- Follow best practices
+- Test your changes
+
+
+
+> **Mandatory Context Read**: Every repository ...
+[Cursor CLI] Spawning process...
+[MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): <@1457705423137275914> using cursor-coder, with mo
+🧪 [TESTING] Channel restrictions bypassed for message in #e2e-basic
+[MessageHandler] Detected model override in prompt: gemini-3-flash-preview
+[MessageHandler] Processing prompt: "using cursor-coder, with , Run a shell command to ..."
+[MessageHandler] Detected agent mention: cursor-coder
+[MessageHandler] Detected provider mention: cursor (client: cursor)
+[MessageHandler] Final target agent: cursor-coder
+[MessageHandler] Deferring reply...
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+🧪 [TESTING] Sandbox disabled (testing mode override)
+🧪 [TESTING] Force mode enabled (testing mode override)
+[Cursor CLI] Executing command: cursor agent --print --output-format stream-json --stream-partial-output --model gemini-3-flash-preview --workspace /Users/jessesep/repos/claude-code-discord --force --sandbox disabled You are an autonomous coding agent.
+- Read, write, and modify code files
+- Write clean, maintainable code
+- Follow best practices
+- Test your changes
+
+
+
+> **Mandatory Context Read**: Every repository contains a root `.agent-context.md` defining "Golden Standards" and improvement tasks. Your VERY FIRST action MUST be to use the `view_file` tool to read this file. This ensures you are aligned with the project mission and standards. Additionally, all repos include a `CLAUDE.md` with `agent-mem` memory shortcuts—use them for historical context.
+
+Task: using cursor-coder, with , Run a shell command to echo "hello_shell_1767808925531" and tell me what the output was. Be brief.
+[Cursor CLI] Prompt: You are an autonomous coding agent.
+- Read, write, and modify code files
+- Write clean, maintainable code
+- Follow best practices
+- Test your changes
+
+
+
+> **Mandatory Context Read**: Every repository ...
+[Cursor CLI] Spawning process...
+[Cursor CLI] stderr chunk: Cannot use this model: gemini-3-flash-preview. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+
+[Cursor CLI] stdout stream ended. Total chunks: [33m0[39m
+[Cursor CLI] Process completed. Exit code: [33m1[39m Duration: [33m3994[39m ms
+[Cursor CLI] Full response length: [33m0[39m
+[Cursor CLI] Full response: 
+[Cursor CLI] Error output: Cannot use this model: gemini-3-flash-preview. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+
+[Agent] Error: Error: Cursor CLI exited with code 1
+stderr: Cannot use this model: gemini-3-flash-preview. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+
+stdout: 
+    at sendToCursorCLI (file:///Users/jessesep/repos/claude-code-discord/provider-clients/cursor-client.ts:294:13)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async chatWithAgent (file:///Users/jessesep/repos/claude-code-discord/agent/handlers.ts:717:16)
+    at async Object.onAgent (file:///Users/jessesep/repos/claude-code-discord/agent/handlers.ts:248:13)
+    at async Object.execute (file:///Users/jessesep/repos/claude-code-discord/index.ts:1578:9)
+    at async Client.<anonymous> (file:///Users/jessesep/repos/claude-code-discord/discord/message-handler.ts:234:7)
+[Cursor CLI] stderr chunk: Cannot use this model: gemini-3-flash-preview. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+
+[Cursor CLI] stdout stream ended. Total chunks: [33m0[39m
+[Cursor CLI] Process completed. Exit code: [33m1[39m Duration: [33m3334[39m ms
+[Cursor CLI] Full response length: [33m0[39m
+[Cursor CLI] Full response: 
+[Cursor CLI] Error output: Cannot use this model: gemini-3-flash-preview. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+
+[Agent] Error: Error: Cursor CLI exited with code 1
+stderr: Cannot use this model: gemini-3-flash-preview. Available models: composer-1, auto, sonnet-4.5, sonnet-4.5-thinking, opus-4.5, opus-4.5-thinking, gemini-3-pro, gemini-3-flash, gpt-5.2, gpt-5.1, gpt-5.2-high, gpt-5.1-high, gpt-5.1-codex, gpt-5.1-codex-high, gpt-5.1-codex-max, gpt-5.1-codex-max-high, opus-4.1, grok
+
+stdout: 
+    at sendToCursorCLI (file:///Users/jessesep/repos/claude-code-discord/provider-clients/cursor-client.ts:294:13)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async chatWithAgent (file:///Users/jessesep/repos/claude-code-discord/agent/handlers.ts:717:16)
+    at async Object.onAgent (file:///Users/jessesep/repos/claude-code-discord/agent/handlers.ts:248:13)
+    at async Object.execute (file:///Users/jessesep/repos/claude-code-discord/index.ts:1578:9)
+    at async Client.<anonymous> (file:///Users/jessesep/repos/claude-code-discord/discord/message-handler.ts:234:7)
+[Antigravity] OAuth API error (403), trying API key fallback: {
+  "error": {
+    "code": 403,
+    "message": "Request had insufficient authentication scopes.",
+    "status": "PERMISSION_DENIED",
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+        "domain": "googleapis.com",
+        "metadata": {
+          "service": "generativelanguage.googleapis.com",
+          "method": "google.ai.generativelanguage.v1beta.GenerativeService.GenerateContent"
+        }
+      }
+    ]
+  }
+}
+
+[Antigravity] Using API key fallback (OAuth preferred for security)
+🧪 [TESTING] Auto-approving (all approvals bypassed)
+🧪 [TESTING] Auto-spawning high-risk agent: ag-coder
+[ModelTester] No test results available, using preferred model
+[Antigravity] OAuth API error (403), trying API key fallback: {
+  "error": {
+    "code": 403,
+    "message": "Request had insufficient authentication scopes.",
+    "status": "PERMISSION_DENIED",
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+        "domain": "googleapis.com",
+        "metadata": {
+          "method": "google.ai.generativelanguage.v1beta.GenerativeService.StreamGenerateContent",
+          "service": "generativelanguage.googleapis.com"
+        }
+      }
+    ]
+  }
+}
+
+[Antigravity] Using API key fallback (OAuth preferred for security)
+[MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): 
+[MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): 
