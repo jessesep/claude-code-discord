@@ -40,8 +40,8 @@
   "apiKey": null,
   "providerConfig": {
     "providers": {
-      "claude-cli": {
-        "id": "claude-cli",
+      "primary-cli": {
+        "id": "primary-cli",
         "enabled": true
       },
       "anthropic-api": {

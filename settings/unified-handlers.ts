@@ -5,7 +5,7 @@ import {
   OPERATION_MODES, 
   ANTHROPIC_RATE_LIMITS 
 } from "./unified-settings.ts";
-import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
+import { CLAUDE_MODELS } from "../provider-clients/enhanced-client.ts";
 
 export interface UnifiedSettingsHandlerDeps {
   settings: UnifiedBotSettings;

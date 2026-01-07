@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
+import { CLAUDE_MODELS } from "../provider-clients/enhanced-client.ts";
 
 // Unified settings interface combining all bot settings
 export interface UnifiedBotSettings {

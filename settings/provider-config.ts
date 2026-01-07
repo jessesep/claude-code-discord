@@ -12,7 +12,7 @@ import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 // ============================================================================
 
 export type ProviderId = 
-  | 'claude-cli'    // Anthropic Claude via CLI
+  | 'primary-cli'   // Primary CLI client
   | 'anthropic-api' // Anthropic direct API
   | 'cursor'        // Cursor IDE CLI
   | 'gemini-api'    // Google Gemini via API key
@@ -54,10 +54,10 @@ export interface ProviderMetadata {
 // ============================================================================
 
 export const PROVIDER_METADATA: Record<ProviderId, ProviderMetadata> = {
-  'claude-cli': {
-    id: 'claude-cli',
-    name: 'Claude CLI',
-    description: 'Anthropic Claude via official CLI tool',
+  'primary-cli': {
+    id: 'primary-cli',
+    name: 'Primary CLI',
+    description: 'Primary CLI client powered by Anthropic',
     website: 'https://docs.anthropic.com/en/docs/claude-cli',
     authType: 'cli-auth',
     defaultModels: ['sonnet', 'opus', 'haiku', 'claude-sonnet-4-5-20250929'],
@@ -223,7 +223,7 @@ export interface ProviderConfigStore {
 
 export const DEFAULT_PROVIDER_CONFIG: ProviderConfigStore = {
   providers: {
-    'claude-cli': { id: 'claude-cli', enabled: true },
+    'primary-cli': { id: 'primary-cli', enabled: true },
     'anthropic-api': { id: 'anthropic-api', enabled: false, apiKeyEnvVar: 'ANTHROPIC_API_KEY' },
     'cursor': { id: 'cursor', enabled: true },
     'gemini-api': { id: 'gemini-api', enabled: true, apiKeyEnvVar: 'GEMINI_API_KEY' },

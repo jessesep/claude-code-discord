@@ -1,5 +1,5 @@
 import { OllamaProvider } from "./agent/providers/ollama-provider.ts";
-import { sendToAntigravityCLI } from "./claude/antigravity-client.ts";
+import { sendToAntigravityCLI } from "./provider-clients/antigravity-client.ts";
 
 async function runComparison() {
   const prompt = "System: You are a helpful assistant.\n\nTask: Explain the difference between a class and an interface in TypeScript in 3 short bullet points.";

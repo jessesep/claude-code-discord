@@ -7,7 +7,7 @@
 import { AgentProviderRegistry } from '../provider-interface.ts';
 
 // Import all provider implementations
-import { ClaudeCliProvider } from './claude-cli-provider.ts';
+import { PrimaryCliProvider } from './primary-cli-provider.ts';
 import { CursorProvider } from './cursor-provider.ts';
 import { AntigravityProvider } from './antigravity-provider.ts';
 import { AnthropicApiProvider } from './anthropic-api-provider.ts';
@@ -28,7 +28,7 @@ export async function initializeProviders(): Promise<void> {
   console.log('[Providers] Initializing agent provider registry...');
 
   // Core providers
-  AgentProviderRegistry.register(new ClaudeCliProvider());
+  AgentProviderRegistry.register(new PrimaryCliProvider());
   AgentProviderRegistry.register(new CursorProvider());
   AgentProviderRegistry.register(new AntigravityProvider());
   AgentProviderRegistry.register(new AnthropicApiProvider());
@@ -103,7 +103,7 @@ export async function getProviderStatusReport(): Promise<string> {
 
 // Export all providers for direct use
 export {
-  ClaudeCliProvider,
+  PrimaryCliProvider,
   CursorProvider,
   AntigravityProvider,
   AnthropicApiProvider,

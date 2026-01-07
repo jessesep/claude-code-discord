@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenerativeAI } from "npm:@google/generative-ai@^0.21.0";
-import { sendToAntigravityCLI } from "../claude/antigravity-client.ts";
+import { sendToAntigravityCLI } from "../provider-clients/antigravity-client.ts";
 
 export interface ModelTestResult {
   model: string;

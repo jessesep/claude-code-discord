@@ -6,9 +6,9 @@
  */
 
 // Test for duplicate commands
-import { claudeCommands } from "../claude/command.ts";
-import { enhancedClaudeCommands } from "../claude/enhanced-commands.ts";
-import { additionalClaudeCommands } from "../claude/additional-commands.ts";
+import { claudeCommands } from "../provider-clients/command.ts";
+import { enhancedClaudeCommands } from "../provider-clients/enhanced-commands.ts";
+import { additionalClaudeCommands } from "../provider-clients/additional-commands.ts";
 import { advancedSettingsCommands } from "../settings/advanced-settings.ts";
 import { unifiedSettingsCommands } from "../settings/unified-settings.ts";
 import { agentCommand } from "../agent/index.ts";

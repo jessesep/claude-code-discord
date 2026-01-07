@@ -46,13 +46,13 @@ Available Subagents:
   },
 
   // ========================================================================
-  // Claude-based Agents (via CLI)
+  // Primary CLI Agents (One Agents)
   // ========================================================================
   'code-reviewer': {
     id: 'code-reviewer',
     name: 'Code Reviewer',
     description: 'Specialized in code review and quality analysis',
-    providerId: 'claude-cli',
+    providerId: 'primary-cli',
     model: 'sonnet',
     systemPrompt: `You are an expert code reviewer. Focus on:
 - Code quality and maintainability
@@ -76,7 +76,7 @@ Provide detailed, actionable feedback with specific suggestions.
     id: 'architect',
     name: 'Software Architect',
     description: 'Focused on system design and architecture decisions',
-    providerId: 'claude-cli',
+    providerId: 'primary-cli',
     model: 'sonnet',
     systemPrompt: `You are a senior software architect. Help with:
 - System design and architecture patterns

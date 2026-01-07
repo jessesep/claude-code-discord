@@ -1,4 +1,4 @@
-import { setupTester, waitForResult, isFinalResponse, CLAUDE_BOT_ID, getBudgetPrompt } from './e2e-utils.ts';
+import { setupTester, waitForResult, isFinalResponse, ONE_BOT_ID, getBudgetPrompt } from './e2e-utils.ts';
 
 async function runE2ETest() {
   console.log('🧪 Starting E2E Tester Bot Suite (Refactored)...');

@@ -253,7 +253,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
             subAgentOutput = await runAgentTask(subAgentName, pending.task, undefined, true, pending.workDir);
 
             const summaryPrompt = `You are the Manager. You spawned '${subAgentName}' to do this task: "${pending.task}".\n\nOutput:\n${subAgentOutput.substring(0, 40000)}\n\nProvide CONCISE summary.`;
-            const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+            const { sendToAntigravityCLI } = await import("../provider-clients/antigravity-client.ts");
             const summaryResponse = await sendToAntigravityCLI(
               summaryPrompt,
               new AbortController(),
@@ -579,7 +579,7 @@ export async function chatWithAgent(
     // Primary Client Logic
     if (clientType === 'claude') {
       try {
-        const { sendToPrimaryCLI } = await import("../claude/cli-client.ts");
+        const { sendToPrimaryCLI } = await import("../provider-clients/cli-client.ts");
         const cliModel = agent.model.includes("sonnet") ? "sonnet" : agent.model.includes("opus") ? "opus" : "sonnet";
         result = await sendToPrimaryCLI(agent.systemPrompt, message, controller, cliModel, 8000, async (chunk) => {
           currentChunk += chunk;
@@ -593,7 +593,7 @@ export async function chatWithAgent(
         if (isRateLimitError(error)) {
           fallbackUsed = true;
           await ctx.editReply({ embeds: [{ color: 0xffaa00, title: `⚠️ one agent: Provider Limit Reached`, description: 'Switching to fallback agent...', timestamp: new Date().toISOString() }] }).catch(() => {});
-          const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
+          const { sendToCursorCLI } = await import("../provider-clients/cursor-client.ts");
           result = await sendToCursorCLI(`${agent.systemPrompt}\n\nTask: ${message}`, controller, { model: agent.model, workspace: workDir, force: true, streamJson: true }, async (chunk) => {
             currentChunk += chunk;
             if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
@@ -606,7 +606,7 @@ export async function chatWithAgent(
         } else throw error;
       }
     } else if (clientType === 'cursor') {
-      const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
+      const { sendToCursorCLI } = await import("../provider-clients/cursor-client.ts");
       const resumeId = sessionData?.session.cursorSessionId;
       const prompt = resumeId ? message : `${agent.systemPrompt}\n\nTask: ${message}`;
       result = await sendToCursorCLI(prompt, controller, { model: agent.model, workspace: workDir, force: agent.force, sandbox: agent.sandbox, streamJson: true, resume: resumeId }, async (chunk) => {
@@ -619,7 +619,7 @@ export async function chatWithAgent(
       });
       if (result.chatId && sessionData?.session) sessionData.session.cursorSessionId = result.chatId;
     } else if (clientType === 'antigravity') {
-      const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+      const { sendToAntigravityCLI } = await import("../provider-clients/antigravity-client.ts");
       result = await sendToAntigravityCLI(enhancedPrompt, controller, { model: agent.model, workspace: workDir, force: agent.force, sandbox: agent.sandbox, streamJson: true, authorized: true }, async (chunk) => {
         currentChunk += chunk;
         if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
@@ -759,7 +759,7 @@ export async function handleManagerInteraction(
   agentConfig: AgentConfig,
   deps?: AgentHandlerDeps
 ) {
-  const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+  const { sendToAntigravityCLI } = await import("../provider-clients/antigravity-client.ts");
   const sessionData = getActiveSession(ctx.user.id, ctx.channelId!);
   if (sessionData?.session) sessionData.session.history.push({ role: 'user', content: userMessage });
 
@@ -905,7 +905,7 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
       { label: '🚀 Antigravity', value: 'antigravity', description: 'Google Gemini via gcloud OAuth' },
       { label: '🖥️ Cursor', value: 'cursor', description: 'Cursor AI agent' },
       { label: '🦙 Ollama', value: 'ollama', description: 'Local Ollama models' },
-      { label: '💻 Primary CLI', value: 'claude-cli', description: 'Primary CLI Client' },
+      { label: '💻 Primary CLI', value: 'primary-cli', description: 'Primary CLI Client' },
       { label: '⚡ OpenAI', value: 'openai', description: 'GPT-4o, o1, o3 models' },
       { label: '🔥 Groq', value: 'groq', description: 'Ultra-fast inference' },
     ];

@@ -256,10 +256,10 @@ export async function createOneAgentBot(config: BotConfig) {
   // Create handlers with dependencies (sendAgentMessages will be updated after bot creation)
   const primaryHandlers = createPrimaryHandlers({
     workDir,
-    claudeController: agentController,
-    setClaudeController: (controller) => { agentController = controller; },
-    setClaudeSessionId: (sessionId) => { agentSessionId = sessionId; },
-    sendClaudeMessages: async (messages) => {
+    agentController: agentController,
+    setAgentController: (controller) => { agentController = controller; },
+    setAgentSessionId: (sessionId) => { agentSessionId = sessionId; },
+    sendAgentMessages: async (messages) => {
       if (agentSender) {
         await agentSender(messages);
       }
@@ -392,7 +392,7 @@ export async function createOneAgentBot(config: BotConfig) {
       },
       { 
         gitHandlers, 
-        claudeHandlers: primaryHandlers, 
+        primaryHandlers, 
         agentHandlers, 
         shellHandlers, 
         utilsHandlers 
@@ -466,7 +466,7 @@ export async function createOneAgentBot(config: BotConfig) {
         const prompt = ctx.getString('prompt', true)!;
         const sessionId = ctx.getString('session_id');
         addToHistory(prompt); // Add to message history
-        await primaryHandlers.onClaude(ctx, prompt, sessionId || undefined);
+        await primaryHandlers.onOneAgent(ctx, prompt, sessionId || undefined);
       },
       handleButton: async (ctx: InteractionContext, customId: string) => {
         if (customId.startsWith('expand:')) {
@@ -537,17 +537,17 @@ export async function createOneAgentBot(config: BotConfig) {
         }
       }
     }],
-    ['agent-continue', {
+    ['one-agent-continue', {
       execute: async (ctx: InteractionContext) => {
         const prompt = ctx.getString('prompt');
         if (prompt) addToHistory(prompt); // Add to message history if prompt provided
-        await primaryHandlers.onContinue(ctx, prompt || undefined);
+        await primaryHandlers.onOneAgentContinue(ctx, prompt || undefined);
       }
     }],
-    ['agent-cancel', {
+    ['one-agent-cancel', {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
-        const cancelled = primaryHandlers.onClaudeCancel(ctx);
+        const cancelled = primaryHandlers.onOneAgentCancel(ctx);
         await ctx.editReply({
           embeds: [{
             color: cancelled ? 0xff0000 : 0x808080,
@@ -1478,7 +1478,7 @@ export async function createOneAgentBot(config: BotConfig) {
         const content = ctx.getString('content', true)!;
         const detailLevel = ctx.getString('detail_level');
         const includeExamples = ctx.getBoolean('include_examples');
-        await additionalAgentHandlers.onClaudeExplain(ctx, content, detailLevel || undefined, includeExamples || undefined);
+        await additionalAgentHandlers.onOneAgentExplain(ctx, content, detailLevel || undefined, includeExamples || undefined);
       }
     }],
     ['agent-debug', {
@@ -1486,7 +1486,7 @@ export async function createOneAgentBot(config: BotConfig) {
         const errorOrCode = ctx.getString('error_or_code', true)!;
         const language = ctx.getString('language');
         const contextFiles = ctx.getString('context_files');
-        await additionalAgentHandlers.onClaudeDebug(ctx, errorOrCode, language || undefined, contextFiles || undefined);
+        await additionalAgentHandlers.onOneAgentDebug(ctx, errorOrCode, language || undefined, contextFiles || undefined);
       }
     }],
     ['agent-optimize', {
@@ -1494,7 +1494,7 @@ export async function createOneAgentBot(config: BotConfig) {
         const code = ctx.getString('code', true)!;
         const focus = ctx.getString('focus');
         const preserveFunctionality = ctx.getBoolean('preserve_functionality');
-        await additionalAgentHandlers.onClaudeOptimize(ctx, code, focus || undefined, preserveFunctionality || undefined);
+        await additionalAgentHandlers.onOneAgentOptimize(ctx, code, focus || undefined, preserveFunctionality || undefined);
       }
     }],
     ['agent-review', {
@@ -1503,7 +1503,7 @@ export async function createOneAgentBot(config: BotConfig) {
         const reviewType = ctx.getString('review_type');
         const includeSecurity = ctx.getBoolean('include_security');
         const includePerformance = ctx.getBoolean('include_performance');
-        await additionalAgentHandlers.onClaudeReview(ctx, codeOrFile, reviewType || undefined, includeSecurity || undefined, includePerformance || undefined);
+        await additionalAgentHandlers.onOneAgentReview(ctx, codeOrFile, reviewType || undefined, includeSecurity || undefined, includePerformance || undefined);
       }
     }],
     ['agent-generate', {
@@ -1511,7 +1511,7 @@ export async function createOneAgentBot(config: BotConfig) {
         const request = ctx.getString('request', true)!;
         const type = ctx.getString('type');
         const style = ctx.getString('style');
-        await additionalAgentHandlers.onClaudeGenerate(ctx, request, type || undefined, style || undefined);
+        await additionalAgentHandlers.onOneAgentGenerate(ctx, request, type || undefined, style || undefined);
       }
     }],
     ['agent-refactor', {
@@ -1520,7 +1520,7 @@ export async function createOneAgentBot(config: BotConfig) {
         const goal = ctx.getString('goal');
         const preserveBehavior = ctx.getBoolean('preserve_behavior');
         const addTests = ctx.getBoolean('add_tests');
-        await additionalAgentHandlers.onClaudeRefactor(ctx, code, goal || undefined, preserveBehavior || undefined, addTests || undefined);
+        await additionalAgentHandlers.onOneAgentRefactor(ctx, code, goal || undefined, preserveBehavior || undefined, addTests || undefined);
       }
     }],
     ['agent-learn', {
@@ -1529,7 +1529,7 @@ export async function createOneAgentBot(config: BotConfig) {
         const level = ctx.getString('level');
         const includeExercises = ctx.getBoolean('include_exercises');
         const stepByStep = ctx.getBoolean('step_by_step');
-        await additionalAgentHandlers.onClaudeLearn(ctx, topic, level || undefined, includeExercises || undefined, stepByStep || undefined);
+        await additionalAgentHandlers.onOneAgentLearn(ctx, topic, level || undefined, includeExercises || undefined, stepByStep || undefined);
       }
     }],
     // Advanced Settings Commands

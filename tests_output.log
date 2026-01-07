@@ -198,3 +198,18 @@ Message: Timed out after 120s
 📂 Testing in channel: #main
 📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
 ⏳ Waiting for agent to complete task...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: Timed out after 120s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+[0m[1m[31merror[0m: Uncaught (in promise) ReferenceError: CLAUDE_BOT_ID is not defined
+  return `<@${CLAUDE_BOT_ID}> using ${agent}, with model="${BUDGET_MODEL}", ${task}`;
+[0m[31m              ^[0m
+    at [0m[1m[3mgetBudgetPrompt[0m ([0m[2m[38;5;245mfile:///Users/jessesep/repos/claude-code-discord/[0m[0m[36mtests/e2e-utils.ts[0m:[0m[33m137[0m:[0m[33m15[0m)
+    at [0m[1m[3mrunE2ETest[0m ([0m[2m[38;5;245mfile:///Users/jessesep/repos/claude-code-discord/[0m[0m[36mtests/e2e-tester-bot.ts[0m:[0m[33m29[0m:[0m[33m22[0m)
+    at async [0m[2m[38;5;245mfile:///Users/jessesep/repos/claude-code-discord/[0m[0m[36mtests/e2e-tester-bot.ts[0m:[0m[33m90[0m:[0m[33m18[0m

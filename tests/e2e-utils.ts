@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, TextChannel, Message } from 'npm:discord.js@14';
 
-export const CLAUDE_BOT_ID = Deno.env.get('CLAUDE_BOT_ID') || '1457705423137275914';
+export const ONE_BOT_ID = Deno.env.get('ONE_BOT_ID') || Deno.env.get('CLAUDE_BOT_ID') || '1457705423137275914';
 export const CHANNEL_ID = Deno.env.get('TEST_CHANNEL_ID') || '1458093359162986620';
 export const TEST_BOT_TOKEN = Deno.env.get('TEST_BOT_TOKEN') || '';
 
@@ -107,7 +107,7 @@ export async function waitForResult(
 
 export const isFinalResponse = (messages: Message[]) => {
   return messages.some(r => 
-    r.author.id === CLAUDE_BOT_ID && 
+    r.author.id === ONE_BOT_ID && 
     (r.content?.toLowerCase().includes('task completed') || 
      r.content?.toLowerCase().includes('done.') ||
      r.embeds?.some((e: any) => 
@@ -134,12 +134,12 @@ export const isFinalResponse = (messages: Message[]) => {
 export const BUDGET_MODEL = "gemini-3-flash";
 
 export function getBudgetPrompt(agent: string, task: string): string {
-  return `<@${CLAUDE_BOT_ID}> using ${agent}, with model="${BUDGET_MODEL}", ${task}`;
+  return `<@${ONE_BOT_ID}> using ${agent}, with model="${BUDGET_MODEL}", ${task}`;
 }
 
 export const hasError = (messages: Message[]) => {
   return messages.some(r => 
-    r.author.id === CLAUDE_BOT_ID && 
+    r.author.id === ONE_BOT_ID && 
     (r.content?.toLowerCase().includes('error') || 
      r.content?.toLowerCase().includes('not found') ||
      r.content?.toLowerCase().includes('does not exist') ||

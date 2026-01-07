@@ -22,7 +22,7 @@ interface TestResponse {
 async function runAutomatedTest() {
   console.log('🤖 Automated Two-Way Bot Test\n');
   console.log('━'.repeat(70));
-  console.log('Tester Bot -> @Claude Bot -> Agent Response\n');
+  console.log('Tester Bot -> @one bot -> Agent Response\n');
 
   const testBot = new Client({
     intents: [
@@ -108,9 +108,9 @@ async function runAutomatedTest() {
       console.log('\nPossible issues:');
       console.log('  - Bot not monitoring #main channel');
       console.log('  - Message handling not working');
-      console.log('  - Claude CLI not authenticated');
+      console.log('  - Provider CLI not authenticated');
       console.log('\nCheck bot logs:');
-      console.log('  /tmp/claude/-Users-jessesep/tasks/b408e18.output\n');
+      console.log('  /tmp/one-agent/-Users-jessesep/tasks/b408e18.output\n');
       Deno.exit(1);
     }
 

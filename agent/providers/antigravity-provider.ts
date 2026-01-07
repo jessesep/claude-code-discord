@@ -11,7 +11,7 @@ import {
   UniversalAgentResponse,
   ProviderStatus,
 } from '../provider-interface.ts';
-import { sendToAntigravityCLI } from '../../claude/antigravity-client.ts';
+import { sendToAntigravityCLI } from '../../provider-clients/antigravity-client.ts';
 
 export class AntigravityProvider implements AgentProvider {
   readonly providerId = 'antigravity';

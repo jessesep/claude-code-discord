@@ -6,7 +6,7 @@
  * - Run with: deno run --allow-run tests/cursor-client-manual-test.ts
  */
 
-import { sendToCursorCLI } from "../claude/cursor-client.ts";
+import { sendToCursorCLI } from "../provider-clients/cursor-client.ts";
 
 console.log("🧪 Testing Cursor CLI Integration\n");
 console.log("=".repeat(50));

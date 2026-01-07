@@ -11,7 +11,7 @@ import {
   UniversalAgentResponse,
   ProviderStatus,
 } from '../provider-interface.ts';
-import { sendToCursorCLI } from '../../claude/cursor-client.ts';
+import { sendToCursorCLI } from '../../provider-clients/cursor-client.ts';
 
 export class CursorProvider implements AgentProvider {
   readonly providerId = 'cursor';

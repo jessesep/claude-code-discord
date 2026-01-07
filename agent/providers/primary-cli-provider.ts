@@ -1,7 +1,7 @@
 /**
- * Claude CLI Provider Adapter
+ * Primary CLI Provider Adapter
  *
- * Wraps the existing Claude CLI client into the universal provider interface
+ * Wraps the existing Primary CLI client into the universal provider interface
  */
 
 import {
@@ -11,11 +11,11 @@ import {
   UniversalAgentResponse,
   ProviderStatus,
 } from '../provider-interface.ts';
-import { sendToPrimaryCLI } from '../../claude/cli-client.ts';
+import { sendToPrimaryCLI } from '../../provider-clients/cli-client.ts';
 
-export class ClaudeCliProvider implements AgentProvider {
-  readonly providerId = 'claude-cli';
-  readonly providerName = 'Claude CLI';
+export class PrimaryCliProvider implements AgentProvider {
+  readonly providerId = 'primary-cli';
+  readonly providerName = 'Primary CLI';
   readonly providerType = ProviderType.CLI;
   supportedModels = [
     'sonnet',
@@ -80,7 +80,7 @@ export class ClaudeCliProvider implements AgentProvider {
       modelUsed: result.modelUsed,
       cost: result.cost,
       metadata: {
-        provider: 'claude-cli',
+        provider: 'primary-cli',
       },
     };
   }
@@ -107,7 +107,7 @@ export class ClaudeCliProvider implements AgentProvider {
       available,
       version,
       lastChecked: new Date(),
-      message: available ? 'Claude CLI is ready' : 'Claude CLI not installed or not in PATH',
+      message: available ? 'Primary CLI is ready' : 'Primary CLI not installed or not in PATH',
     };
   }
 
@@ -119,9 +119,9 @@ export class ClaudeCliProvider implements AgentProvider {
       errors.push(`Unsupported model: ${options.model}. Supported: ${this.supportedModels.join(', ')}`);
     }
 
-    // Claude CLI doesn't support workspace/force/sandbox
+    // Primary CLI doesn't support workspace/force/sandbox
     if (options.workspace) {
-      errors.push('Claude CLI does not support workspace option');
+      errors.push('Primary CLI does not support workspace option');
     }
 
     return {

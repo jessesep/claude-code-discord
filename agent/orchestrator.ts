@@ -43,7 +43,7 @@ export async function runAgentTask(
   const effectiveWorkDir = workDir || agent.workspace;
 
   if (clientType === 'cursor') {
-    const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
+    const { sendToCursorCLI } = await import("../provider-clients/cursor-client.ts");
     const safeTask = task.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const prompt = `${agent.systemPrompt}\n\n<task>${safeTask}</task>`;
     const result = await sendToCursorCLI(
@@ -59,7 +59,7 @@ export async function runAgentTask(
     );
     resultText = result.response;
   } else if (clientType === 'antigravity') {
-    const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+    const { sendToAntigravityCLI } = await import("../provider-clients/antigravity-client.ts");
     const safeSystemPrompt = agent.systemPrompt.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeTask = task.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const prompt = `${safeSystemPrompt}\n\n<task>${safeTask}</task>`;
@@ -79,7 +79,7 @@ export async function runAgentTask(
     );
     resultText = result.response;
   } else {
-    throw new Error("Claude client headless not yet supported");
+    throw new Error("Primary CLI client headless not yet supported");
   }
 
   return resultText;

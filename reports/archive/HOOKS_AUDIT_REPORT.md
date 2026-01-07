@@ -192,7 +192,7 @@ hook.unref();
 
 ## 2. Antigravity Client Implementation Analysis
 
-### File: `../claude/antigravity-client.ts`
+### File: `../provider-clients/antigravity-client.ts`
 
 #### 🔴 CRITICAL: Credential Exposure Risk
 

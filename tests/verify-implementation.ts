@@ -17,9 +17,9 @@ import { agentCommand, PREDEFINED_AGENTS } from "./agent/index.ts";
 import { getProxyStatus } from "./util/proxy.ts";
 
 // Import existing systems to check for conflicts
-import { claudeCommands } from "./claude/command.ts";
-import { enhancedClaudeCommands } from "./claude/enhanced-commands.ts";
-import { additionalClaudeCommands } from "./claude/additional-commands.ts";
+import { claudeCommands } from "./provider-clients/command.ts";
+import { enhancedClaudeCommands } from "./provider-clients/enhanced-commands.ts";
+import { additionalClaudeCommands } from "./provider-clients/additional-commands.ts";
 import { advancedSettingsCommands } from "./settings/advanced-settings.ts";
 import { helpCommand } from "./help/commands.ts";
 

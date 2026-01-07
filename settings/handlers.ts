@@ -1,4 +1,4 @@
-import { CLAUDE_MODELS } from "../claude/enhanced-client.ts";
+import { AGENT_MODELS } from "../provider-clients/enhanced-client.ts";
 import type { AdvancedBotSettings } from "./advanced-settings.ts";
 
 export interface SettingsHandlerDeps {
@@ -11,17 +11,17 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
   const { settings, updateSettings, crashHandler } = deps;
 
   return {
-    // Claude Settings
-    async onClaudeSettings(ctx: any, action: string, value?: string) {
+    // One Agent Settings
+    async onOneAgentSettings(ctx: any, action: string, value?: string) {
       try {
         switch (action) {
           case 'show':
             await ctx.reply({
               embeds: [{
                 color: 0x0099ff,
-                title: '🤖 Claude Code Settings',
+                title: '🤖 One Agent Settings',
                 fields: [
-                  { name: 'Default Model', value: `\`${settings.defaultModel}\`\n${CLAUDE_MODELS[settings.defaultModel as keyof typeof CLAUDE_MODELS]?.name || 'Unknown'}`, inline: true },
+                  { name: 'Default Model', value: `\`${settings.defaultModel}\`\n${AGENT_MODELS[settings.defaultModel as keyof typeof AGENT_MODELS]?.name || 'Unknown'}`, inline: true },
                   { name: 'Temperature', value: settings.defaultTemperature.toString(), inline: true },
                   { name: 'Max Tokens', value: settings.defaultMaxTokens.toString(), inline: true },
                   { name: 'Auto System Info', value: settings.autoIncludeSystemInfo ? 'Enabled' : 'Disabled', inline: true },
@@ -35,8 +35,8 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
             break;
 
           case 'set-model':
-            if (!value || !CLAUDE_MODELS[value as keyof typeof CLAUDE_MODELS]) {
-              const modelList = Object.entries(CLAUDE_MODELS).map(([key, model]) => 
+            if (!value || !AGENT_MODELS[value as keyof typeof AGENT_MODELS]) {
+              const modelList = Object.entries(AGENT_MODELS).map(([key, model]) => 
                 `• \`${key}\` - ${model.name}`
               ).join('\n');
               
@@ -44,7 +44,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
                 embeds: [{
                   color: 0xff6600,
                   title: '❌ Invalid Model',
-                  description: 'Please specify a valid Claude model.',
+                  description: 'Please specify a valid agent model.',
                   fields: [{ name: 'Available Models', value: modelList, inline: false }],
                   timestamp: true
                 }],
@@ -54,13 +54,13 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
             }
             
             updateSettings({ defaultModel: value });
-            const selectedModel = CLAUDE_MODELS[value as keyof typeof CLAUDE_MODELS];
+            const selectedModel = AGENT_MODELS[value as keyof typeof AGENT_MODELS];
             
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
                 title: '✅ Model Updated',
-                description: `Default Claude model set to **${selectedModel.name}**`,
+                description: `Default model set to **${selectedModel.name}**`,
                 fields: [
                   { name: 'Description', value: selectedModel.description, inline: false },
                   { name: 'Context Window', value: selectedModel.contextWindow.toLocaleString() + ' tokens', inline: true },
@@ -170,7 +170,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               embeds: [{
                 color: 0x00ff00,
                 title: `✅ Auto System Info ${newSystemInfo ? 'Enabled' : 'Disabled'}`,
-                description: `System information will ${newSystemInfo ? '' : 'not '}be automatically included in Claude requests`,
+                description: `System information will ${newSystemInfo ? '' : 'not '}be automatically included in One Agent requests`,
                 timestamp: true
               }],
               ephemeral: true
@@ -184,7 +184,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               embeds: [{
                 color: 0x00ff00,
                 title: `✅ Auto Git Context ${newGitContext ? 'Enabled' : 'Disabled'}`,
-                description: `Git context will ${newGitContext ? '' : 'not '}be automatically included in Claude requests`,
+                description: `Git context will ${newGitContext ? '' : 'not '}be automatically included in One Agent requests`,
                 timestamp: true
               }],
               ephemeral: true
@@ -205,7 +205,7 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
               embeds: [{
                 color: 0x00ff00,
                 title: '✅ Settings Reset',
-                description: 'Claude Code settings have been reset to defaults',
+                description: 'One Agent settings have been reset to defaults',
                 timestamp: true
               }],
               ephemeral: true
@@ -214,12 +214,12 @@ export function createAdvancedSettingsHandlers(deps: SettingsHandlerDeps) {
 
           default:
             await ctx.reply({
-              content: 'Unknown action. Use `/claude-settings action: show` to see current settings.',
+              content: 'Unknown action. Use `/agent-settings action: show` to see current settings.',
               ephemeral: true
             });
         }
       } catch (error) {
-        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'claude-settings', `Action: ${action}`);
+        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'agent-settings', `Action: ${action}`);
         throw error;
       }
     },
