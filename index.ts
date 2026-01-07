@@ -38,6 +38,7 @@ import { OSCManager } from "./osc/index.ts";
 import { repoCommands, createRepoHandlers } from "./repo/index.ts";
 import { githubCommands, createGitHubHandlers } from "./git/index.ts";
 import { simpleCommands } from "./agent/index.ts";
+import { configCommand, handleConfigCommand } from "./settings/index.ts";
 
 
 
@@ -1278,6 +1279,11 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await helpHandlers.onHelp(ctx, commandName || undefined);
       }
     }],
+    ['config', {
+      execute: async (ctx: InteractionContext) => {
+        await handleConfigCommand(ctx);
+      }
+    }],
     ['claude-enhanced', {
       execute: async (ctx: InteractionContext) => {
         const prompt = ctx.getString('prompt', true)!;
@@ -1605,6 +1611,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
       ...simpleCommands, // /run and /kill
       helpCommand, // /help
       agentCommand, // /agent
+      configCommand, // /config - provider management
       ...githubCommands, // /github
       ...adminCommands.map(c => c.data), // /restart
       // Old commands commented out to simplify Discord interface

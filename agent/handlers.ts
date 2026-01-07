@@ -571,12 +571,13 @@ export async function chatWithAgent(
           currentChunk = "";
         }
       });
-    } else if (clientType === 'ollama') {
+    } else if (clientType === 'ollama' || clientType === 'openai' || clientType === 'groq') {
+      // Use universal provider interface for API-based providers
       const { AgentProviderRegistry } = await import("./provider-interface.ts");
-      const provider = AgentProviderRegistry.getProvider('ollama');
-      if (!provider || !await provider.isAvailable()) throw new Error("Ollama unavailable");
+      const provider = AgentProviderRegistry.getProvider(clientType);
+      if (!provider || !await provider.isAvailable()) throw new Error(`${clientType} unavailable`);
       const fullPrompt = `System: ${safeSystemPrompt}\n\nTask: ${historyPrompt}\n\n<user_query>${safeMessage}</user_query>`;
-      const ollamaResult = await provider.execute(fullPrompt, { model: agent.model, temperature: agent.temperature, maxTokens: agent.maxTokens }, async (chunk) => {
+      const providerResult = await provider.execute(fullPrompt, { model: agent.model, temperature: agent.temperature, maxTokens: agent.maxTokens, streaming: true }, async (chunk) => {
         currentChunk += chunk;
         if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
           lastUpdate = Date.now();
@@ -584,7 +585,7 @@ export async function chatWithAgent(
           currentChunk = "";
         }
       }, controller.signal);
-      result = { response: ollamaResult.response, modelUsed: ollamaResult.modelUsed };
+      result = { response: providerResult.response, modelUsed: providerResult.modelUsed };
     }
 
     if (currentChunk) await sendAgentUpdate(currentChunk, effectiveDeps);
@@ -734,6 +735,8 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
       { label: '🖥️ Cursor', value: 'cursor', description: 'Cursor AI agent' },
       { label: '🦙 Ollama', value: 'ollama', description: 'Local Ollama models' },
       { label: '💻 Claude CLI', value: 'claude-cli', description: 'Anthropic Claude via CLI' },
+      { label: '⚡ OpenAI', value: 'openai', description: 'GPT-4o, o1, o3 models' },
+      { label: '🔥 Groq', value: 'groq', description: 'Ultra-fast inference' },
     ];
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId('run-adv-provider')

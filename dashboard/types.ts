@@ -101,3 +101,27 @@ export interface SystemStat {
   uptime: string;
   activeProcesses: number;
 }
+
+// Provider configuration types
+export type ProviderId = 
+  | 'claude-cli' | 'anthropic-api' | 'cursor' | 'gemini-api' 
+  | 'antigravity' | 'ollama' | 'openai' | 'groq' 
+  | 'together' | 'fireworks' | 'deepseek' | 'aider' | 'openrouter';
+
+export interface ProviderConfig {
+  id: ProviderId;
+  enabled: boolean;
+  apiKey?: string;
+  apiKeyEnvVar?: string;
+  endpoint?: string;
+  defaultModel?: string;
+}
+
+export interface ProviderStatus {
+  id: ProviderId;
+  name: string;
+  enabled: boolean;
+  available: boolean;
+  credentialStatus: string;
+  pricing: 'free' | 'paid' | 'freemium' | 'byok';
+}

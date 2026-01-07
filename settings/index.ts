@@ -31,3 +31,20 @@ export type {
   TodoItem,
   MCPServerConfig
 } from "./unified-handlers.ts";
+
+// Provider configuration exports
+export {
+  configCommand,
+  PROVIDER_METADATA,
+  DEFAULT_PROVIDER_CONFIG,
+  checkProviderCredentials,
+  getEnabledProviders,
+  formatProviderList
+} from "./provider-config.ts";
+export { handleConfigCommand } from "./config-handlers.ts";
+export type {
+  ProviderId,
+  ProviderMetadata,
+  ProviderConfigEntry,
+  ProviderConfigStore
+} from "./provider-config.ts";

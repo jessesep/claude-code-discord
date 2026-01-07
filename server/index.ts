@@ -109,6 +109,106 @@ export class WebServer {
             });
         });
 
+        // GET /api/providers - List all providers with status
+        api.get("/providers", async (c) => {
+            try {
+                const { DEFAULT_PROVIDER_CONFIG, PROVIDER_METADATA, getEnabledProviders } = await import("../settings/provider-config.ts");
+                
+                // Get stored config or use defaults
+                const settings = this.settingsPersistence.getSettings() as any;
+                const providerConfig = settings.providerConfig || DEFAULT_PROVIDER_CONFIG;
+                
+                const providers = await getEnabledProviders(providerConfig);
+                
+                // Add pricing info from metadata
+                const providersWithPricing = providers.map(p => ({
+                    ...p,
+                    pricing: PROVIDER_METADATA[p.id]?.pricing || 'paid'
+                }));
+                
+                return c.json({ 
+                    providers: providersWithPricing,
+                    defaultProvider: providerConfig.defaultProvider,
+                    defaultModelByRole: providerConfig.defaultModelByRole
+                });
+            } catch (error) {
+                return c.json({ error: String(error) }, 500);
+            }
+        });
+
+        // POST /api/providers/:id/enable - Enable a provider
+        api.post("/providers/:id/enable", async (c) => {
+            try {
+                const id = c.req.param("id");
+                const { DEFAULT_PROVIDER_CONFIG } = await import("../settings/provider-config.ts");
+                
+                const settings = this.settingsPersistence.getSettings() as any;
+                const providerConfig = settings.providerConfig || { ...DEFAULT_PROVIDER_CONFIG };
+                
+                if (providerConfig.providers[id]) {
+                    providerConfig.providers[id].enabled = true;
+                }
+                
+                settings.providerConfig = providerConfig;
+                await this.settingsPersistence.save(settings);
+                
+                return c.json({ success: true, provider: id, enabled: true });
+            } catch (error) {
+                return c.json({ error: String(error) }, 500);
+            }
+        });
+
+        // POST /api/providers/:id/disable - Disable a provider
+        api.post("/providers/:id/disable", async (c) => {
+            try {
+                const id = c.req.param("id");
+                const { DEFAULT_PROVIDER_CONFIG } = await import("../settings/provider-config.ts");
+                
+                const settings = this.settingsPersistence.getSettings() as any;
+                const providerConfig = settings.providerConfig || { ...DEFAULT_PROVIDER_CONFIG };
+                
+                // Don't disable if it's the default
+                if (providerConfig.defaultProvider === id) {
+                    return c.json({ error: "Cannot disable default provider" }, 400);
+                }
+                
+                if (providerConfig.providers[id]) {
+                    providerConfig.providers[id].enabled = false;
+                }
+                
+                settings.providerConfig = providerConfig;
+                await this.settingsPersistence.save(settings);
+                
+                return c.json({ success: true, provider: id, enabled: false });
+            } catch (error) {
+                return c.json({ error: String(error) }, 500);
+            }
+        });
+
+        // POST /api/providers/:id/default - Set as default provider
+        api.post("/providers/:id/default", async (c) => {
+            try {
+                const id = c.req.param("id");
+                const { DEFAULT_PROVIDER_CONFIG } = await import("../settings/provider-config.ts");
+                
+                const settings = this.settingsPersistence.getSettings() as any;
+                const providerConfig = settings.providerConfig || { ...DEFAULT_PROVIDER_CONFIG };
+                
+                // Enable it if not already
+                if (providerConfig.providers[id]) {
+                    providerConfig.providers[id].enabled = true;
+                }
+                providerConfig.defaultProvider = id;
+                
+                settings.providerConfig = providerConfig;
+                await this.settingsPersistence.save(settings);
+                
+                return c.json({ success: true, defaultProvider: id });
+            } catch (error) {
+                return c.json({ error: String(error) }, 500);
+            }
+        });
+
         // Webhook Route
         api.post("/webhooks/:id", async (c) => {
             const id = c.req.param("id");

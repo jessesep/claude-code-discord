@@ -12,6 +12,8 @@ import { CursorProvider } from './cursor-provider.ts';
 import { AntigravityProvider } from './antigravity-provider.ts';
 import { AnthropicApiProvider } from './anthropic-api-provider.ts';
 import { OllamaProvider } from './ollama-provider.ts';
+import { OpenAIProvider } from './openai-provider.ts';
+import { GroqProvider } from './groq-provider.ts';
 import {
   createContinueProvider,
   createCodeiumProvider,
@@ -31,6 +33,8 @@ export async function initializeProviders(): Promise<void> {
   AgentProviderRegistry.register(new AntigravityProvider());
   AgentProviderRegistry.register(new AnthropicApiProvider());
   AgentProviderRegistry.register(new OllamaProvider());
+  AgentProviderRegistry.register(new OpenAIProvider());
+  AgentProviderRegistry.register(new GroqProvider());
 
   // VS Code extension providers
   AgentProviderRegistry.register(createContinueProvider());
@@ -104,6 +108,8 @@ export {
   AntigravityProvider,
   AnthropicApiProvider,
   OllamaProvider,
+  OpenAIProvider,
+  GroqProvider,
   createContinueProvider,
   createCodeiumProvider,
   createAiderProvider,

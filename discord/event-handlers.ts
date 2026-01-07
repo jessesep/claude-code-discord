@@ -170,7 +170,15 @@ export async function handleButton(
       const session = setAgentSession(ctx.user.id, channelId, 'general-assistant', role, workspacePath);
       const roleDef = ROLE_DEFINITIONS[role];
       // Store customizations in session, not in global PREDEFINED_AGENTS
-      const providerToClient: any = { 'cursor': 'cursor', 'claude-cli': 'claude', 'gemini-api': 'antigravity', 'antigravity': 'antigravity', 'ollama': 'ollama' };
+      const providerToClient: any = { 
+        'cursor': 'cursor', 
+        'claude-cli': 'claude', 
+        'gemini-api': 'antigravity', 
+        'antigravity': 'antigravity', 
+        'ollama': 'ollama',
+        'openai': 'openai',
+        'groq': 'groq'
+      };
       session.modelOverride = selectedModel;
       // Store client override in session metadata (extend session type if needed)
       (session as any).clientOverride = providerToClient[provider];
@@ -452,6 +460,20 @@ export async function handleSelectMenu(
       const { listAvailableModels } = await import("../util/list-models.ts");
       const models = await listAvailableModels();
       modelOptions = models.slice(0, 24).map(m => ({ label: m.displayName, value: m.name }));
+    } else if (provider === 'openai') {
+      const { AgentProviderRegistry } = await import("../agent/provider-interface.ts");
+      const openaiProvider = AgentProviderRegistry.getProvider('openai');
+      const openaiModels = openaiProvider?.supportedModels || [
+        'gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini', 'o3-mini', 'gpt-4-turbo'
+      ];
+      modelOptions = openaiModels.slice(0, 24).map(m => ({ label: m, value: m }));
+    } else if (provider === 'groq') {
+      const { AgentProviderRegistry } = await import("../agent/provider-interface.ts");
+      const groqProvider = AgentProviderRegistry.getProvider('groq');
+      const groqModels = groqProvider?.supportedModels || [
+        'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'
+      ];
+      modelOptions = groqModels.slice(0, 24).map(m => ({ label: m, value: m }));
     } else {
       // Fallback to Gemini models
       const { listAvailableModels } = await import("../util/list-models.ts");
@@ -483,7 +505,15 @@ export async function handleSelectMenu(
     if (ctx.channelId) {
       // Store customizations in session, not in global PREDEFINED_AGENTS
       const session = setAgentSession(ctx.user.id, ctx.channelId, 'general-assistant', role, workspacePath);
-      const providerToClient: any = { 'cursor': 'cursor', 'claude-cli': 'claude', 'gemini-api': 'antigravity', 'antigravity': 'antigravity', 'ollama': 'ollama' };
+      const providerToClient: any = { 
+        'cursor': 'cursor', 
+        'claude-cli': 'claude', 
+        'gemini-api': 'antigravity', 
+        'antigravity': 'antigravity', 
+        'ollama': 'ollama',
+        'openai': 'openai',
+        'groq': 'groq'
+      };
       session.modelOverride = model;
       (session as any).clientOverride = providerToClient[provider];
       await ctx.editReply({ embeds: [{ color: 0x00ff00, title: '✅ Session Started', description: `**Role:** ${role}\n**Model:** ${model}\n**Provider:** ${provider}\n**Workspace:** \`${workspacePath}\`` }], components: [] });
