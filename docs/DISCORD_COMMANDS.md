@@ -40,6 +40,15 @@ List all available AI agents and their capabilities.
 
 ---
 
+### `/agent action:aliases`
+
+List all available agent mention aliases.
+
+- **Parameters**: None
+- **Output**: Shows a list of short aliases (e.g., `@coder`, `@arch`) and which agents they target.
+
+---
+
 ### `/agent action:start`
 
 Start a persistent session with a specific agent role.
@@ -67,6 +76,27 @@ Check your currently active agent session.
 End the current agent session and clear history.
 
 - **Parameters**: None
+
+---
+
+## 🎯 Direct Agent Mentions (@agent-name)
+
+You can invoke specific agents directly in any message by using the `@alias` syntax. This bypasses the Manager agent's decision-making process and sends your request directly to the named agent.
+
+- **Syntax**: `@alias [your message]`
+- **Benefits**: Reduced latency, direct control, and specialized responses.
+- **Example**: `@coder add a new login route to the auth controller`
+
+### Popular Aliases:
+- `@coder` or `@code` → Implementation specialist
+- `@builder` or `@build` → Autonomous coding specialist
+- `@architect` or `@arch` → System design expert
+- `@test` or `@tester` → QA and testing specialist
+- `@review` or `@reviewer` → Code review specialist
+- `@security` or `@sec` → Security analyst
+- `@manager` → Direct call to the Manager orchestrator
+
+Use `/agent action:aliases` to see the full list of available shortcuts.
 
 ---
 

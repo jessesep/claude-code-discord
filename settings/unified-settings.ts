@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
 import { AGENT_MODELS } from "../provider-clients/enhanced-client.ts";
+import { RemoteAgentEndpoint } from "../agent/types.ts";
 
 // Unified settings interface combining all bot settings
 export interface UnifiedBotSettings {
@@ -50,6 +51,9 @@ export interface UnifiedBotSettings {
   // Webhook settings (new)
   webhooks: WebhookConfig[];
   apiKey: string | null; // For API access
+
+  // Remote Agent endpoints (new)
+  remoteEndpoints: RemoteAgentEndpoint[];
 }
 
 export interface WebhookConfig {
@@ -105,7 +109,10 @@ export const UNIFIED_DEFAULT_SETTINGS: UnifiedBotSettings = {
 
   // Webhooks
   webhooks: [],
-  apiKey: null
+  apiKey: null,
+
+  // Remote Agent endpoints
+  remoteEndpoints: []
 };
 
 // Thinking mode options

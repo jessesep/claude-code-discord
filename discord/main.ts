@@ -3,8 +3,9 @@ import { createDiscordBot } from "./bot.ts";
 import { PREDEFINED_AGENTS, createAgentHandlers } from "../agent/index.ts";
 import { Collection } from "npm:discord.js@14.14.1";
 import type { CommandHandlers, ButtonHandlers, BotDependencies } from "./types.ts";
-import { getAgentCommand, setAgentHandlers } from "./commands.ts";
+import { getAgentCommand, getAgentsCommand, setAgentHandlers } from "./commands.ts";
 import { getAdminCommands } from "./admin-commands.ts";
+import { RemoteAgentRegistry } from "../agent/remote-registry.ts";
 
 // Main Execution
 if (import.meta.main) {
@@ -57,6 +58,10 @@ if (import.meta.main) {
     const agentCmd = await getAgentCommand(agentDeps);
     commandHandlers.set(agentCmd.data.name, agentCmd);
 
+    // Register 'agents' command (plural) for management
+    const agentsCmd = await getAgentsCommand();
+    commandHandlers.set(agentsCmd.data.name, agentsCmd);
+
     // Register admin commands
     const adminCmds = await getAdminCommands();
     for (const cmd of adminCmds) {
@@ -65,7 +70,7 @@ if (import.meta.main) {
 
     // Setup Dependencies
     const dependencies: BotDependencies = {
-        commands: [agentCmd.data, ...adminCmds.map(c => c.data)],
+        commands: [agentCmd.data, agentsCmd.data, ...adminCmds.map(c => c.data)],
         botSettings: {
             mentionEnabled: true,
             mentionUserId: null
@@ -76,6 +81,18 @@ if (import.meta.main) {
         console.log("🚀 Initializing Discord Bot...");
         await createDiscordBot(config, commandHandlers, buttonHandlers, dependencies);
         console.log("✅ Bot logic started.");
+
+        // Initialize remote health checks
+        const remoteRegistry = RemoteAgentRegistry.getInstance();
+        remoteRegistry.healthCheckAll().then(() => {
+            console.log("[RemoteHealth] Initial health checks complete.");
+        });
+        
+        // Setup periodic health checks (every 5 minutes)
+        setInterval(async () => {
+            console.log("[RemoteHealth] Running periodic health checks...");
+            await remoteRegistry.healthCheckAll();
+        }, 5 * 60 * 1000);
     } catch (err) {
         console.error("💥 Fatal Error starting bot:", err);
         Deno.exit(1);

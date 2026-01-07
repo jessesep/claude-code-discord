@@ -1,4 +1,5 @@
 import { MANAGER_SYSTEM_PROMPT } from "./manager.ts";
+import { AgentExecutionOptions } from "./provider-interface.ts";
 
 export interface AgentConfig {
   name: string;
@@ -9,11 +10,37 @@ export interface AgentConfig {
   maxTokens: number;
   capabilities: string[];
   riskLevel: 'low' | 'medium' | 'high';
-  client?: 'claude' | 'cursor' | 'antigravity' | 'ollama'; // Which CLI client to use (default: claude)
+  client?: 'claude' | 'cursor' | 'antigravity' | 'ollama' | 'remote'; // Which CLI client to use (default: claude)
   workspace?: string; // For cursor: working directory
   force?: boolean; // For cursor: auto-approve operations
   sandbox?: 'enabled' | 'disabled'; // For cursor: sandbox mode
   isManager?: boolean; // If true, this agent can spawn other agents
+  remoteEndpointId?: string; // For remote agents: ID of the endpoint to use
+}
+
+export interface RemoteAgentEndpoint {
+  id: string;
+  name: string;
+  url: string;           // e.g., "http://mac-mini.local:8081"
+  capabilities: string[];
+  providers: string[];   // Which providers available on this machine
+  status: 'online' | 'offline' | 'unknown';
+  lastHealthCheck: Date;
+  apiKey?: string;       // Optional auth
+}
+
+export interface RemoteExecutionRequest {
+  taskId: string;
+  prompt: string;
+  agentConfig: AgentConfig;
+  options: AgentExecutionOptions;
+}
+
+export interface RemoteExecutionResponse {
+  taskId: string;
+  status: 'running' | 'completed' | 'error';
+  output?: string;
+  error?: string;
 }
 
 export interface AgentSession {
@@ -43,6 +70,10 @@ export interface AgentSession {
 
   // Agent-mem session ID for persistent memory
   memorySessionId?: string;
+
+  // Real-time tracking for dashboard
+  task?: string;
+  lastOutput?: string;
 }
 
 // Context note for all agents
@@ -89,6 +120,47 @@ export const AGENT_STYLES: Record<string, AgentStyle> = {
   // Default fallback
   'default': { emoji: '🤖', color: 0x99AAB5 },
 };
+
+/**
+ * Agent Aliases - Short names mapped to agent IDs
+ */
+export const AGENT_ALIASES: Record<string, string> = {
+  // Short names → agent IDs
+  'coder': 'ag-coder',
+  'code': 'ag-coder',
+  'builder': 'cursor-coder',
+  'build': 'cursor-coder',
+  'architect': 'ag-architect',
+  'arch': 'ag-architect',
+  'test': 'ag-tester',
+  'tester': 'ag-tester',
+  'security': 'ag-security',
+  'sec': 'ag-security',
+  'review': 'code-reviewer',
+  'reviewer': 'code-reviewer',
+  'manager': 'ag-manager',
+  'fast': 'cursor-fast',
+  'refactor': 'cursor-refactor',
+};
+
+/**
+ * Resolves an agent alias or name to a valid agent ID
+ */
+export function resolveAgentAlias(alias: string): string | null {
+  const normalized = alias.toLowerCase();
+  
+  // Check direct aliases
+  if (AGENT_ALIASES[normalized]) {
+    return AGENT_ALIASES[normalized];
+  }
+  
+  // Check if it's already a valid agent ID
+  if (PREDEFINED_AGENTS[normalized] || PREDEFINED_AGENTS[alias]) {
+    return PREDEFINED_AGENTS[normalized] ? normalized : alias;
+  }
+  
+  return null;
+}
 
 /**
  * Get styling for an agent by name/type

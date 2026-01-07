@@ -388,7 +388,9 @@ function extractInstanceId(messages: Message[]): string | undefined {
 // =============================================================================
 
 /**
- * Wait for messages matching a condition
+ * Wait for messages matching a condition with a watchdog timer
+ * This improves reliability for long-running tasks by extending the timeout
+ * as long as the bot is showing progress.
  */
 export async function waitForResult(
   ctx: TestContext, 
@@ -396,8 +398,38 @@ export async function waitForResult(
   condition: (messages: Message[]) => boolean
 ): Promise<{ success: boolean; messages: Message[]; error?: string }> {
   const messagesMap = new Map<string, Message>();
+  const ACTIVITY_TIMEOUT = 60000; // 1 minute of no activity = failure
+  const TOTAL_MAX_TIMEOUT = 600000; // 10 minutes absolute max
   
+  let lastActivityTime = Date.now();
+  let absoluteTimeout: number;
+  let activityTimeout: number;
+
   return new Promise((resolve) => {
+    const checkState = (messages: Message[]) => {
+      lastActivityTime = Date.now();
+      
+      // Update activity timeout
+      clearTimeout(activityTimeout);
+      activityTimeout = setTimeout(() => {
+        const elapsed = (Date.now() - ctx.startTime) / 1000;
+        cleanup();
+        resolve({ 
+          success: false, 
+          messages: Array.from(messagesMap.values()), 
+          error: `Stalled: No activity for ${ACTIVITY_TIMEOUT/1000}s (Total elapsed: ${elapsed}s)` 
+        });
+      }, ACTIVITY_TIMEOUT);
+
+      if (condition(messages)) {
+        cleanup();
+        resolve({ success: true, messages });
+      } else if (hasError(messages)) {
+        cleanup();
+        resolve({ success: false, messages, error: 'Agent reported an error' });
+      }
+    };
+
     const onMessage = (msg: Message) => {
       if (msg.channelId !== ctx.channel.id) return;
       if (msg.author.id === ctx.tester.user?.id) return;
@@ -408,15 +440,10 @@ export async function waitForResult(
       }
       
       messagesMap.set(msg.id, msg);
-      const messages = Array.from(messagesMap.values());
-      if (condition(messages)) {
-        cleanup();
-        resolve({ success: true, messages });
-      }
+      checkState(Array.from(messagesMap.values()));
     };
 
     const onUpdate = (_oldMsg: Message | { partial: true }, newMsg: Message | { partial: true }) => {
-      // Skip partial messages
       if ('partial' in newMsg && newMsg.partial) return;
       const msg = newMsg as Message;
       
@@ -429,27 +456,35 @@ export async function waitForResult(
       }
 
       messagesMap.set(msg.id, msg);
-      const messages = Array.from(messagesMap.values());
-      if (condition(messages)) {
-        cleanup();
-        resolve({ success: true, messages });
-      }
+      checkState(Array.from(messagesMap.values()));
     };
 
     const cleanup = () => {
       ctx.tester.off('messageCreate', onMessage);
       ctx.tester.off('messageUpdate', onUpdate);
-      clearTimeout(timeout);
+      clearTimeout(absoluteTimeout);
+      clearTimeout(activityTimeout);
     };
 
-    const timeout = setTimeout(() => {
+    // Absolute max timeout
+    absoluteTimeout = setTimeout(() => {
       cleanup();
       resolve({ 
         success: false, 
         messages: Array.from(messagesMap.values()), 
-        error: `Timed out after ${timeoutMs/1000}s` 
+        error: `Timed out: Exceeded absolute limit of ${TOTAL_MAX_TIMEOUT/1000}s` 
       });
-    }, timeoutMs);
+    }, Math.max(timeoutMs, TOTAL_MAX_TIMEOUT));
+
+    // Initial activity timeout
+    activityTimeout = setTimeout(() => {
+      cleanup();
+      resolve({ 
+        success: false, 
+        messages: Array.from(messagesMap.values()), 
+        error: `Stalled: No initial response for ${ACTIVITY_TIMEOUT/1000}s` 
+      });
+    }, ACTIVITY_TIMEOUT);
 
     ctx.tester.on('messageCreate', onMessage);
     ctx.tester.on('messageUpdate', onUpdate);
@@ -474,6 +509,7 @@ export const isFinalResponse = (messages: Message[]): boolean => {
       e.title?.toLowerCase().includes('summary') ||
       e.title?.includes('✅') ||
       e.title?.includes('🏁') ||
+      e.title?.includes('✨') ||
       e.description?.toLowerCase().includes('successfully') ||
       e.description?.toLowerCase().includes('created') ||
       e.description?.toLowerCase().includes('finished') ||
@@ -501,7 +537,8 @@ export const hasError = (messages: Message[]): boolean => {
        e.description?.toLowerCase().includes('error') ||
        e.description?.toLowerCase().includes('failed') ||
        e.description?.toLowerCase().includes('not found') ||
-       e.description?.toLowerCase().includes('does not exist')
+       e.description?.toLowerCase().includes('does not exist') ||
+       e.fields?.some(f => f.name.toLowerCase().includes('error') || f.value.toLowerCase().includes('failed'))
      ))
   );
 };
@@ -512,12 +549,16 @@ export const hasError = (messages: Message[]): boolean => {
 export const isProcessing = (messages: Message[]): boolean => {
   return messages.some(r => 
     r.author.id === ONE_BOT_ID && 
-    r.embeds?.some((e) => 
+    (r.content?.toLowerCase().includes('processing') ||
+     r.embeds?.some((e) => 
       e.title?.toLowerCase().includes('processing') ||
       e.title?.includes('🤖') ||
+      e.title?.includes('🔄') ||
+      e.title?.includes('⏳') ||
       e.description?.toLowerCase().includes('working') ||
-      e.description?.toLowerCase().includes('analyzing')
-    )
+      e.description?.toLowerCase().includes('analyzing') ||
+      e.footer?.text?.toLowerCase().includes('working')
+    ))
   );
 };
 

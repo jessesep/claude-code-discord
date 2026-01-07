@@ -2,13 +2,13 @@
   "mentionEnabled": false,
   "mentionUserId": null,
   "defaultModel": "claude-sonnet-4",
-  "defaultTemperature": 0.99,
+  "defaultTemperature": 0.7,
   "defaultMaxTokens": 4096,
   "defaultSystemPrompt": null,
-  "autoIncludeSystemInfo": true,
+  "autoIncludeSystemInfo": false,
   "autoIncludeGitContext": true,
   "thinkingMode": "none",
-  "operationMode": "danger",
+  "operationMode": "normal",
   "codeHighlighting": true,
   "autoPageLongOutput": true,
   "maxOutputLength": 4000,
@@ -19,9 +19,9 @@
   "defaultProcessLimit": 20,
   "defaultLogLines": 50,
   "showSystemWarnings": true,
-  "enableDebugMode": true,
-  "verboseErrorReporting": true,
-  "enablePerformanceMetrics": true,
+  "enableDebugMode": false,
+  "verboseErrorReporting": false,
+  "enablePerformanceMetrics": false,
   "proxyEnabled": false,
   "proxyUrl": null,
   "noProxyDomains": [
@@ -29,86 +29,7 @@
     "127.0.0.1",
     "::1"
   ],
-  "webhooks": [
-    {
-      "id": "test-hook",
-      "name": "Test Hook",
-      "enabled": true,
-      "actions": []
-    }
-  ],
+  "webhooks": [],
   "apiKey": null,
-  "providerConfig": {
-    "providers": {
-      "primary-cli": {
-        "id": "primary-cli",
-        "enabled": true
-      },
-      "anthropic-api": {
-        "id": "anthropic-api",
-        "enabled": false,
-        "apiKeyEnvVar": "ANTHROPIC_API_KEY"
-      },
-      "cursor": {
-        "id": "cursor",
-        "enabled": true
-      },
-      "gemini-api": {
-        "id": "gemini-api",
-        "enabled": true,
-        "apiKeyEnvVar": "GEMINI_API_KEY"
-      },
-      "antigravity": {
-        "id": "antigravity",
-        "enabled": true
-      },
-      "ollama": {
-        "id": "ollama",
-        "enabled": true,
-        "endpoint": "http://localhost:11434"
-      },
-      "openai": {
-        "id": "openai",
-        "enabled": true,
-        "apiKeyEnvVar": "OPENAI_API_KEY"
-      },
-      "groq": {
-        "id": "groq",
-        "enabled": false,
-        "apiKeyEnvVar": "GROQ_API_KEY"
-      },
-      "together": {
-        "id": "together",
-        "enabled": false,
-        "apiKeyEnvVar": "TOGETHER_API_KEY"
-      },
-      "fireworks": {
-        "id": "fireworks",
-        "enabled": false,
-        "apiKeyEnvVar": "FIREWORKS_API_KEY"
-      },
-      "deepseek": {
-        "id": "deepseek",
-        "enabled": false,
-        "apiKeyEnvVar": "DEEPSEEK_API_KEY"
-      },
-      "aider": {
-        "id": "aider",
-        "enabled": false
-      },
-      "openrouter": {
-        "id": "openrouter",
-        "enabled": false,
-        "apiKeyEnvVar": "OPENROUTER_API_KEY"
-      }
-    },
-    "defaultProvider": "gemini-api",
-    "defaultModelByRole": {
-      "builder": "gemini-3-flash-preview",
-      "tester": "gemini-2.0-flash",
-      "investigator": "gemini-2.5-pro",
-      "architect": "gemini-2.5-pro",
-      "reviewer": "gemini-2.0-flash"
-    }
-  }
+  "remoteEndpoints": []
 }

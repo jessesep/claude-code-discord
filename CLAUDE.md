@@ -33,4 +33,25 @@ Discord → one agent Router → Provider (Cursor/Claude/Ollama/Gemini)
            Manager Agent → Roles → Execution
 ```
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
+## 🛠 Build & Test Commands
+
+- **Start Bot**: `deno task start` (uses `start-bot.sh`)
+- **Run E2E Tests**: `deno task test:e2e` (uses `scripts/run-e2e-tests.ts`)
+- **Run Unit Tests**: `deno test --allow-all`
+- **Create Issues**: `deno run --allow-all scripts/create-latest-progress-issues.ts`
+
+## 🆕 Recent Features
+
+- **Progress Indicators**: Real-time elapsed time in Discord embeds.
+- **Model Fallback Chain**: Automatic retry with same-gen or newer models on 429/503.
+- **Agent Isolation**: Hard channel binding and unique instance IDs per session.
+- **Testing Mode**: `TESTING_MODE=true` to bypass restrictions and auto-approve.
+- **Usage Analytics**: Real-time dashboard at `http://localhost:8000`.
+
+## 🏆 Golden Standards
+
+1. **Branding**: This project is **one agent discord** (lowercase).
+2. **Never Downgrade**: Fallbacks must be same-generation or newer.
+3. **Isolation**: Every spawned agent must have a unique ID and hard channel binding.
+4. **Interactive UX**: Prefer Discord embeds and buttons.
+5. **Event-Driven Tests**: E2E tests use activity-based watchdog timers.

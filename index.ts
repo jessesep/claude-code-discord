@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-all
+#!/usr/bin/env -S deno run --allow-all --unstable-net
 
 import {
   createDiscordBot,
@@ -209,7 +209,7 @@ export async function createOneAgentBot(config: BotConfig) {
 
   // Start Web Server
   try {
-    const webServer = new WebServer(8000); // Default port 8000
+    const webServer = new WebServer(3000); // Changed from 8000 to 3000 per dashboard requirements
     webServer.start();
   } catch (error) {
     console.error("Failed to start Web Server:", error);
@@ -1983,6 +1983,27 @@ export async function createOneAgentBot(config: BotConfig) {
   ]);
 
   bot = await createDiscordBot(config, handlers, buttonHandlers, dependencies, crashHandler);
+
+  // Initialize Slack bot if requested or tokens present
+  const startSlack = Deno.args.includes("--slack") || !!Deno.env.get("SLACK_BOT_TOKEN");
+  if (startSlack) {
+    try {
+      const { startSlackBot } = await import("./slack/index.ts");
+      console.log("🚀 Initializing Slack Bot...");
+      await startSlackBot({
+        workDir,
+        crashHandler,
+        sessionManager: agentSessionManager,
+        sendAgentMessages: async (messages) => {
+          // This is a fallback; Slack handlers use their own context-based sender
+          console.log("[Slack Fallback] Would send messages:", messages.length);
+        }
+      });
+      console.log("✅ Slack bot started.");
+    } catch (error) {
+      console.error("💥 Failed to start Slack bot:", error);
+    }
+  }
 
   // Create Discord sender for Claude messages
   const discordSender: DiscordSender = {

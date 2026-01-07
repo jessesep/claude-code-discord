@@ -18,6 +18,7 @@ import {
   clearAgentSessions 
 } from "./session-manager.ts";
 import { runAgentTask, loadRoleDocument } from "./orchestrator.ts";
+import { eventBus } from "../util/event-bus.ts";
 
 export interface AgentHandlerDeps {
   workDir: string;
@@ -45,8 +46,31 @@ const pendingSwarmTasks = new Map<string, {
 async function sendAgentUpdate(
   content: string, 
   deps: AgentHandlerDeps, 
-  options: { isFinal?: boolean } = {}
+  options: { isFinal?: boolean, sessionId?: string } = {}
 ) {
+  // Emit to event bus for real-time dashboard updates
+  if (options.sessionId) {
+    const session = agentSessions.find(s => s.id === options.sessionId);
+    if (session) {
+      if (options.isFinal) {
+        session.lastOutput = (session.lastOutput || "") + content;
+      } else {
+        // For streaming chunks, we append to a buffer for the dashboard
+        session.lastOutput = (session.lastOutput || "") + content;
+        // Cap last output to avoid memory issues in the long run
+        if (session.lastOutput.length > 5000) {
+          session.lastOutput = "..." + session.lastOutput.substring(session.lastOutput.length - 4500);
+        }
+      }
+    }
+
+    eventBus.emit('session:update', { 
+      sessionId: options.sessionId, 
+      content,
+      isFinal: options.isFinal 
+    });
+  }
+
   if (!deps.sendAgentMessages) {
     console.warn(`[AgentUpdate] SKIP: sendAgentMessages not defined`);
     return;
@@ -290,7 +314,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
           case 'select':
           case 'start':
             if (!agentName) {
-              await ctx.editReply({ content: 'Agent name is required.', ephemeral: true });
+              await listAgents(ctx);
               return;
             }
             await startAgentSession(ctx, agentName, context.roleId, model);
@@ -434,20 +458,37 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
 }
 
 async function listAgents(ctx: any) {
+  const { StringSelectMenuBuilder, ActionRowBuilder } = await import("npm:discord.js@14.14.1");
   const agents = AgentRegistry.getInstance().listAgents();
   const agentList = Object.entries(agents).map(([key, agent]) => {
     const riskEmoji = agent.riskLevel === 'high' ? '🔴' : agent.riskLevel === 'medium' ? '🟡' : '🟢';
     return `${riskEmoji} **${agent.name}** (\`${key}\`)\n   ${agent.description}\n   Capabilities: ${agent.capabilities.join(', ')}`;
   }).join('\n\n');
 
+  // Create selection menu
+  const options = Object.entries(agents).map(([key, agent]) => ({
+    label: agent.name,
+    description: agent.description.substring(0, 100),
+    value: `agent:${key}:${agent.model}`,
+    emoji: getAgentStyle(key).emoji
+  })).slice(0, 25); // Discord limit is 25 options
+
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId('select-agent-model')
+    .setPlaceholder('Select an agent to start a session...')
+    .addOptions(options);
+
+  const row = new ActionRowBuilder<any>().addComponents(selectMenu);
+
   await ctx.editReply({
     embeds: [{
       color: 0x0099ff,
       title: '🤖 Available AI Agents',
       description: agentList,
-      footer: { text: 'Use /agent start agent_name:[name] to begin a session' },
+      footer: { text: 'Select an agent from the dropdown or use /agent start agent_name:[name]' },
       timestamp: new Date().toISOString()
-    }]
+    }],
+    components: [row]
   });
 }
 
@@ -518,7 +559,10 @@ export async function chatWithAgent(
 
   const agent = { ...agentRef };
   const sessionData = getActiveSession(userId, channelId || '');
-  if (sessionData?.session.modelOverride) agent.model = sessionData.session.modelOverride;
+  if (sessionData?.session) {
+    if (sessionData.session.modelOverride) agent.model = sessionData.session.modelOverride;
+    sessionData.session.task = message.substring(0, 100);
+  }
   if (effectiveDeps?.modelOverride) agent.model = effectiveDeps.modelOverride;
 
   // Resolve model name to ensure it's valid (e.g., gemini-3-flash -> gemini-3-flash-preview)
@@ -796,7 +840,7 @@ export async function chatWithAgent(
           currentChunk += chunk;
           if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
             lastUpdate = Date.now();
-            await sendAgentUpdate(currentChunk, finalDeps);
+            await sendAgentUpdate(currentChunk, finalDeps, { sessionId: sessionData?.session.id });
             currentChunk = "";
           }
         });
@@ -809,7 +853,7 @@ export async function chatWithAgent(
             currentChunk += chunk;
             if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
               lastUpdate = Date.now();
-              await sendAgentUpdate(currentChunk, finalDeps);
+              await sendAgentUpdate(currentChunk, finalDeps, { sessionId: sessionData?.session.id });
               currentChunk = "";
             }
           });
@@ -824,7 +868,7 @@ export async function chatWithAgent(
         currentChunk += chunk;
         if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
           lastUpdate = Date.now();
-          await sendAgentUpdate(currentChunk, finalDeps);
+          await sendAgentUpdate(currentChunk, finalDeps, { sessionId: sessionData?.session.id });
           currentChunk = "";
         }
       });
@@ -835,10 +879,33 @@ export async function chatWithAgent(
         currentChunk += chunk;
         if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
           lastUpdate = Date.now();
-          await sendAgentUpdate(currentChunk, finalDeps);
+          await sendAgentUpdate(currentChunk, finalDeps, { sessionId: sessionData?.session.id });
           currentChunk = "";
         }
       });
+    } else if (clientType === 'remote') {
+      const { AgentProviderRegistry } = await import("./provider-interface.ts");
+      const endpointId = agent.remoteEndpointId;
+      if (!endpointId) throw new Error("Remote endpoint ID not specified for this agent");
+      
+      const providerId = `remote-${endpointId}`;
+      const provider = AgentProviderRegistry.getProvider(providerId);
+      if (!provider) throw new Error(`Remote provider ${providerId} not found. Ensure the endpoint is registered and online.`);
+
+      result = await provider.execute(enhancedPrompt, {
+        model: agent.model,
+        workspace: workDir,
+        force: agent.force,
+        sandbox: agent.sandbox === 'enabled',
+        streaming: true
+      }, async (chunk) => {
+        currentChunk += chunk;
+        if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
+          lastUpdate = Date.now();
+          await sendAgentUpdate(currentChunk, finalDeps, { sessionId: sessionData?.session.id });
+          currentChunk = "";
+        }
+      }, controller.signal);
     } else if (clientType === 'ollama' || clientType === 'openai' || clientType === 'groq') {
       // Use universal provider interface for API-based providers
       const { AgentProviderRegistry } = await import("./provider-interface.ts");
@@ -849,14 +916,14 @@ export async function chatWithAgent(
         currentChunk += chunk;
         if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
           lastUpdate = Date.now();
-          await sendAgentUpdate(currentChunk, finalDeps);
+          await sendAgentUpdate(currentChunk, finalDeps, { sessionId: sessionData?.session.id });
           currentChunk = "";
         }
       }, controller.signal);
       result = { response: providerResult.response, modelUsed: providerResult.modelUsed };
     }
 
-    if (currentChunk) await sendAgentUpdate(currentChunk, finalDeps);
+    if (currentChunk) await sendAgentUpdate(currentChunk, finalDeps, { sessionId: sessionData?.session.id });
 
     const fullResponse = result?.response || '';
     if (sessionData?.session) sessionData.session.history.push({ role: 'model', content: fullResponse });
@@ -1227,9 +1294,50 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
 }
 
 export function getAgentsForAPI() {
-  return Object.entries(PREDEFINED_AGENTS).map(([id, agent]) => ({ id, name: agent.name }));
+  return Object.entries(PREDEFINED_AGENTS).map(([id, agent]) => ({ 
+    id, 
+    name: agent.name,
+    description: agent.description,
+    model: agent.model,
+    capabilities: agent.capabilities,
+    riskLevel: agent.riskLevel
+  }));
 }
 
 export function getSessionsForAPI() {
-  return { sessions: agentSessions.map(s => ({ id: s.id, agent: s.agentName })), stats: { activeSessions: agentSessions.length } };
+  const activeCount = agentSessions.filter(s => s.status === 'active').length;
+  const totalCost = agentSessions.reduce((acc, s) => acc + (s.totalCost || 0), 0);
+  const totalMessages = agentSessions.reduce((acc, s) => acc + (s.messageCount || 0), 0);
+
+  return { 
+    sessions: agentSessions.map(s => ({ 
+      id: s.id, 
+      agentName: s.agentName,
+      status: s.status,
+      startTime: s.startTime,
+      lastActivity: s.lastActivity,
+      messageCount: s.messageCount,
+      totalCost: s.totalCost,
+      userId: s.userId,
+      channelId: s.channelId,
+      task: s.task,
+      lastOutput: s.lastOutput
+    })), 
+    stats: { 
+      activeSessions: activeCount,
+      totalSessions: agentSessions.length,
+      totalCost,
+      totalMessages
+    } 
+  };
+}
+
+export function getSessionDetails(id: string) {
+  const session = agentSessions.find(s => s.id === id);
+  if (!session) return null;
+  
+  return {
+    ...session,
+    agent: PREDEFINED_AGENTS[session.agentName]
+  };
 }

@@ -14,6 +14,8 @@ import { AnthropicApiProvider } from './anthropic-api-provider.ts';
 import { OllamaProvider } from './ollama-provider.ts';
 import { OpenAIProvider } from './openai-provider.ts';
 import { GroqProvider } from './groq-provider.ts';
+import { RemoteProvider } from './remote-provider.ts';
+import { RemoteAgentRegistry } from '../remote-registry.ts';
 import {
   createContinueProvider,
   createCodeiumProvider,
@@ -36,10 +38,31 @@ export async function initializeProviders(): Promise<void> {
   AgentProviderRegistry.register(new OpenAIProvider());
   AgentProviderRegistry.register(new GroqProvider());
 
+  // Remote providers
+  await syncRemoteProviders();
+
   // VS Code extension providers
   AgentProviderRegistry.register(createContinueProvider());
   AgentProviderRegistry.register(createCodeiumProvider());
   AgentProviderRegistry.register(createAiderProvider());
+
+  // ... rest of the function
+}
+
+/**
+ * Sync remote providers from the registry
+ */
+export async function syncRemoteProviders(): Promise<void> {
+  const remoteRegistry = RemoteAgentRegistry.getInstance();
+  const endpoints = remoteRegistry.getEndpoints();
+  
+  for (const endpoint of endpoints) {
+    const providerId = `remote-${endpoint.id}`;
+    if (!AgentProviderRegistry.getProvider(providerId)) {
+      AgentProviderRegistry.register(new RemoteProvider(endpoint));
+    }
+  }
+}
 
   // Check availability of all providers
   const providers = AgentProviderRegistry.getAllProviders();

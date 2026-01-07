@@ -168,6 +168,15 @@ const Dashboard: React.FC<DashboardProps> = ({ sessions, logs, settings, webhook
                         <p className="text-[10px] text-zinc-500 mono uppercase">{session.agentName} ID: {session.id.substring(0, 8)}</p>
                       </div>
                     </div>
+                    
+                    {session.lastOutput && (
+                      <div className="mb-4 p-3 bg-black/40 rounded-lg border border-zinc-800/50 max-h-24 overflow-hidden">
+                        <p className="text-[10px] text-zinc-400 mono whitespace-pre-wrap animate-in fade-in duration-300">
+                          {session.lastOutput.substring(session.lastOutput.length - 200)}
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center pt-4 border-t border-zinc-800/50">
                       <div className="flex gap-3">
                         <div className="text-center">

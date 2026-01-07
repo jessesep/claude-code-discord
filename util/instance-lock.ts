@@ -49,14 +49,14 @@ export async function acquireInstanceLock(): Promise<boolean> {
 }
 
 /**
- * Release the instance lock
+ * Release the instance lock (Synchronous for exit handlers)
  */
-export async function releaseInstanceLock(): Promise<void> {
+export function releaseInstanceLock(): void {
   try {
-    const pid = await Deno.readTextFile(LOCK_FILE);
+    const pid = Deno.readTextFileSync(LOCK_FILE);
     // Only remove if it's our PID
     if (parseInt(pid.trim(), 10) === Deno.pid) {
-      await Deno.remove(LOCK_FILE);
+      Deno.removeSync(LOCK_FILE);
     }
   } catch {
     // Ignore errors

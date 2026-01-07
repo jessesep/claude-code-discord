@@ -29,6 +29,8 @@
   },
   "imports": {
     "discord.js": "npm:discord.js@14.14.1",
-    "@anthropic-ai/claude-code": "npm:@anthropic-ai/claude-code@1.0.95"
+    "@anthropic-ai/claude-code": "npm:@anthropic-ai/claude-code@1.0.95",
+    "@slack/bolt": "npm:@slack/bolt@^3.17.0",
+    "@slack/web-api": "npm:@slack/web-api@^6.11.0"
   }
 }

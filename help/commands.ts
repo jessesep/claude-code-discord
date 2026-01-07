@@ -21,8 +21,8 @@ export interface HelpHandlerDeps {
 // Detailed command information
 export const COMMAND_HELP = {
   claude: {
-    title: "🤖 Claude Code Integration",
-    description: "Send prompts to Claude Code CLI for AI-powered development assistance",
+    title: "🤖 one agent Integration",
+    description: "Send prompts to one agent CLI for AI-powered development assistance",
     usage: "/claude prompt: [your message] session_id: [optional]",
     examples: [
       "/claude prompt: Help me fix this bug in my TypeScript code",
@@ -30,7 +30,7 @@ export const COMMAND_HELP = {
       "/claude prompt: Explain this error message"
     ],
     parameters: [
-      { name: "prompt", description: "Your message or question for Claude", required: true },
+      { name: "prompt", description: "Your message or question for one agent", required: true },
       { name: "session_id", description: "Resume a previous conversation (optional)", required: false }
     ],
     notes: [
@@ -41,7 +41,7 @@ export const COMMAND_HELP = {
   },
   continue: {
     title: "⏭️ Continue Conversation",
-    description: "Continue the most recent Claude Code conversation in this directory",
+    description: "Continue the most recent conversation in this directory",
     usage: "/continue prompt: [optional additional message]",
     examples: [
       "/continue",
@@ -58,15 +58,15 @@ export const COMMAND_HELP = {
     ]
   },
   "claude-cancel": {
-    title: "❌ Cancel Claude Session",
-    description: "Cancel any currently running Claude Code operation",
+    title: "❌ Cancel Session",
+    description: "Cancel any currently running agent operation",
     usage: "/claude-cancel",
     examples: ["/claude-cancel"],
     parameters: [],
     notes: [
-      "Immediately stops Claude Code execution",
+      "Immediately stops execution",
       "Safe to use - no data loss",
-      "Use when Claude is taking too long or stuck"
+      "Use when agent is taking too long or stuck"
     ]
   },
   git: {
@@ -244,7 +244,7 @@ export const COMMAND_HELP = {
     examples: ["/status"],
     parameters: [],
     notes: [
-      "Shows Claude Code session status",
+      "Shows active session status",
       "Displays Git branch and repository info",
       "Lists running shell processes count",
       "Shows worktree bot count and mention settings"
@@ -264,7 +264,7 @@ export const COMMAND_HELP = {
       { name: "value", description: "User ID for mention-on action", required: false }
     ],
     notes: [
-      "mention-on: Enable notifications for Claude completions",
+      "mention-on: Enable notifications for agent completions",
       "mention-off: Disable notifications",
       "show: Display current settings",
       "User ID can be obtained by right-clicking username"
@@ -291,13 +291,13 @@ export const COMMAND_HELP = {
     notes: [
       "Stops all running shell processes",
       "Kills all worktree bot instances",
-      "Cancels any running Claude Code sessions",
+      "Cancels any running agent sessions",
       "Use with caution - requires manual restart"
     ]
   },
   "claude-enhanced": {
-    title: "🚀 Enhanced Claude Code Integration",
-    description: "Send prompts to Claude Code with advanced options and context",
+    title: "🚀 Enhanced Integration",
+    description: "Send prompts to agents with advanced options and context",
     usage: "/claude-enhanced prompt: [message] model: [model] template: [template] ...",
     examples: [
       "/claude-enhanced prompt: Debug this error include_system_info: true",
@@ -305,8 +305,8 @@ export const COMMAND_HELP = {
       "/claude-enhanced prompt: Help with this file context_files: src/main.ts,README.md include_git_context: true"
     ],
     parameters: [
-      { name: "prompt", description: "Your message or question for Claude", required: true },
-      { name: "model", description: "Claude model to use (see /claude-models)", required: false },
+      { name: "prompt", description: "Your message or question", required: true },
+      { name: "model", description: "Model to use (see /claude-models)", required: false },
       { name: "template", description: "Predefined template (debug, explain, optimize, etc.)", required: false },
       { name: "include_system_info", description: "Include system information in context", required: false },
       { name: "include_git_context", description: "Include git repository context", required: false },
@@ -316,13 +316,13 @@ export const COMMAND_HELP = {
     notes: [
       "Provides more context and options than regular /claude command",
       "Templates help with common tasks like debugging and optimization",
-      "System and git context can provide valuable information to Claude",
+      "System and git context can provide valuable information to agents",
       "Context files are automatically truncated if too large"
     ]
   },
   "claude-models": {
-    title: "🤖 Available Claude Models",
-    description: "List all available Claude models and their capabilities",
+    title: "🤖 Available Models",
+    description: "List all available AI models and their capabilities",
     usage: "/claude-models",
     examples: ["/claude-models"],
     parameters: [],
@@ -333,8 +333,8 @@ export const COMMAND_HELP = {
     ]
   },
   "claude-sessions": {
-    title: "📋 Claude Session Management",
-    description: "Manage and view Claude Code conversation sessions",
+    title: "📋 Session Management",
+    description: "Manage and view conversation sessions",
     usage: "/claude-sessions action: [action] session_id: [optional]",
     examples: [
       "/claude-sessions action: list",
@@ -377,8 +377,8 @@ export const COMMAND_HELP = {
   },
   */
   "claude-context": {
-    title: "📋 Claude Context Preview",
-    description: "Preview what context information would be sent to Claude",
+    title: "📋 Context Preview",
+    description: "Preview what context information would be sent to the agent",
     usage: "/claude-context include_system_info: [true/false] include_git_context: [true/false] ...",
     examples: [
       "/claude-context include_system_info: true",
@@ -392,7 +392,7 @@ export const COMMAND_HELP = {
     ],
     notes: [
       "Shows exactly what context would be included",
-      "Helps you understand what information Claude will receive",
+      "Helps you understand what information the agent will receive",
       "Useful for debugging context issues"
     ]
   },
@@ -914,7 +914,7 @@ export function createHelpHandlers(deps: HelpHandlerDeps) {
         await ctx.reply({
           embeds: [{
             color: 0x00ff00,
-            title: "🤖 Antigravity AI Bot - Help",
+            title: "🤖 one agent discord - Help",
             description: `Bot for **${deps.repoName}** (${deps.branchName} branch)\n\n**Simple & Easy to Use!**`,
             fields: [
               {

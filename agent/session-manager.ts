@@ -1,5 +1,6 @@
 import { AgentSession, PREDEFINED_AGENTS } from "./types.ts";
 import { agentMemService } from "../util/agent-mem-service.ts";
+import { eventBus } from "../util/event-bus.ts";
 
 // In-memory storage for agent sessions
 export let agentSessions: AgentSession[] = [];
@@ -113,6 +114,15 @@ export function setAgentSession(
   agentSessions.push(newSession);
   addActiveAgent(userId, channelId, agentName);
 
+  // Emit session start event
+  eventBus.emit('session:start', { 
+    sessionId: newSession.id, 
+    agentName, 
+    userId, 
+    channelId,
+    startTime: newSession.startTime 
+  });
+
   // Trigger agent-mem session start (async, don't block)
   (async () => {
     try {
@@ -143,6 +153,7 @@ export function clearAgentSessions(userId: string, channelId: string, agentName?
       if (session.memorySessionId) {
         agentMemService.endSession(session.memorySessionId);
       }
+      eventBus.emit('session:complete', { sessionId: session.id, agentName: session.agentName });
     }
     removeActiveAgent(userId, channelId, agentName);
   } else {
@@ -156,6 +167,7 @@ export function clearAgentSessions(userId: string, channelId: string, agentName?
       if (session.memorySessionId) {
         agentMemService.endSession(session.memorySessionId);
       }
+      eventBus.emit('session:complete', { sessionId: session.id, agentName: session.agentName });
     }
     removeActiveAgent(userId, channelId);
   }

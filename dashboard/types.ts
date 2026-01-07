@@ -23,6 +23,7 @@ export interface Session {
   lastActivity: string;
   status: 'active' | 'paused' | 'completed' | 'error';
   task?: string;
+  lastOutput?: string;
 }
 
 export interface Webhook {

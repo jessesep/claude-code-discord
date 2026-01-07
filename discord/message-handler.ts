@@ -1,6 +1,8 @@
 import { Events } from "npm:discord.js@14.14.1";
 import { getActiveSession } from "../agent/index.ts";
 import { createInteractionContext } from "./interaction-context.ts";
+import { parseAgentMention } from "./mention-parser.ts";
+import { getAgentStyle } from "../agent/types.ts";
 
 /**
  * Handle incoming messages
@@ -130,18 +132,29 @@ export function handleMessageCreate(
       const { getActiveAgents, PREDEFINED_AGENTS } = await import("../agent/index.ts");
       const activeAgents = getActiveAgents(message.author.id, message.channelId);
       
-      let targetAgent = activeSession?.session.agentName || 'general-assistant';
-      let agentExplicitlyNamed = false;
+      // Check for direct @agent-name mentions
+      const { agentId: mentionedAgentId, cleanMessage } = parseAgentMention(contentWithoutMentions);
       
-      const messageLower = contentWithoutMentions.toLowerCase();
+      let targetAgent = mentionedAgentId || activeSession?.session.agentName || 'ag-manager';
+      let agentExplicitlyNamed = !!mentionedAgentId;
+      let isDirectInvocation = !!mentionedAgentId;
+      
+      // If we have a direct mention, use the clean message (without the @mention)
+      if (isDirectInvocation) {
+        prompt = cleanMessage;
+      }
+      
+      const messageLower = prompt.toLowerCase();
 
-      // NEW: Check for exact agent name mentions first
-      for (const agentName of Object.keys(PREDEFINED_AGENTS)) {
-        if (messageLower.includes(agentName.toLowerCase())) {
-          targetAgent = agentName;
-          agentExplicitlyNamed = true;
-          console.log(`[MessageHandler] Detected agent mention: ${agentName}`);
-          break;
+      // Fallback: Check for exact agent name mentions in text (legacy support)
+      if (!agentExplicitlyNamed) {
+        for (const agentName of Object.keys(PREDEFINED_AGENTS)) {
+          if (messageLower.includes(agentName.toLowerCase())) {
+            targetAgent = agentName;
+            agentExplicitlyNamed = true;
+            console.log(`[MessageHandler] Detected legacy agent mention in text: ${agentName}`);
+            break;
+          }
         }
       }
       
@@ -186,6 +199,8 @@ export function handleMessageCreate(
 
       // Create mock interaction
       let replyMessage: any = null;
+      const agentStyle = getAgentStyle(targetAgent);
+      
       const mockCtx = await createInteractionContext({
         user: message.author,
         channel: message.channel,
@@ -206,12 +221,16 @@ export function handleMessageCreate(
           replyMessage = await message.reply(opts);
         },
         deferReply: async () => {
-          console.log(`[MessageHandler] Deferring reply...`);
+          console.log(`[MessageHandler] Deferring reply for ${targetAgent}...`);
+          const title = isDirectInvocation 
+            ? `${agentStyle.emoji} Direct → ${PREDEFINED_AGENTS[targetAgent]?.name || targetAgent}`
+            : '🤖 Processing...';
+            
           replyMessage = await message.reply({
             embeds: [{
-              color: 0x5865F2,
-              title: '🤖 Processing...',
-              description: 'Starting agent conversation...',
+              color: agentStyle.color,
+              title: title,
+              description: isDirectInvocation ? 'Invoking agent directly...' : 'Starting agent conversation...',
               timestamp: new Date().toISOString(),
             }]
           });

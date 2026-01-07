@@ -6,7 +6,23 @@ export interface AgentResponse {
   modelUsed?: string;
 }
 
+export interface ClaudeResponse {
+  response: string;
+  sessionId?: string;
+  cost?: number;
+  duration?: number;
+  modelUsed?: string;
+}
+
 export interface AgentMessage {
+  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'system' | 'other';
+  content: string;
+  // deno-lint-ignore no-explicit-any
+  metadata?: any;
+  timestamp?: string;
+}
+
+export interface ClaudeMessage {
   type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'system' | 'other';
   content: string;
   // deno-lint-ignore no-explicit-any

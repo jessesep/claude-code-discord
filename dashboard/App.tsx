@@ -6,11 +6,12 @@ import WebhookManager from './components/WebhookManager';
 import Terminal from './components/Terminal';
 import MemoryExplorer from './components/MemoryExplorer';
 import SettingsManager from './components/SettingsManager';
+import UsageAnalytics from './components/UsageAnalytics';
 import { Agent, Session, BotSettings, Webhook } from './types';
 import { getAgents, getSessions, getSettings, updateSettings, getLogs } from './services/api';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dash' | 'agents' | 'webhooks' | 'term' | 'mem' | 'settings'>('dash');
+  const [activeTab, setActiveTab] = useState<'dash' | 'agents' | 'webhooks' | 'term' | 'mem' | 'settings' | 'usage'>('dash');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [settings, setSettings] = useState<BotSettings>({} as BotSettings);
@@ -49,6 +50,69 @@ const App: React.FC = () => {
     // Refresh data periodically
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Handle Real-time SSE Events
+  useEffect(() => {
+    const eventSource = new EventSource('/api/events');
+    
+    eventSource.addEventListener('session:start', (e: any) => {
+      try {
+        const data = JSON.parse(e.data);
+        setSessions(prev => {
+          // Avoid duplicates
+          if (prev.find(s => s.id === data.id || s.id === data.sessionId)) return prev;
+          const newSession: Session = {
+            id: data.sessionId || data.id,
+            agentName: data.agentName,
+            userId: data.userId,
+            channelId: data.channelId,
+            startTime: data.startTime || new Date().toISOString(),
+            messageCount: 0,
+            totalCost: 0,
+            lastActivity: new Date().toISOString(),
+            status: 'active',
+            lastOutput: ''
+          };
+          return [newSession, ...prev];
+        });
+        addLog(`Session started: ${data.agentName}`);
+      } catch (err) {
+        console.error('Failed to parse session:start event', err);
+      }
+    });
+    
+    eventSource.addEventListener('session:update', (e: any) => {
+      try {
+        const data = JSON.parse(e.data);
+        setSessions(prev => prev.map(s => 
+          s.id === data.sessionId 
+            ? { ...s, lastOutput: (s.lastOutput || '') + data.content, lastActivity: new Date().toISOString() } 
+            : s
+        ));
+      } catch (err) {
+        console.error('Failed to parse session:update event', err);
+      }
+    });
+    
+    eventSource.addEventListener('session:complete', (e: any) => {
+      try {
+        const data = JSON.parse(e.data);
+        setSessions(prev => prev.map(s => 
+          s.id === data.sessionId ? { ...s, status: 'completed' } : s
+        ));
+        addLog(`Session completed: ${data.agentName}`);
+      } catch (err) {
+        console.error('Failed to parse session:complete event', err);
+      }
+    });
+
+    eventSource.onerror = (err) => {
+      console.error('SSE Error:', err);
+      // EventSource will automatically try to reconnect
+    };
+    
+    return () => eventSource.close();
   }, []);
 
   // Refresh logs more frequently
@@ -104,6 +168,8 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dash': 
         return <Dashboard sessions={sessions} logs={logs} settings={settings} webhooks={webhooks} />;
+      case 'usage':
+        return <UsageAnalytics sessions={sessions} />;
       case 'agents': 
         return <AgentMonitor agents={agents} sessions={sessions} />;
       case 'webhooks': 
@@ -134,7 +200,7 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-4">
             <div className="px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-xs text-zinc-400 mono">
-              Port: 8000
+              Port: 3000
             </div>
             <button className="p-2 text-zinc-400 hover:text-white transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>

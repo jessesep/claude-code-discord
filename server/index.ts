@@ -1,7 +1,9 @@
 import { Hono } from "npm:hono@4.0.0";
 import { serveStatic } from "npm:hono@4.0.0/deno";
+import { streamSSE } from "npm:hono@4.0.0/streaming";
 import { SettingsPersistence } from "../util/settings-persistence.ts";
 import { UnifiedBotSettings, WebhookConfig } from "../settings/unified-settings.ts";
+import { eventBus } from "../util/event-bus.ts";
 
 export class WebServer {
     private app: Hono;
@@ -75,6 +77,30 @@ export class WebServer {
             }
         });
 
+        // GET /api/sessions/:id - Get session details
+        api.get("/sessions/:id", async (c) => {
+            try {
+                const id = c.req.param("id");
+                const { getSessionDetails } = await import("../agent/index.ts");
+                const data = getSessionDetails(id);
+                if (!data) return c.json({ error: "Session not found" }, 404);
+                return c.json(data);
+            } catch (error) {
+                return c.json({ error: String(error) }, 500);
+            }
+        });
+
+        // GET /api/stats - Aggregate stats
+        api.get("/stats", async (c) => {
+            try {
+                const { getSessionsForAPI } = await import("../agent/index.ts");
+                const data = getSessionsForAPI();
+                return c.json(data.stats);
+            } catch (error) {
+                return c.json({ error: String(error) }, 500);
+            }
+        });
+
         // GET /api/logs - Get system logs (simple polling endpoint)
         api.get("/logs", (c) => {
             const limit = parseInt(c.req.query("limit") || "50");
@@ -134,6 +160,57 @@ export class WebServer {
             } catch (error) {
                 return c.json({ error: String(error) }, 500);
             }
+        });
+
+        // GET /api/providers/status - Alias for /api/providers
+        api.get("/providers/status", async (c) => {
+            const res = await api.request("/providers");
+            return c.json(await res.json());
+        });
+
+        // GET /api/events - SSE for real-time updates
+        api.get("/events", (c) => {
+            return streamSSE(c, async (stream) => {
+                const cleanupFunctions: Array<() => void> = [];
+
+                const onSessionStart = (data: any) => {
+                    stream.writeSSE({
+                        event: "session:start",
+                        data: JSON.stringify(data),
+                    });
+                };
+
+                const onSessionUpdate = (data: any) => {
+                    stream.writeSSE({
+                        event: "session:update",
+                        data: JSON.stringify(data),
+                    });
+                };
+
+                const onSessionComplete = (data: any) => {
+                    stream.writeSSE({
+                        event: "session:complete",
+                        data: JSON.stringify(data),
+                    });
+                };
+
+                cleanupFunctions.push(eventBus.on("session:start", onSessionStart));
+                cleanupFunctions.push(eventBus.on("session:update", onSessionUpdate));
+                cleanupFunctions.push(eventBus.on("session:complete", onSessionComplete));
+
+                // Keep alive
+                const keepAliveInterval = setInterval(() => {
+                    stream.writeSSE({ event: "ping", data: "pong" });
+                }, 30000);
+
+                stream.onAbort(() => {
+                    clearInterval(keepAliveInterval);
+                    cleanupFunctions.forEach(fn => fn());
+                });
+
+                // Wait forever
+                await new Promise(() => {});
+            });
         });
 
         // POST /api/providers/:id/enable - Enable a provider
@@ -261,8 +338,10 @@ export class WebServer {
 
         this.app.route("/api", api);
 
+        // Redirect /dashboard to / for the SPA
+        this.app.get("/dashboard", (c) => c.redirect("/"));
+
         // Serve Frontend (Dashboard)
-        // We will serve a simple HTML file for now
         this.app.get("/*", serveStatic({ root: "./dashboard" }));
     }
 

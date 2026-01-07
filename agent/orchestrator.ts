@@ -78,6 +78,23 @@ export async function runAgentTask(
       onChunk
     );
     resultText = result.response;
+  } else if (clientType === 'remote') {
+    const { AgentProviderRegistry } = await import("./provider-interface.ts");
+    const endpointId = agent.remoteEndpointId;
+    if (!endpointId) throw new Error("Remote endpoint ID not specified for this agent");
+    
+    const providerId = `remote-${endpointId}`;
+    const provider = AgentProviderRegistry.getProvider(providerId);
+    if (!provider) throw new Error(`Remote provider ${providerId} not found`);
+
+    const result = await provider.execute(task, {
+      model: agent.model,
+      workspace: effectiveWorkDir,
+      force: agent.force,
+      sandbox: agent.sandbox === 'enabled',
+      streaming: !!onChunk
+    }, onChunk, controller.signal);
+    resultText = result.response;
   } else {
     throw new Error("Primary CLI client headless not yet supported");
   }
