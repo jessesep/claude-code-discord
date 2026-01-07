@@ -22,7 +22,7 @@ import { runAgentTask, loadRoleDocument } from "./orchestrator.ts";
 export interface AgentHandlerDeps {
   workDir: string;
   crashHandler: any;
-  sendClaudeMessages: (messages: any[]) => Promise<void>;
+  sendAgentMessages: (messages: any[]) => Promise<void>;
   sessionManager: any;
   clientOverride?: 'claude' | 'cursor' | 'antigravity' | 'ollama';
   includeGit?: boolean;
@@ -47,12 +47,12 @@ async function sendAgentUpdate(
   deps: AgentHandlerDeps, 
   options: { isFinal?: boolean } = {}
 ) {
-  if (!deps.sendClaudeMessages) {
-    console.warn(`[AgentUpdate] SKIP: sendClaudeMessages not defined`);
+  if (!deps.sendAgentMessages) {
+    console.warn(`[AgentUpdate] SKIP: sendAgentMessages not defined`);
     return;
   }
 
-  const claudeMessages = [{
+  const agentMessages = [{
     type: 'text' as const,
     content: content,
     timestamp: new Date().toISOString()
@@ -68,10 +68,10 @@ async function sendAgentUpdate(
   
   if ((actionNeeded || options.isFinal) && deps.targetUserId) {
     const prefix = actionNeeded ? "⚠️ Action needed: " : "";
-    (claudeMessages[0] as any).content = `<@${deps.targetUserId}> ${prefix}${content}`;
+    (agentMessages[0] as any).content = `<@${deps.targetUserId}> ${prefix}${content}`;
   }
 
-  await deps.sendClaudeMessages(claudeMessages).catch(err => { 
+  await deps.sendAgentMessages(agentMessages).catch(err => { 
     console.error(`[AgentUpdate] FAILED to send messages:`, err);
   });
 }
@@ -124,7 +124,7 @@ export async function resolveChannelContext(ctx: any, deps?: AgentHandlerDeps) {
 }
 
 export function createAgentHandlers(deps: AgentHandlerDeps) {
-  const { workDir, crashHandler, sendClaudeMessages, sessionManager } = deps;
+  const { workDir, crashHandler, sendAgentMessages, sessionManager } = deps;
 
   return {
     async onAgent(
@@ -146,7 +146,7 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
           workDir: context.workDir,
           channelContext: context.channelContext,
           modelOverride: model,
-          sendClaudeMessages: ctx.sendClaudeMessages || deps.sendClaudeMessages
+          sendAgentMessages: ctx.sendAgentMessages || deps.sendAgentMessages
         };
 
         switch (action) {
@@ -401,7 +401,7 @@ export async function chatWithAgent(
   // to avoid overwriting the parent's message in the same interaction
   const subAgentDeps = {
     ...effectiveDeps,
-    sendClaudeMessages: async (messages: any[]) => {
+    sendAgentMessages: async (messages: any[]) => {
       const content = messages[0]?.content || '';
       if (!content) return;
       
@@ -420,8 +420,8 @@ export async function chatWithAgent(
   };
 
   // Use the wrapper if this is NOT a top-level interaction (e.g. spawned by manager)
-  // We can detect this if deps was already passed in with a sendClaudeMessages
-  const finalDeps = deps?.sendClaudeMessages ? subAgentDeps : effectiveDeps;
+  // We can detect this if deps was already passed in with a sendAgentMessages
+  const finalDeps = deps?.sendAgentMessages ? subAgentDeps : effectiveDeps;
 
   // Casual greeting detection
   const isCasualGreeting = (text: string): boolean => {
@@ -579,9 +579,9 @@ export async function chatWithAgent(
     // Primary Client Logic
     if (clientType === 'claude') {
       try {
-        const { sendToClaudeCLI } = await import("../claude/cli-client.ts");
+        const { sendToPrimaryCLI } = await import("../claude/cli-client.ts");
         const cliModel = agent.model.includes("sonnet") ? "sonnet" : agent.model.includes("opus") ? "opus" : "sonnet";
-        result = await sendToClaudeCLI(agent.systemPrompt, message, controller, cliModel, 8000, async (chunk) => {
+        result = await sendToPrimaryCLI(agent.systemPrompt, message, controller, cliModel, 8000, async (chunk) => {
           currentChunk += chunk;
           if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
             lastUpdate = Date.now();
@@ -589,10 +589,10 @@ export async function chatWithAgent(
             currentChunk = "";
           }
         });
-      } catch (claudeError) {
-        if (isRateLimitError(claudeError)) {
+      } catch (error) {
+        if (isRateLimitError(error)) {
           fallbackUsed = true;
-          await ctx.editReply({ embeds: [{ color: 0xffaa00, title: `⚠️ Claude Limit Reached`, description: 'Switching to **Cursor Agent** fallback...', timestamp: new Date().toISOString() }] }).catch(() => {});
+          await ctx.editReply({ embeds: [{ color: 0xffaa00, title: `⚠️ one agent: Provider Limit Reached`, description: 'Switching to fallback agent...', timestamp: new Date().toISOString() }] }).catch(() => {});
           const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
           result = await sendToCursorCLI(`${agent.systemPrompt}\n\nTask: ${message}`, controller, { model: agent.model, workspace: workDir, force: true, streamJson: true }, async (chunk) => {
             currentChunk += chunk;
@@ -603,7 +603,7 @@ export async function chatWithAgent(
             }
           });
           clientType = 'cursor';
-        } else throw claudeError;
+        } else throw error;
       }
     } else if (clientType === 'cursor') {
       const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
@@ -905,7 +905,7 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
       { label: '🚀 Antigravity', value: 'antigravity', description: 'Google Gemini via gcloud OAuth' },
       { label: '🖥️ Cursor', value: 'cursor', description: 'Cursor AI agent' },
       { label: '🦙 Ollama', value: 'ollama', description: 'Local Ollama models' },
-      { label: '💻 Claude CLI', value: 'claude-cli', description: 'Anthropic Claude via CLI' },
+      { label: '💻 Primary CLI', value: 'claude-cli', description: 'Primary CLI Client' },
       { label: '⚡ OpenAI', value: 'openai', description: 'GPT-4o, o1, o3 models' },
       { label: '🔥 Groq', value: 'groq', description: 'Ultra-fast inference' },
     ];

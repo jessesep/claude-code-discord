@@ -1,13 +1,13 @@
 /**
  * Fully Automated Two-Way Testing
  *
- * Tester Bot -> @mentions Claude Bot -> Agent Responds
+ * Tester Bot -> @mentions one bot -> Agent Responds
  */
 
 import { Client, GatewayIntentBits, TextChannel } from 'npm:discord.js@14';
 
 const TEST_BOT_TOKEN = Deno.env.get('TEST_BOT_TOKEN') || '';
-const CLAUDE_BOT_ID = '1457705423137275914'; // Master-Remote#8819
+const ONE_BOT_ID = '1457705423137275914'; // Master-Remote#8819
 const CHANNEL_ID = '1457712107016552523'; // #main
 const TEST_TIMEOUT = 45000; // 45 seconds for agent to respond
 
@@ -82,7 +82,7 @@ async function runAutomatedTest() {
 
     // Test 1: Simple script creation
     console.log('\n📤 TEST 1: Sending mention with simple task...');
-    const testPrompt = `<@${CLAUDE_BOT_ID}> create a file called hello.py that prints "Hello from Claude Agent!" and show me the contents`;
+    const testPrompt = `<@${ONE_BOT_ID}> create a file called hello.py that prints "Hello from one agent!" and show me the contents`;
 
     console.log(`   Prompt: ${testPrompt.substring(0, 70)}...`);
 
@@ -118,9 +118,9 @@ async function runAutomatedTest() {
     console.log('✅ SUCCESS: Bot responded!\n');
     console.log('Response breakdown:');
 
-    const claudeResponses = responses.filter(r => r.author.includes('Master-Remote'));
-    console.log(`  Claude bot: ${claudeResponses.length} message(s)`);
-    console.log(`  Other bots: ${responses.length - claudeResponses.length} message(s)\n`);
+    const agentResponses = responses.filter(r => r.author.includes('Master-Remote'));
+    console.log(`  One bot: ${agentResponses.length} message(s)`);
+    console.log(`  Other bots: ${responses.length - agentResponses.length} message(s)\n`);
 
     console.log('Timeline:');
     responses.forEach((r, i) => {
@@ -143,7 +143,7 @@ async function runAutomatedTest() {
 
     if (hasToolOutput && responses.length > 0) {
       console.log('\n🎉 FULL TWO-WAY WORKFLOW VERIFIED!');
-      console.log('   Tester -> Mention -> Claude Agent -> Tool Usage -> Responses\n');
+      console.log('   Tester -> Mention -> one agent -> Tool Usage -> Responses\n');
     } else {
       console.log('\n⚠️  Partial success: responses received but no tool usage detected\n');
     }

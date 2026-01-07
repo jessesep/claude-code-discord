@@ -7,6 +7,20 @@ async function runE2ETest() {
   console.log(`✅ Tester connected as ${ctx.tester.user?.tag}`);
   console.log(`📂 Testing in channel: #${ctx.channel.name}`);
 
+  // NEW: Announce startup to Discord
+  await ctx.channel.send({
+    embeds: [{
+      color: 0x9b59b6,
+      title: "🧪 E2E Test Suite Active",
+      description: `Testing bot **${ctx.tester.user?.tag}** is now online and initiating scenarios.`,
+      fields: [
+        { name: "📂 Channel", value: `#${ctx.channel.name}`, inline: true },
+        { name: "🤖 Mode", value: "Budget (Gemini 3 Flash)", inline: true }
+      ],
+      timestamp: new Date().toISOString()
+    }]
+  });
+
   const timestamp = Date.now();
   const filename = `e2e_test_${timestamp}.txt`;
   const expectedContent = "E2E TEST PASSED";
@@ -36,9 +50,32 @@ async function runE2ETest() {
     }
     
     console.log(`✅ File verification passed.`);
+    
+    // NEW: Report final success to Discord
+    await ctx.channel.send({
+      embeds: [{
+        color: 0x00ff00,
+        title: "✨ E2E Test Passed",
+        description: "Basic file creation and verification sequence completed successfully.",
+        timestamp: new Date().toISOString()
+      }]
+    });
+
     return { success: true, message: 'Basic file creation test passed' };
 
   } catch (err) {
+    // NEW: Report error to Discord
+    try {
+      await ctx.channel.send({
+        embeds: [{
+          color: 0xff0000,
+          title: "❌ E2E Test Failed",
+          description: `Error: ${err.message}`,
+          timestamp: new Date().toISOString()
+        }]
+      });
+    } catch {}
+
     return { success: false, message: err.message };
   } finally {
     try {

@@ -1,0 +1,200 @@
+🧪 Starting E2E Tester Bot Suite...
+
+💥 Critical Error during test: Error: Used disallowed intents
+    at WebSocketShard.onClose (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/ws/1.2.3/dist/index.js:1151:18)
+    at WebSocket.connection.onclose (file:///Users/jessesep/Library/Caches/deno/npm/registry.npmjs.org/@discordjs/ws/1.2.3/dist/index.js:688:17)
+    at WebSocket.wrappedHandler (ext:deno_web/02_event.js:1430:12)
+    at innerInvokeEventListeners (ext:deno_web/02_event.js:781:9)
+    at invokeEventListeners (ext:deno_web/02_event.js:827:5)
+    at dispatch (ext:deno_web/02_event.js:677:9)
+    at WebSocket.dispatchEvent (ext:deno_web/02_event.js:1071:12)
+    at WebSocket.[[[eventLoop]]] (ext:deno_websocket/01_websocket.js:614:16)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+🧪 Starting E2E Tester Bot Suite...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> Create a file named "e2e_te..."
+  [+2.0s] 📨 Received response from Master-Remote#8819
+  [+2.0s] 📨 Received response from user-tester-bot#5126
+⏳ Waiting up to 60s for agent to complete task...
+  [+4.8s] 📨 Received response from Master-Remote#8819
+  [+7.7s] 📨 Received response from user-tester-bot#5126
+  [+8.0s] 📨 Received response from Master-Remote#8819
+  [+18.0s] 📨 Received response from Master-Remote#8819
+❌ Could not verify or remove test file: No such file or directory (os error 2): readfile 'e2e_test_1767797113055.txt'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: E2E Test Failed: Response, tool usage, or file verification missing.
+Total Responses: 6
+Tool Usage Detected: No
+File Verification: Failed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 Starting E2E Tester Bot Suite...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> Create a file named "e2e_te..."
+  [+1.3s] 📨 Received response from user-tester-bot#5126
+⏳ Waiting up to 60s for agent to complete task...
+  [+1.6s] 📨 Received response from Master-Remote#8819
+  [+5.9s] 📨 Received response from user-tester-bot#5126
+  [+6.2s] 📨 Received response from Master-Remote#8819
+❌ Could not verify or remove test file: No such file or directory (os error 2): readfile 'e2e_test_1767797209925.txt'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: E2E Test Failed: Response, tool usage, or file verification missing.
+Total Responses: 4
+Tool Usage Detected: No
+File Verification: Failed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 Starting E2E Tester Bot Suite...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, Create ..."
+  [+1.5s] 📨 Received response from user-tester-bot#5126
+⏳ Waiting up to 60s for agent to complete task...
+  [+1.8s] 📨 Received response from Master-Remote#8819
+  [+6.0s] 📨 Received response from user-tester-bot#5126
+  [+6.5s] 📨 Received response from Master-Remote#8819
+  [+17.1s] 📨 Received response from Master-Remote#8819
+  [+23.2s] 📨 Received response from Master-Remote#8819
+  [+24.2s] 📨 Received response from Master-Remote#8819
+❌ Could not verify or remove test file: No such file or directory (os error 2): readfile 'e2e_test_1767797495211.txt'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: E2E Test Failed: Response, tool usage, or file verification missing.
+Total Responses: 7
+Tool Usage Detected: No
+File Verification: Failed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, Create ..."
+⏳ Waiting for agent to complete task...
+📩 Message from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+📩 Message from Master-Remote#8819: (embed)
+   Embed Title: 🤖 Processing..., Desc: Starting agent conversation......
+🔄 Update from Master-Remote#8819: (embed)
+   Embed Title: ⚠️ Approval Required, Desc: The manager wants to spawn **Antigravity Coder** f...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: Timed out after 120s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, Create ..."
+⏳ Waiting for agent to complete task...
+📩 Message from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+📩 Message from Master-Remote#8819: (embed)
+   Embed Title: 🤖 Processing..., Desc: Starting agent conversation......
+🔄 Update from Master-Remote#8819: <@1458440747295576206> ⚠️ **Approval Required**
+   Embed Title: ⚠️ Approval Required, Desc: The manager wants to spawn **Antigravity Coder** f...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: Timed out after 120s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: Timed out after 120s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+📩 Message from Master-Remote#8819: (embed)
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+📩 Message from Master-Remote#8819: (embed)
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+🔄 Update from Master-Remote#8819: (embed)
+📩 Message from Master-Remote#8819: (embed)
+   Embed Title: 🤖 Processing..., Desc: Starting agent conversation......
+🔄 Update from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+   Embed Title: 🤖 Cursor Autonomous Coder Processing..., Desc: undefined...
+🔄 Update from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+   Embed Title: ❌ Agent Error, Desc: Error: Cursor CLI exited with code 1
+stderr: Canno...
+📩 Message from Master-Remote#8819: (embed)
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+📩 Message from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+🔄 Update from Master-Remote#8819: (embed)
+📩 Message from Master-Remote#8819: (embed)
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+📩 Message from Master-Remote#8819: (embed)
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+📩 Message from Master-Remote#8819: (embed)
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+📩 Message from Master-Remote#8819: (embed)
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: Timed out after 120s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 Starting E2E Tester Bot Suite (Refactored)...
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #main
+📤 Sending command: "<@1457705423137275914> using cursor-coder, with mo..."
+⏳ Waiting for agent to complete task...

@@ -1,15 +1,15 @@
 <div align="center">
 
-# claude-code-discord
+# one agent bot
 
 <kbd>
 
 | Advantage                     | Details                                                                                  | Status |
 | ----------------------------- | ---------------------------------------------------------------------------------------- | :----: |
-| Use Claude Code Anywhere      | Host locally (VM / Docker / cloud) and send commands via the Discord API                 |   ✅   |
+| Use AI Anywhere      | Host locally (VM / Docker / cloud) and send commands via the Discord API                 |   ✅   |
 | Centralized collaboration     | Run commands and discuss results where your team already communicates                    |   ✅   |
 | Branch-aware organization     | Maps Git branches to channels/categories so feature work stays separated                 |   ✅   |
-| Immediate, shareable feedback | Execute `/git`, `/shell`, or `/claude` and get outputs directly in-channel               |   ✅   |
+| Immediate, shareable feedback | Execute `/git`, `/shell`, or `/agent` and get outputs directly in-channel               |   ✅   |
 | Reduced context switching     | Keep actions, logs, and discussion together — less switching between terminal and chat   |   ✅   |
 | Role-based access control     | Restrict destructive commands (`/shell`, `/git`, worktree ops) to specific Discord roles |   ✅   |
 | Non-developer friendly        | PMs, QA, and stakeholders can trigger checks and view results without repo access        |   ✅   |
@@ -59,13 +59,6 @@ git clone https://github.com/zebbern/claude-code-discord.git
 cd claude-code-discord
 ```
 
-**Install claude `If you dont have it` and login:**
-
-```
-npm install -g @anthropic-ai/claude-code
-claude /login
-```
-
 **Required environment variables**
 
 ```
@@ -103,14 +96,14 @@ deno run --allow-all index.ts
 # Option 2: Run the bot with extra terminal output (For Dev)
 deno run --allow-all index.ts --watch
 
-# Option 3: Run the bot and get pings when claude is done
+# Option 3: Run the bot and get pings when agent is done
 ./index.ts --category myproject --user-id Your_Discord_User_ID_Here
 
 # Can also be ran like this:
 deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User_ID_Here
 ```
 
-**You can run without `--user-id Your_Discord_User_ID_Here` if you dont want to be notified when claude finishes**
+**You can run without `--user-id Your_Discord_User_ID_Here` if you dont want to be notified when agent finishes**
 <img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/2fea008b-76b7-48d8-9a87-8214cc7a24ad" />
 
 <h1 id="setup">Setup Discord Bot</h1>
@@ -121,7 +114,7 @@ deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User
 >
 > - Go to the [Discord Developer Portal](https://discord.com/developers/applications)
 > - Click <kbd>New Application</kbd>
-> - Give your application a name (e.g., <kbd>ClaudeCode</kbd>)
+> - Give your application a name (e.g., <kbd>one agent</kbd>)
 > - Click <kbd>Create</kbd> > <img width="500" height="500" alt="app-create" src="https://github.com/user-attachments/assets/ee8bdf4e-9bbf-4d01-8046-a182ca6d5da9" />
 
 <h2 id="2">2. Copy Application ID (Needed For Config)</h2>
@@ -169,29 +162,29 @@ deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User
 
 > (48 Commands)
 
-### Core Claude (3)
+### Core Agent (3)
 
-- `/claude`, `/continue`, `/claude-cancel`
+- `/agent`, `/continue`, `/cancel-agent`
 
-### Enhanced Claude (4)
+### Enhanced Agent (4)
 
-- `/claude-enhanced`, `/claude-models`, `/claude-sessions`, `/claude-context`
+- `/agent-enhanced`, `/agent-models`, `/agent-sessions`, `/agent-context`
 
 ### Development Tools (7)
 
-- `/claude-explain`, `/claude-debug`, `/claude-optimize`, `/claude-review`
-- `/claude-generate`, `/claude-refactor`, `/claude-learn`
+- `/agent-explain`, `/agent-debug`, `/agent-optimize`, `/agent-review`
+- `/agent-generate`, `/agent-refactor`, `/agent-learn`
 
 ### New Features (3)
 
 - `/todos` - Task management with API rate limits
 - `/mcp` - Model Context Protocol servers
-- `/agent` - 7 specialized AI agents
+- `/agent` - Specialized AI agents
 
 ### Settings (4)
 
 - `/settings` - Unified settings (NEW)
-- `/claude-settings`, `/output-settings`, `/quick-model`
+- `/agent-settings`, `/output-settings`, `/quick-model`
 
 ### Git Operations (6)
 
@@ -215,23 +208,23 @@ deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User
 - `/category-info` - Show category and repository information
 - `/repo-info` - Display repository details
 
-### Agent System (3)
+### Agent System
 
 - `/agent` with specialized AI agents:
-  - **ag-manager**: Main orchestrator agent (Gemini 3 Flash)
-  - **ag-coder**: Autonomous coding agent (Antigravity)
-  - **ag-architect**: System design and planning (Antigravity)
-  - **ag-security**: Security analyst (Antigravity)
-  - **cursor-coder**: Autonomous coder (Cursor Sonnet)
-  - **cursor-refactor**: Refactoring specialist (Cursor Sonnet)
-  - **cursor-fast**: Quick edits agent (Cursor Sonnet)
-  - **code-reviewer**: Quality and security review (Claude Sonnet)
-  - **architect**: Architecture review (Claude Sonnet)
-  - **general-assistant**: Helpful AI assistant (Gemini 3 Flash)
+  - **ag-manager**: Main orchestrator agent
+  - **ag-coder**: Autonomous coding agent
+  - **ag-architect**: System design and planning
+  - **ag-security**: Security analyst
+  - **cursor-coder**: Autonomous coder
+  - **cursor-refactor**: Refactoring specialist
+  - **cursor-fast**: Quick edits agent
+  - **code-reviewer**: Quality and security review
+  - **architect**: Architecture review
+  - **general-assistant**: Helpful AI assistant
 
 #### Thinking Mode Options ✨
 
-- `none` - Standard Claude responses
+- `none` - Standard responses
 - `think` - Step-by-step reasoning mode
 - `think-hard` - Deep analysis and reasoning
 - `ultrathink` - Maximum depth thinking for complex problems
@@ -243,7 +236,7 @@ deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User
 - `auto-accept` - Automatically apply suggested changes
 - `danger` - Unrestricted mode (high risk)
 
-#### Claude Code (Discord Bot Edition)
+#### one agent bot
 
 A powerful Discord-based AI coding assistant that acts as a "Main Agent" (Manager) to orchestrate specialized subagents for complex coding tasks.
 
@@ -265,7 +258,7 @@ A powerful Discord-based AI coding assistant that acts as a "Main Agent" (Manage
 
 ## 🌟 New Architecture (Manager-Subagent)
 
-This bot now uses a **Gemini 3 Flash** powered "Manager Agent" to:
+This bot now uses a "Manager Agent" to:
 
 1.  **Interact with the User**: Provides instant, helpful responses and remembers conversation context.
 2.  **Orchestrate Work**: Intelligently delegates complex tasks (like coding or architecture design) to specialized subagents.
@@ -273,9 +266,9 @@ This bot now uses a **Gemini 3 Flash** powered "Manager Agent" to:
 
 ### Key Features
 
-- **🧠 Main Agent**: Powered by Google's `gemini-3-flash-preview`. Fast, smart, and context-aware.
+- **🧠 Main Agent**: Powered by high-performance models. Fast, smart, and context-aware.
 - **🛠️ Subagents**: Specialized agents (e.g., `ag-coder`) that run headlessly to perform heavy lifting.
-- **💬 Interactive UI**: (Coming Soon) Buttons, Select Menus, and rich embeds.
+- **💬 Interactive UI**: Buttons, Select Menus, and rich embeds.
 - **📂 Local Context**: Full access to your local filesystem.
 
 ## Getting Started
@@ -283,7 +276,7 @@ This bot now uses a **Gemini 3 Flash** powered "Manager Agent" to:
 1.  **Clone the Repo**
 2.  **Configure**: Copy `.env.example` to `.env` and add your tokens:
     - `DISCORD_TOKEN`
-    - `GEMINI_API_KEY` or `GOOGLE_API_KEY`
+    - `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY`
 3.  **Run**:
     ```bash
     ./start-bot.sh
@@ -294,7 +287,7 @@ This bot now uses a **Gemini 3 Flash** powered "Manager Agent" to:
 - `agent/`: Core agent logic.
   - `manager.ts`: Brain of the Main Agent.
   - `index.ts`: Agent orchestration and session management.
-- `claude/`: Gemini API client ("Antigravity").
+- `claude/`: API client implementations.
 - `discord/`: Discord bot interaction handlers.
 
 ## Contributing
@@ -305,7 +298,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to add new agents.
 
 - **Action types**: list, add, complete, generate, prioritize, rate-status
 - **Priority levels**: low, medium, high, critical
-- **Rate limit awareness** - Supports Anthropic API tiers including `exceeds_200k_tokens`
+- **Rate limit awareness** - Supports API tiers including `exceeds_200k_tokens`
 - **Token estimation** - Calculates estimated token usage
 - **Auto-generation** - Generate todos from code files
 
@@ -319,10 +312,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to add new agents.
 #### `/agent` Command ✨
 
 - **Specialized AI agents** for different development tasks:
-  - Gemini Manager - Main orchestrator
-  - Antigravity Coder - Autonomous coding
-  - Antigravity Architect - System design
-  - Antigravity Security - Vulnerability assessment
+  - Manager - Main orchestrator
+  - Coder - Autonomous coding
+  - Architect - System design
+  - Security - Vulnerability assessment
   - Cursor Autonomous Coder - File editing
   - Cursor Refactoring Specialist - Code improvement
   - Cursor Fast Agent - Quick targeted changes

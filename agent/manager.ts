@@ -15,8 +15,8 @@ Your role is to understand user requests, decompose tasks, delegate to specializ
 
 ## Memory & Context Helpers
 
-- **Golden Standards**: Found in `.agent-context.md`. Summarize these for subagents if necessary.
-- **claude-mem**: Every repo has `CLAUDE.md` with memory search shortcuts. Use them via MCP tools to fetch history.
+- **Golden Standards**: Found in \`.agent-context.md\`. Summarize these for subagents if necessary.
+- **Persistent Memory**: Every repo has \`ONE_AGENT.md\` with memory search shortcuts. Use them via MCP tools to fetch history.
 
 ## Instructions
 
@@ -131,7 +131,7 @@ export interface ManagerAction {
 }
 
 export function parseManagerResponse(response: string): ManagerAction | null {
-    const jsonBlock = response.match(/```json\n([\s\S]*?)\n```/);
+    const jsonBlock = response.match(/\`\`\`json\n([\s\S]*?)\n\`\`\`/);
     if (jsonBlock) {
         try {
             const data = JSON.parse(jsonBlock[1]);
@@ -178,7 +178,7 @@ export function parseManagerResponse(response: string): ManagerAction | null {
  */
 export function parseGitHubIssueRequest(response: string): ManagerAction | null {
     // Try to find JSON block with create_github_issue action
-    const jsonBlock = response.match(/```json\n([\s\S]*?)\n```/);
+    const jsonBlock = response.match(/\`\`\`json\n([\s\S]*?)\n\`\`\`/);
     if (jsonBlock) {
         try {
             const data = JSON.parse(jsonBlock[1]);

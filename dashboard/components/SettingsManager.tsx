@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BotSettings } from '../types';
+import ProviderConfig from './ProviderConfig';
 
 interface SettingsManagerProps {
   settings: BotSettings;
@@ -171,6 +172,8 @@ const SettingsManager: React.FC<SettingsManagerProps> = ({ settings, onUpdate })
           </div>
         </div>
       </div>
+
+      <ProviderConfig />
     </div>
   );
 };

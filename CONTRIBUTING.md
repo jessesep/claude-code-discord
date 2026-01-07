@@ -1,4 +1,4 @@
-# Contributing to Claude Code Discord
+# Contributing to one agent bot
 
 We welcome contributions! This guide specifically covers how to add **new agents** to the system.
 

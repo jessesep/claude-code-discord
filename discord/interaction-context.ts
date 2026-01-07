@@ -65,6 +65,84 @@ export async function createInteractionContext(
       }
     },
 
+    async sendAgentMessages(messages: any[]): Promise<void> {
+      const content = messages[0]?.content || '';
+      if (!content) return;
+      
+      const { splitText, DISCORD_LIMITS } = await import("./utils.ts");
+      const chunks = splitText(content, DISCORD_LIMITS.EMBED_DESCRIPTION, true);
+      
+      try {
+        if ('editReply' in interaction && (interaction.deferred || interaction.replied)) {
+          await interaction.editReply(convertMessageContent({
+            embeds: [{
+              color: 0x0099ff,
+              title: chunks.length > 1 ? 'Assistant (1/' + chunks.length + ')' : 'Assistant',
+              description: chunks[0],
+              timestamp: true
+            }]
+          }));
+          
+          for (let i = 1; i < chunks.length; i++) {
+            await interaction.followUp(convertMessageContent({
+              embeds: [{
+                color: 0x0099ff,
+                title: `Assistant (${i + 1}/${chunks.length})`,
+                description: chunks[i],
+                timestamp: true
+              }]
+            }));
+          }
+        } else if ('reply' in interaction) {
+          await interaction.reply(convertMessageContent({
+            embeds: [{
+              color: 0x0099ff,
+              title: chunks.length > 1 ? 'Assistant (1/' + chunks.length + ')' : 'Assistant',
+              description: chunks[0],
+              timestamp: true
+            }]
+          }));
+          
+          for (let i = 1; i < chunks.length; i++) {
+            await interaction.followUp(convertMessageContent({
+              embeds: [{
+                color: 0x0099ff,
+                title: `Assistant (${i + 1}/${chunks.length})`,
+                description: chunks[i],
+                timestamp: true
+              }]
+            }));
+          }
+        } else if (interaction.channel) {
+          // Fallback to channel.send if no interaction methods available
+          for (const chunk of chunks) {
+            await interaction.channel.send(convertMessageContent({
+              embeds: [{
+                color: 0x0099ff,
+                title: 'Assistant',
+                description: chunk,
+                timestamp: true
+              }]
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn("[InteractionContext] Failed to send messages via interaction, falling back to channel.send:", err);
+        if (interaction.channel) {
+          for (const chunk of chunks) {
+            await interaction.channel.send(convertMessageContent({
+              embeds: [{
+                color: 0x0099ff,
+                title: 'Assistant',
+                description: chunk,
+                timestamp: true
+              }]
+            })).catch((e: any) => console.error("[InteractionContext] Final fallback failed:", e));
+          }
+        }
+      }
+    },
+
     getString(name: string, required?: boolean): string | null {
       if (interaction.isCommand && interaction.isCommand()) {
         // deno-lint-ignore no-explicit-any

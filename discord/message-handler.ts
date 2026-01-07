@@ -120,7 +120,7 @@ export function handleMessageCreate(
       const { getActiveAgents, PREDEFINED_AGENTS } = await import("../agent/index.ts");
       const activeAgents = getActiveAgents(message.author.id, message.channelId);
       
-      let targetAgent = activeSession?.agentName || 'general-assistant';
+      let targetAgent = activeSession?.session.agentName || 'general-assistant';
       let agentExplicitlyNamed = false;
       
       const messageLower = contentWithoutMentions.toLowerCase();

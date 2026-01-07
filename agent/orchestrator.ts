@@ -30,7 +30,8 @@ export async function runAgentTask(
   agentId: string,
   task: string,
   onChunk?: (text: string) => void,
-  isAuthorized: boolean = false
+  isAuthorized: boolean = false,
+  workDir?: string
 ): Promise<string> {
   const agent = AgentRegistry.getInstance().getAgent(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
@@ -39,6 +40,7 @@ export async function runAgentTask(
   let resultText = "";
 
   const clientType = agent.client || 'claude';
+  const effectiveWorkDir = workDir || agent.workspace;
 
   if (clientType === 'cursor') {
     const { sendToCursorCLI } = await import("../claude/cursor-client.ts");
@@ -48,7 +50,7 @@ export async function runAgentTask(
       prompt,
       controller,
       {
-        workspace: agent.workspace,
+        workspace: effectiveWorkDir,
         force: agent.force,
         sandbox: agent.sandbox,
         streamJson: true,
@@ -67,7 +69,7 @@ export async function runAgentTask(
       controller,
       {
         model: agent.model,
-        workspace: agent.workspace,
+        workspace: effectiveWorkDir,
         streamJson: true,
         force: agent.force,
         sandbox: agent.sandbox,

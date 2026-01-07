@@ -121,7 +121,7 @@ export async function handleStartup(
       // Check providers status
       const { AgentProviderRegistry } = await import("../agent/provider-interface.ts");
       const providers = AgentProviderRegistry.getAllProviders();
-      const availableProviders = providers.filter(p => p.available);
+      const availableProviders = await AgentProviderRegistry.getAvailableProviders();
       const providerDetail = `${availableProviders.length}/${providers.length} available`;
       await updateStatus(2, availableProviders.length > 0 ? '✅' : '⚠️', providerDetail);
 
@@ -156,13 +156,15 @@ export async function handleStartup(
           console.log('[Commands] ✅ Commands unchanged since last registration, skipping (saves rate limit)');
           await updateStatus(3, '✅', 'Cached (no changes)');
         } else {
+          let animationRunning = false;
+          let animationInterval: any = null;
           try {
             console.log(`Registering slash commands for guild ${guild.id}...`);
             
             // ASCII progress bar logic...
             let animationProgress = 0;
-            let animationRunning = true;
-            const animationInterval = setInterval(async () => {
+            animationRunning = true;
+            animationInterval = setInterval(async () => {
               if (!animationRunning) return;
               if (animationProgress < 85) {
                 animationProgress += Math.random() * 12 + 5;

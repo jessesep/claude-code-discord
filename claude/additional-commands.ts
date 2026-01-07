@@ -1,10 +1,10 @@
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { CLAUDE_MODELS, CLAUDE_TEMPLATES } from "./enhanced-client.ts";
+import { AGENT_MODELS, AGENT_TEMPLATES } from "./enhanced-client.ts";
 
-export const additionalClaudeCommands = [
+export const additionalAgentCommands = [
   new SlashCommandBuilder()
-    .setName('claude-explain')
-    .setDescription('Ask Claude to explain code, concepts, or errors in detail')
+    .setName('agent-explain')
+    .setDescription('Ask agent to explain code, concepts, or errors in detail')
     .addStringOption(option =>
       option.setName('content')
         .setDescription('Code, concept, or error to explain')
@@ -24,7 +24,7 @@ export const additionalClaudeCommands = [
         .setRequired(false)),
 
   new SlashCommandBuilder()
-    .setName('claude-debug')
+    .setName('agent-debug')
     .setDescription('Get help debugging code issues and errors')
     .addStringOption(option =>
       option.setName('error_or_code')
@@ -50,8 +50,8 @@ export const additionalClaudeCommands = [
         .setRequired(false)),
 
   new SlashCommandBuilder()
-    .setName('claude-optimize')
-    .setDescription('Get code optimization suggestions from Claude')
+    .setName('agent-optimize')
+    .setDescription('Get code optimization suggestions from agent')
     .addStringOption(option =>
       option.setName('code')
         .setDescription('Code to optimize')
@@ -73,8 +73,8 @@ export const additionalClaudeCommands = [
         .setRequired(false)),
 
   new SlashCommandBuilder()
-    .setName('claude-review')
-    .setDescription('Get comprehensive code review from Claude')
+    .setName('agent-review')
+    .setDescription('Get comprehensive code review from agent')
     .addStringOption(option =>
       option.setName('code_or_file')
         .setDescription('Code to review or file path')
@@ -98,8 +98,8 @@ export const additionalClaudeCommands = [
         .setRequired(false)),
 
   new SlashCommandBuilder()
-    .setName('claude-generate')
-    .setDescription('Generate code, tests, or documentation with Claude')
+    .setName('agent-generate')
+    .setDescription('Generate code, tests, or documentation with the agent')
     .addStringOption(option =>
       option.setName('request')
         .setDescription('What to generate (function, class, test, documentation, etc.)')
@@ -128,8 +128,8 @@ export const additionalClaudeCommands = [
         )),
 
   new SlashCommandBuilder()
-    .setName('claude-refactor')
-    .setDescription('Refactor existing code with Claude\'s assistance')
+    .setName('agent-refactor')
+    .setDescription('Refactor existing code with the agent\'s assistance')
     .addStringOption(option =>
       option.setName('code')
         .setDescription('Code to refactor')
@@ -155,8 +155,8 @@ export const additionalClaudeCommands = [
         .setRequired(false)),
 
   new SlashCommandBuilder()
-    .setName('claude-learn')
-    .setDescription('Learn programming concepts with Claude as your tutor')
+    .setName('agent-learn')
+    .setDescription('Learn programming concepts with the agent as your tutor')
     .addStringOption(option =>
       option.setName('topic')
         .setDescription('Programming topic or concept to learn')
@@ -179,6 +179,9 @@ export const additionalClaudeCommands = [
         .setDescription('Break down into step-by-step guide')
         .setRequired(false))
 ];
+
+// Alias for backward compatibility
+export const additionalClaudeCommands = additionalAgentCommands;
 
 export interface AdditionalClaudeHandlerDeps {
   workDir: string;
@@ -211,12 +214,12 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
         
         prompt += `:\n\n${content}`;
 
-        const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
+        const { enhancedAgentQuery } = await import("./enhanced-client.ts");
         
         const controller = new AbortController();
         deps.setClaudeController(controller);
 
-        const result = await enhancedClaudeQuery(
+        const result = await enhancedAgentQuery(
           prompt,
           {
             workDir,
@@ -263,7 +266,7 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
         
         prompt += '\n\nPlease provide:\n1. Root cause analysis\n2. Step-by-step solution\n3. Prevention tips\n4. Code examples if applicable';
 
-        const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
+        const { enhancedAgentQuery } = await import("./enhanced-client.ts");
         
         const controller = new AbortController();
         deps.setClaudeController(controller);
@@ -272,7 +275,7 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
           contextFiles.split(',').map(f => f.trim()).filter(f => f.length > 0) : 
           undefined;
 
-        const result = await enhancedClaudeQuery(
+        const result = await enhancedAgentQuery(
           prompt,
           {
             workDir,
@@ -324,12 +327,12 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
         
         prompt += `:\n\n${code}\n\nPlease provide:\n1. Optimized version\n2. Explanation of changes\n3. Performance impact\n4. Any trade-offs`;
 
-        const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
+        const { enhancedAgentQuery } = await import("./enhanced-client.ts");
         
         const controller = new AbortController();
         deps.setClaudeController(controller);
 
-        const result = await enhancedClaudeQuery(
+        const result = await enhancedAgentQuery(
           prompt,
           {
             workDir,
@@ -388,7 +391,7 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
         
         prompt += `\n${analysisPoints.join('\n')}\n\nProvide specific recommendations with examples where applicable.`;
 
-        const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
+        const { enhancedAgentQuery } = await import("./enhanced-client.ts");
         
         const controller = new AbortController();
         deps.setClaudeController(controller);
@@ -397,7 +400,7 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
         const isFilePath = codeOrFile.includes('/') || codeOrFile.includes('\\') || codeOrFile.includes('.');
         const contextFiles = isFilePath ? [codeOrFile] : undefined;
 
-        const result = await enhancedClaudeQuery(
+        const result = await enhancedAgentQuery(
           prompt,
           {
             workDir,
@@ -445,12 +448,12 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
         
         prompt += '\n\nPlease include:\n• Well-commented code\n• Error handling where appropriate\n• Type annotations (if applicable)\n• Brief explanation of the implementation';
 
-        const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
+        const { enhancedAgentQuery } = await import("./enhanced-client.ts");
         
         const controller = new AbortController();
         deps.setClaudeController(controller);
 
-        const result = await enhancedClaudeQuery(
+        const result = await enhancedAgentQuery(
           prompt,
           {
             workDir,
@@ -506,12 +509,12 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
           prompt += '\n• Unit tests for the refactored code';
         }
 
-        const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
+        const { enhancedAgentQuery } = await import("./enhanced-client.ts");
         
         const controller = new AbortController();
         deps.setClaudeController(controller);
 
-        const result = await enhancedClaudeQuery(
+        const result = await enhancedAgentQuery(
           prompt,
           {
             workDir,
@@ -563,12 +566,12 @@ export function createAdditionalClaudeHandlers(deps: AdditionalClaudeHandlerDeps
           prompt += '\n• Practical exercises to reinforce learning';
         }
 
-        const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
+        const { enhancedAgentQuery } = await import("./enhanced-client.ts");
         
         const controller = new AbortController();
         deps.setClaudeController(controller);
 
-        const result = await enhancedClaudeQuery(
+        const result = await enhancedAgentQuery(
           prompt,
           {
             workDir,

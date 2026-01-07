@@ -24,7 +24,7 @@ if (import.meta.main) {
         workDir: workDir,
         repoName: "claude-code-discord",
         branchName: "main",
-        categoryName: "Claude Agents",
+        categoryName: "one agents",
         defaultMentionUserId: Deno.env.get("DEFAULT_MENTION_USER_ID")
     };
 
@@ -40,7 +40,7 @@ if (import.meta.main) {
                 console.error(`[CrashHandler] ${module}:`, error, context, details);
             }
         },
-        sendClaudeMessages: async (messages: any[]) => {
+        sendAgentMessages: async (messages: any[]) => {
             // Will be set up when bot channel is available
             console.log("[Agent] Would send messages:", messages.length);
         },

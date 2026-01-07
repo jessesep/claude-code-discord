@@ -21,7 +21,7 @@ async function setupTestingStructure() {
     Deno.exit(1);
   }
 
-  const CATEGORY_NAME = "[TESTING] Claude Agent Bot";
+  const CATEGORY_NAME = "[TESTING] one agent Bot";
   const CHANNELS = [
     { name: "e2e-basic", topic: "Basic E2E command tests" },
     { name: "e2e-multi-file", topic: "Tests for multi-file operations" },

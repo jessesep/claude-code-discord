@@ -1,38 +1,41 @@
 /**
- * Claude CLI Client
+ * Primary CLI Client
  *
- * Spawns Claude CLI processes instead of using the Anthropic API.
+ * Spawns Primary CLI processes instead of using an API directly.
  * Provides streaming support and proper error handling.
  */
 
-export interface ClaudeResponse {
+export interface PrimaryCLIResponse {
   response: string;
   cost?: number;
   duration?: number;
   modelUsed?: string;
 }
 
+// Alias for backward compatibility
+export { sendToPrimaryCLI as sendToClaudeCLI };
+
 /**
- * Send a prompt to Claude CLI and get streamed response
+ * Send a prompt to Primary CLI and get streamed response
  *
- * @param systemPrompt - System instructions for Claude
+ * @param systemPrompt - System instructions
  * @param userPrompt - User message/query
  * @param controller - AbortController for cancellation
  * @param model - Model identifier (default: claude-sonnet-4-5-20250929)
  * @param maxTokens - Maximum tokens to generate (default: 8000)
  * @param onChunk - Optional callback for streaming chunks
- * @returns ClaudeResponse with full text and metadata
+ * @returns PrimaryCLIResponse with full text and metadata
  */
-export async function sendToClaudeCLI(
+export async function sendToPrimaryCLI(
   systemPrompt: string,
   userPrompt: string,
   controller: AbortController,
   model: string = "claude-sonnet-4-5-20250929",
   maxTokens: number = 8000,
   onChunk?: (text: string) => void
-): Promise<ClaudeResponse> {
+): Promise<PrimaryCLIResponse> {
   try {
-    // Build Claude CLI command with correct options
+    // Build Primary CLI command with correct options
     const cmd = new Deno.Command("claude", {
       args: [
         "--print",  // Non-interactive mode
@@ -76,7 +79,7 @@ export async function sendToClaudeCLI(
       } catch (error) {
         // Handle abort/cancellation gracefully
         if (error instanceof Error && error.name === "AbortError") {
-          console.log("Claude CLI: Process cancelled by abort signal");
+          console.log("Primary CLI: Process cancelled by abort signal");
         } else {
           throw error;
         }
@@ -99,7 +102,7 @@ export async function sendToClaudeCLI(
       } catch (error) {
         // Ignore abort errors on stderr
         if (error instanceof Error && error.name !== "AbortError") {
-          console.error("Claude CLI stderr error:", error);
+          console.error("Primary CLI stderr error:", error);
         }
       } finally {
         stderrReader.releaseLock();
@@ -134,7 +137,7 @@ export async function sendToClaudeCLI(
 
       // Other errors
       throw new Error(
-        `Claude CLI exited with code ${status.code}\n` +
+        `Primary CLI exited with code ${status.code}\n` +
         `stderr: ${errorOutput}\n` +
         `stdout: ${fullResponse}`
       );
@@ -162,19 +165,18 @@ export async function sendToClaudeCLI(
 }
 
 /**
- * Send a prompt to Claude CLI with retry logic
- * Falls back to sonnet-4 on rate limits
+ * Send a prompt to Primary CLI with retry logic
  */
-export async function sendToClaudeCLIWithRetry(
+export async function sendToPrimaryCLIWithRetry(
   systemPrompt: string,
   userPrompt: string,
   controller: AbortController,
   model: string = "claude-sonnet-4-5-20250929",
   maxTokens: number = 8000,
   onChunk?: (text: string) => void
-): Promise<ClaudeResponse> {
+): Promise<PrimaryCLIResponse> {
   try {
-    return await sendToClaudeCLI(
+    return await sendToPrimaryCLI(
       systemPrompt,
       userPrompt,
       controller,
@@ -188,10 +190,10 @@ export async function sendToClaudeCLIWithRetry(
         (error.message.includes("exit code 1") ||
          error.message.includes("exited with code 1"))) {
 
-      console.log("Rate limit detected, retrying with Sonnet 4...");
+      console.log("Rate limit detected, retrying with fallback model...");
 
-      // Retry with sonnet-4
-      return await sendToClaudeCLI(
+      // Retry with fallback
+      return await sendToPrimaryCLI(
         systemPrompt,
         userPrompt,
         controller,

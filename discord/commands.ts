@@ -126,48 +126,7 @@ export async function getAgentCommand(deps?: AgentHandlerDeps) {
                 const deps: any = {
                     workDir: effectiveWorkDir,
                     targetUserId: ctx.user.id,
-                    sendClaudeMessages: async (msgs: any[]) => {
-                        const content = msgs[0]?.content || '';
-                        if (!content) return;
-                        
-                        // Use embeds for better length handling (4096 vs 2000 limit)
-                        // Split content if needed to respect embed description limit
-                        const chunks = splitText(content, DISCORD_LIMITS.EMBED_DESCRIPTION, true);
-                        
-                        if (chunks.length === 1) {
-                            // Single chunk - use embed for consistency and higher limit
-                            await ctx.editReply({ 
-                                embeds: [{
-                                    color: 0x0099ff,
-                                    title: 'Assistant Response',
-                                    description: chunks[0],
-                                    timestamp: true
-                                }]
-                            });
-                        } else {
-                            // Multiple chunks - send first as edit, rest as follow-ups
-                            await ctx.editReply({ 
-                                embeds: [{
-                                    color: 0x0099ff,
-                                    title: `Assistant Response (1/${chunks.length})`,
-                                    description: chunks[0],
-                                    timestamp: true
-                                }]
-                            });
-                            
-                            // Send remaining chunks as follow-up messages
-                            for (let i = 1; i < chunks.length; i++) {
-                                await ctx.followUp({
-                                    embeds: [{
-                                        color: 0x0099ff,
-                                        title: `Assistant Response (${i + 1}/${chunks.length})`,
-                                        description: chunks[i],
-                                        timestamp: true
-                                    }]
-                                });
-                            }
-                        }
-                    }
+                    sendAgentMessages: ctx.sendAgentMessages
                 };
 
                 const includeGit = ctx.getBoolean("include_git_context") || false;

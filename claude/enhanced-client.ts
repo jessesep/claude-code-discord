@@ -1,9 +1,9 @@
-import { sendToClaudeCode } from "./client.ts";
+import { sendToOneAgent } from "./client.ts";
 import type { ClaudeMessage } from "./types.ts";
 import { DISCORD_LIMITS } from "../discord/utils.ts";
 
-// Enhanced Claude Code client with additional features
-export interface EnhancedClaudeOptions {
+// Enhanced agent client with additional features
+export interface EnhancedAgentOptions {
   workDir: string;
   model?: string;
   temperature?: number;
@@ -14,7 +14,7 @@ export interface EnhancedClaudeOptions {
   includeSystemInfo?: boolean;
 }
 
-export interface ClaudeSession {
+export interface InternalAgentSession {
   id: string;
   startTime: Date;
   lastActivity: Date;
@@ -24,12 +24,12 @@ export interface ClaudeSession {
   workDir: string;
 }
 
-// Session manager for Claude Code
-export class ClaudeSessionManager {
-  private sessions = new Map<string, ClaudeSession>();
+// Session manager for agents
+export class InternalAgentSessionManager {
+  private sessions = new Map<string, InternalAgentSession>();
 
-  createSession(workDir: string, model?: string): ClaudeSession {
-    const session: ClaudeSession = {
+  createSession(workDir: string, model?: string): InternalAgentSession {
+    const session: InternalAgentSession = {
       id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       startTime: new Date(),
       lastActivity: new Date(),
@@ -43,7 +43,7 @@ export class ClaudeSessionManager {
     return session;
   }
 
-  getSession(sessionId: string): ClaudeSession | undefined {
+  getSession(sessionId: string): InternalAgentSession | undefined {
     return this.sessions.get(sessionId);
   }
 
@@ -58,11 +58,11 @@ export class ClaudeSessionManager {
     }
   }
 
-  getAllSessions(): ClaudeSession[] {
+  getAllSessions(): InternalAgentSession[] {
     return Array.from(this.sessions.values());
   }
 
-  getActiveSessions(maxAge: number = 3600000): ClaudeSession[] { // 1 hour default
+  getActiveSessions(maxAge: number = 3600000): InternalAgentSession[] { // 1 hour default
     const cutoff = Date.now() - maxAge;
     return Array.from(this.sessions.values()).filter(
       session => session.lastActivity.getTime() > cutoff
@@ -88,10 +88,16 @@ export class ClaudeSessionManager {
   }
 }
 
-// Enhanced Claude Code client with additional context
-export async function enhancedClaudeQuery(
+// Export aliases for backward compatibility
+export { AGENT_MODELS as CLAUDE_MODELS, AGENT_TEMPLATES as CLAUDE_TEMPLATES };
+export { InternalAgentSessionManager as ClaudeSessionManager };
+export { enhancedAgentQuery as enhancedClaudeQuery };
+export type { EnhancedAgentOptions as EnhancedClaudeOptions, InternalAgentSession as ClaudeSession };
+
+// Enhanced agent client with additional context
+export async function enhancedAgentQuery(
   prompt: string,
-  options: EnhancedClaudeOptions,
+  options: EnhancedAgentOptions,
   controller: AbortController,
   sessionId?: string,
   onChunk?: (text: string) => void,
@@ -122,7 +128,7 @@ export async function enhancedClaudeQuery(
     }
   }
 
-  return sendToClaudeCode(
+  return sendToOneAgent(
     options.workDir,
     enhancedPrompt,
     controller,
@@ -133,7 +139,7 @@ export async function enhancedClaudeQuery(
   );
 }
 
-// Get system context for Claude
+// Get system context for agent
 async function getSystemContext(workDir: string): Promise<string> {
   try {
     const [osInfo, nodeInfo, denoInfo] = await Promise.all([
@@ -247,39 +253,39 @@ async function getDenoInfo(): Promise<string> {
   }
 }
 
-// Claude Code model options - Updated with latest models
-export const CLAUDE_MODELS = {
+// Agent model options - Updated with latest models
+export const AGENT_MODELS = {
   'claude-sonnet-4': {
-    name: 'Claude Sonnet 4 (Latest)',
-    description: 'Most advanced Claude model with superior reasoning',
+    name: 'Sonnet 4 (Latest)',
+    description: 'Most advanced model with superior reasoning',
     contextWindow: 200000,
     recommended: true,
     supportsThinking: true
   },
   'claude-sonnet-4-20250514?thinking_mode=true': {
-    name: 'Claude Sonnet 4 (Thinking Mode)',
-    description: 'Claude Sonnet 4 with visible reasoning process',
+    name: 'Sonnet 4 (Thinking Mode)',
+    description: 'Sonnet 4 with visible reasoning process',
     contextWindow: 200000,
     recommended: true,
     supportsThinking: true,
     thinkingMode: true
   },
   'claude-3-5-sonnet-20241022': {
-    name: 'Claude 3.5 Sonnet',
+    name: '3.5 Sonnet',
     description: 'Previous generation high-performance model',
     contextWindow: 200000,
     recommended: false,
     supportsThinking: false
   },
   'claude-3-5-haiku-20241022': {
-    name: 'Claude 3.5 Haiku',
+    name: '3.5 Haiku',
     description: 'Fast model for quick tasks and simple queries',
     contextWindow: 200000,
     recommended: false,
     supportsThinking: false
   },
   'claude-3-opus-20240229': {
-    name: 'Claude 3 Opus',
+    name: '3 Opus',
     description: 'Legacy model for complex reasoning (deprecated)',
     contextWindow: 200000,
     recommended: false,
@@ -288,7 +294,7 @@ export const CLAUDE_MODELS = {
 };
 
 // Quick prompt templates for common tasks
-export const CLAUDE_TEMPLATES = {
+export const AGENT_TEMPLATES = {
   debug: "Please help me debug this issue. Analyze the error and provide a solution:",
   explain: "Please explain this code in detail, including what it does and how it works:",
   optimize: "Please review this code and suggest optimizations for performance and readability:",

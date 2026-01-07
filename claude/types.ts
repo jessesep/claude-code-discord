@@ -11,6 +11,7 @@ export interface ClaudeMessage {
   content: string;
   // deno-lint-ignore no-explicit-any
   metadata?: any;
+  timestamp?: string;
 }
 
 export interface TodoItem {

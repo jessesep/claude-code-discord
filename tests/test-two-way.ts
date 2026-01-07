@@ -81,7 +81,7 @@ async function runTwoWayTest() {
     console.log('━'.repeat(60));
 
     // Send test message
-    const testPrompt = 'Create a simple hello.py script that prints "Hello from Claude Agent!" and test it';
+    const testPrompt = 'Create a simple hello.py script that prints "Hello from one agent!" and test it';
     console.log(`\n📤 Sending test message to claude-code-discord bot:`);
     console.log(`   "${testPrompt}"\n`);
 

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<handoff version="2" generated="2026-01-06T19:14:12Z" scope="auto" type="session-end" duration="0m">
+<handoff version="2" generated="2026-01-07T14:30:50Z" scope="auto" type="session-end" duration="0m">
 
   <project>
     <name>claude-code-discord</name>
@@ -9,7 +9,7 @@
   </project>
 
   <session>
-    <uncommitted-changes>14</uncommitted-changes>
+    <uncommitted-changes>26</uncommitted-changes>
     <staged-files>
 
     </staged-files>
@@ -17,30 +17,30 @@
 
   <changes>
     <commits count="5">
-d937104 fix: Remove duplicate channelId declaration
-8c0b05b fix: Move errorMessage declaration outside embed object
-f33b1d1 feat: Add multi-agent spawning and category names with repo info
-af46ade Milestone: Security fixes and utilities
-24a4974 Fix /run command: handle Discord.js select menu components
+a9f67d4 feat: add OpenAI and Groq providers and provider configuration system
+bd80300 chore: repository audit, documentation consolidation, and cleanup
+7db2625 fix: /run command and batch of bug fixes
+3911d3d fix: use reboot.sh for /restart command to run bot in background
+d5a0279 docs: update conversation logs
     </commits>
     <modified-files>
+.agent-context.md
 .handoffs/current.xml
 .handoffs/previous.xml
 ARCHITECTURE.md
-FEATURES_SUMMARY.md
+CONTRIBUTING.md
 README.md
-agent/index.ts
-agent/manager.ts
-agent/providers/antigravity-provider.ts
-agent/providers/ollama-provider.ts
-bot.log
+agent/AGENT_ACCESS_AUDIT.md
+agent/AGENT_CONTEXT.md
+agent/HANDOFF.md
+agent/START_HERE.md
     </modified-files>
   </changes>
 
   <issues open-bugs="1">
-      - [High] No session timeout/cleanup - memory leak risk
-      - [Critical] Agent sessions not persisted - lost on bot restart
-      - [exe] Command failed unexpectedly
+      - [Refactor] Interaction State Management & CustomId Optimization
+      - [BUG] CursorProvider had incorrect/fabricated model names
+      - [BUG] Antigravity provider missing from /run-adv provider selection
     </issues>
 
   <next-actions>

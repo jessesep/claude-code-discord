@@ -12,7 +12,7 @@ import {
 import { ShellManager } from "./shell/index.ts";
 import { getGitInfo } from "./git/index.ts";
 
-import { createClaudeHandlers, claudeCommands, cleanSessionId, createClaudeSender, expandableContent, type DiscordSender, ClaudeMessage, enhancedClaudeCommands, createEnhancedClaudeHandlers, ClaudeSessionManager } from "./claude/index.ts";
+import { createClaudeHandlers, claudeCommands, cleanSessionId, createClaudeSender, expandableContent, type DiscordSender, ClaudeMessage, enhancedAgentCommands as enhancedClaudeCommands, createEnhancedAgentHandlers as createEnhancedClaudeHandlers, ClaudeSessionManager } from "./claude/index.ts";
 import { additionalClaudeCommands, createAdditionalClaudeHandlers } from "./claude/additional-index.ts";
 import {
   advancedSettingsCommands,
@@ -74,10 +74,10 @@ function parseArgs(args: string[]): { category?: string; userId?: string } {
 
 // Re-export for backward compatibility
 export { getGitInfo, executeGitCommand } from "./git/index.ts";
-export { sendToClaudeCode } from "./claude/index.ts";
+export { sendToOneAgent } from "./claude/index.ts";
 
-// Create Claude Code Discord Bot
-export async function createClaudeCodeBot(config: BotConfig) {
+// Create One Agent Bot
+export async function createOneAgentBot(config: BotConfig) {
   const { discordToken, applicationId, workDir, repoName, branchName, categoryName, defaultMentionUserId } = config;
 
   // Determine category name (include repo name for visibility)
@@ -103,10 +103,10 @@ export async function createClaudeCodeBot(config: BotConfig) {
     console.warn("[Startup] Could not initialize conversation sync:", error);
   }
 
-  // Claude Code session management
-  let claudeController: AbortController | null = null;
+  // One agent session management
+  let agentController: AbortController | null = null;
   // deno-lint-ignore no-unused-vars
-  let claudeSessionId: string | undefined;
+  let agentSessionId: string | undefined;
 
   // Message history for navigation (like terminal history)
   const messageHistory: string[] = [];
@@ -169,8 +169,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Setup global error handlers
   setupGlobalErrorHandlers(crashHandler);
 
-  // Create Claude session manager
-  const claudeSessionManager = new ClaudeSessionManager();
+  // Create agent session manager
+  const agentSessionManager = new ClaudeSessionManager();
 
   // Set up crash handler dependencies
   crashHandler.setManagers(shellManager, worktreeBotManager);
@@ -180,7 +180,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     try {
       crashHandler.cleanup();
       cleanupPaginationStates();
-      claudeSessionManager.cleanup(); // Clean up old Claude sessions
+      agentSessionManager.cleanup(); // Clean up old sessions
     } catch (error) {
       console.error('Error during periodic cleanup:', error);
     }
@@ -250,18 +250,18 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // deno-lint-ignore no-explicit-any prefer-const
   let bot: any;
 
-  // We'll create the Claude sender after bot initialization
-  let claudeSender: ((messages: ClaudeMessage[]) => Promise<void>) | null = null;
+  // We'll create the agent sender after bot initialization
+  let agentSender: ((messages: ClaudeMessage[]) => Promise<void>) | null = null;
 
-  // Create handlers with dependencies (sendClaudeMessages will be updated after bot creation)
+  // Create handlers with dependencies (sendAgentMessages will be updated after bot creation)
   const claudeHandlers = createClaudeHandlers({
     workDir,
-    claudeController,
-    setClaudeController: (controller) => { claudeController = controller; },
-    setClaudeSessionId: (sessionId) => { claudeSessionId = sessionId; },
+    claudeController: agentController,
+    setClaudeController: (controller) => { agentController = controller; },
+    setClaudeSessionId: (sessionId) => { agentSessionId = sessionId; },
     sendClaudeMessages: async (messages) => {
-      if (claudeSender) {
-        await claudeSender(messages);
+      if (agentSender) {
+        await agentSender(messages);
       }
     }
   });
@@ -322,15 +322,15 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
   const enhancedClaudeHandlers = createEnhancedClaudeHandlers({
     workDir,
-    claudeController,
-    setClaudeController: (controller) => { claudeController = controller; },
-    setClaudeSessionId: (sessionId) => { claudeSessionId = sessionId; },
-    sendClaudeMessages: async (messages) => {
-      if (claudeSender) {
-        await claudeSender(messages);
+    agentController: agentController,
+    setAgentController: (controller: AbortController | null) => { agentController = controller; },
+    setAgentSessionId: (sessionId: string | undefined) => { agentSessionId = sessionId; },
+    sendAgentMessages: async (messages: any[]) => {
+      if (agentSender) {
+        await agentSender(messages);
       }
     },
-    sessionManager: claudeSessionManager,
+    sessionManager: agentSessionManager,
     crashHandler
   });
 
@@ -341,14 +341,14 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
   const additionalClaudeHandlers = createAdditionalClaudeHandlers({
     workDir,
-    claudeController,
-    setClaudeController: (controller) => { claudeController = controller; },
+    claudeController: agentController,
+    setClaudeController: (controller) => { agentController = controller; },
     sendClaudeMessages: async (messages) => {
-      if (claudeSender) {
-        await claudeSender(messages);
+      if (agentSender) {
+        await agentSender(messages);
       }
     },
-    sessionManager: claudeSessionManager,
+    sessionManager: agentSessionManager,
     crashHandler,
     settings: advancedSettings
   });
@@ -368,12 +368,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
   const agentHandlers = createAgentHandlers({
     workDir,
     crashHandler,
-    sendClaudeMessages: async (messages) => {
-      if (claudeSender) {
-        await claudeSender(messages);
+    sendAgentMessages: async (messages) => {
+      if (agentSender) {
+        await agentSender(messages);
       }
     },
-    sessionManager: claudeSessionManager
+    sessionManager: agentSessionManager
   });
 
   // Start OSC Server
@@ -410,12 +410,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await handleSimpleCommand(ctx, 'run', {
           workDir,
           crashHandler,
-          sendClaudeMessages: async (messages) => {
-            if (claudeSender) {
-              await claudeSender(messages);
+          sendAgentMessages: async (messages) => {
+            if (agentSender) {
+              await agentSender(messages);
             }
           },
-          sessionManager: claudeSessionManager
+          sessionManager: agentSessionManager
         });
       }
     }],
@@ -424,12 +424,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await handleSimpleCommand(ctx, 'kill', {
           workDir,
           crashHandler,
-          sendClaudeMessages: async (messages) => {
-            if (claudeSender) {
-              await claudeSender(messages);
+          sendAgentMessages: async (messages) => {
+            if (agentSender) {
+              await agentSender(messages);
             }
           },
-          sessionManager: claudeSessionManager
+          sessionManager: agentSessionManager
         });
       }
     }],
@@ -438,12 +438,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await handleSimpleCommand(ctx, 'sync', {
           workDir,
           crashHandler,
-          sendClaudeMessages: async (messages) => {
-            if (claudeSender) {
-              await claudeSender(messages);
+          sendAgentMessages: async (messages) => {
+            if (agentSender) {
+              await agentSender(messages);
             }
           },
-          sessionManager: claudeSessionManager
+          sessionManager: agentSessionManager
         });
       }
     }],
@@ -452,12 +452,12 @@ export async function createClaudeCodeBot(config: BotConfig) {
         await handleSimpleCommand(ctx, 'run-adv', {
           workDir,
           crashHandler,
-          sendClaudeMessages: async (messages) => {
-            if (claudeSender) {
-              await claudeSender(messages);
+          sendAgentMessages: async (messages) => {
+            if (agentSender) {
+              await agentSender(messages);
             }
           },
-          sessionManager: claudeSessionManager
+          sessionManager: agentSessionManager
         });
       }
     }],
@@ -1194,7 +1194,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
     ['status', {
       execute: async (ctx: InteractionContext) => {
         await ctx.deferReply();
-        const sessionStatus = claudeController ? "Running" : "Idle";
+        const sessionStatus = agentController ? "Running" : "Idle";
         const gitStatusInfo = await gitHandlers.getStatus();
         const runningCount = shellHandlers.onShellList(ctx).size;
         const worktreeStatus = gitHandlers.onWorktreeBots(ctx);
@@ -1204,7 +1204,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
             color: 0x00ffff,
             title: 'Status',
             fields: [
-              { name: 'Claude Code', value: sessionStatus, inline: true },
+              { name: 'One Agent', value: sessionStatus, inline: true },
               { name: 'Git Branch', value: gitStatusInfo.branch, inline: true },
               { name: 'Shell Processes', value: `${runningCount} running`, inline: true },
               { name: 'Worktree Bots', value: `${worktreeStatus.totalBots} running`, inline: true },
@@ -1252,9 +1252,9 @@ export async function createClaudeCodeBot(config: BotConfig) {
         // Kill all worktree bots
         gitHandlers.killAllWorktreeBots();
 
-        // Cancel Claude Code session
-        if (claudeController) {
-          claudeController.abort();
+        // Cancel agent session
+        if (agentController) {
+          agentController.abort();
         }
 
         // Clean up monitoring and crash handlers
@@ -1294,7 +1294,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const contextFiles = ctx.getString('context_files');
         const sessionId = ctx.getString('session_id');
 
-        await enhancedClaudeHandlers.onClaudeEnhanced(
+        await enhancedClaudeHandlers.onAgentEnhanced(
           ctx, prompt, model || undefined, template || undefined,
           includeSystemInfo || undefined, includeGitContext || undefined,
           contextFiles || undefined, sessionId || undefined
@@ -1303,14 +1303,14 @@ export async function createClaudeCodeBot(config: BotConfig) {
     }],
     ['claude-models', {
       execute: async (ctx: InteractionContext) => {
-        await enhancedClaudeHandlers.onClaudeModels(ctx);
+        await enhancedClaudeHandlers.onAgentModels(ctx);
       }
     }],
     ['claude-sessions', {
       execute: async (ctx: InteractionContext) => {
         const action = ctx.getString('action', true)!;
         const sessionId = ctx.getString('session_id');
-        await enhancedClaudeHandlers.onClaudeSessions(ctx, action, sessionId || undefined);
+        await enhancedClaudeHandlers.onAgentSessions(ctx, action, sessionId || undefined);
       }
     }],
     ['claude-context', {
@@ -1318,7 +1318,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         const includeSystemInfo = ctx.getBoolean('include_system_info');
         const includeGitContext = ctx.getBoolean('include_git_context');
         const contextFiles = ctx.getString('context_files');
-        await enhancedClaudeHandlers.onClaudeContext(
+        await enhancedClaudeHandlers.onAgentContext(
           ctx, includeSystemInfo || undefined, includeGitContext || undefined,
           contextFiles || undefined
         );
@@ -1634,14 +1634,14 @@ export async function createClaudeCodeBot(config: BotConfig) {
   // Create Discord bot
   // Button handlers
   const buttonHandlers: ButtonHandlers = new Map([
-    // Claude action buttons
-    ['cancel-claude', async (ctx: InteractionContext) => {
+    // Agent action buttons
+    ['cancel-agent', async (ctx: InteractionContext) => {
       const cancelled = claudeHandlers.onClaudeCancel(ctx);
       await ctx.update({
         embeds: [{
           color: cancelled ? 0xff0000 : 0x808080,
           title: cancelled ? 'Cancel Successful' : 'Cancel Failed',
-          description: cancelled ? 'Claude Code session cancelled.' : 'No running Claude Code session.',
+          description: cancelled ? 'Agent session cancelled.' : 'No running agent session.',
           timestamp: true
         }]
       });
@@ -1649,7 +1649,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
     // Copy session ID button
     ['copy-session', async (ctx: InteractionContext) => {
-      const sessionId = claudeSessionId;
+      const sessionId = agentSessionId;
       await ctx.update({
         embeds: [{
           color: 0x00ff00,
@@ -1671,7 +1671,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
             title: '⬆️ No Previous Messages',
             description: 'No previous messages found in history.',
             fields: [
-              { name: 'Tip', value: 'Send some Claude commands to build up your message history!', inline: false }
+              { name: 'Tip', value: 'Send some commands to build up your message history!', inline: false }
             ],
             timestamp: true
           }]
@@ -1689,7 +1689,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
           title: `⬆️ Previous Message (${historyPosition}/${totalMessages})`,
           description: `\`\`\`\n${previousMessage}\n\`\`\``,
           fields: [
-            { name: 'Usage', value: 'Copy this message to use with `/claude prompt:...`', inline: false },
+            { name: 'Usage', value: 'Copy this message to use with your next command', inline: false },
             { name: 'Navigation', value: `Position ${historyPosition} of ${totalMessages} messages in history`, inline: false }
           ],
           timestamp: true
@@ -1730,13 +1730,13 @@ export async function createClaudeCodeBot(config: BotConfig) {
 
     // Continue button with session ID
     ['continue', async (ctx: InteractionContext) => {
-      const sessionId = claudeSessionId;
+      const sessionId = agentSessionId;
       if (!sessionId) {
         await ctx.update({
           embeds: [{
             color: 0xff0000,
             title: '❌ No Session Available',
-            description: 'No active session found. Use `/claude` to start a new conversation.',
+            description: 'No active session found.',
             timestamp: true
           }]
         });
@@ -1747,7 +1747,7 @@ export async function createClaudeCodeBot(config: BotConfig) {
         embeds: [{
           color: 0xffff00,
           title: '➡️ Continue Session',
-          description: `Use \`/continue\` or \`/claude session_id:${sessionId}\` to continue the conversation.`,
+          description: `Use the session ID \`${sessionId}\` to continue the conversation.`,
           fields: [
             { name: 'Session ID', value: `\`${sessionId}\``, inline: false }
           ],
@@ -2029,8 +2029,8 @@ export async function createClaudeCodeBot(config: BotConfig) {
     }
   };
 
-  // Create Claude sender function
-  claudeSender = createClaudeSender(discordSender);
+  // Create agent sender function
+  agentSender = createClaudeSender(discordSender);
 
   // Signal handlers
   const handleSignal = async (signal: string) => {
@@ -2043,14 +2043,14 @@ export async function createClaudeCodeBot(config: BotConfig) {
       // Kill all worktree bots
       gitHandlers.killAllWorktreeBots();
 
-      // Cancel Claude Code session
-      if (claudeController) {
-        claudeController.abort();
+      // Cancel session
+      if (agentController) {
+        agentController.abort();
       }
 
       // Send shutdown message
-      if (claudeSender) {
-        await claudeSender([{
+      if (agentSender) {
+        await agentSender([{
           type: 'system',
           content: '',
           metadata: {
@@ -2125,7 +2125,7 @@ if (import.meta.main) {
     const gitInfo = await getGitInfo();
 
     // Create and start bot
-    await createClaudeCodeBot({
+    await createOneAgentBot({
       discordToken,
       applicationId,
       workDir: Deno.cwd(),

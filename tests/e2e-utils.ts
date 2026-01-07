@@ -131,7 +131,7 @@ export const isFinalResponse = (messages: Message[]) => {
 /**
  * Budget-friendly testing utilities
  */
-export const BUDGET_MODEL = "gemini-3-flash-preview";
+export const BUDGET_MODEL = "gemini-3-flash";
 
 export function getBudgetPrompt(agent: string, task: string): string {
   return `<@${CLAUDE_BOT_ID}> using ${agent}, with model="${BUDGET_MODEL}", ${task}`;

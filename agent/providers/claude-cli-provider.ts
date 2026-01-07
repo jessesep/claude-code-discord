@@ -11,7 +11,7 @@ import {
   UniversalAgentResponse,
   ProviderStatus,
 } from '../provider-interface.ts';
-import { sendToClaudeCLI } from '../../claude/cli-client.ts';
+import { sendToPrimaryCLI } from '../../claude/cli-client.ts';
 
 export class ClaudeCliProvider implements AgentProvider {
   readonly providerId = 'claude-cli';
@@ -64,7 +64,7 @@ export class ClaudeCliProvider implements AgentProvider {
     const userPrompt = parts[1] || prompt;
 
     // Call the existing Claude CLI client
-    const result = await sendToClaudeCLI(
+    const result = await sendToPrimaryCLI(
       systemPrompt,
       userPrompt,
       controller,

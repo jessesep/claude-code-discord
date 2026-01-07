@@ -10,8 +10,11 @@ export function cleanSessionId(sessionId: string): string {
     .trim();                         // Remove whitespace again
 }
 
-// Wrapper for Claude Code SDK query function
-export async function sendToClaudeCode(
+// Alias for backward compatibility
+export { sendToOneAgent as sendToClaudeCode };
+
+// Wrapper for agent SDK query function
+export async function sendToOneAgent(
   workDir: string,
   prompt: string,
   controller: AbortController,
@@ -52,7 +55,7 @@ export async function sendToClaudeCode(
         },
       };
       
-      console.log(`Claude Code: Running with ${useRetryModel ? 'Sonnet 4' : 'default model'}...`);
+      console.log(`Agent: Running with ${useRetryModel ? 'fallback model' : 'default model'}...`);
       if (continueMode) {
         console.log(`Continue mode: Reading latest conversation in directory`);
       } else if (cleanedSessionId) {
@@ -67,7 +70,7 @@ export async function sendToClaudeCode(
       for await (const message of iterator) {
         // Check AbortSignal to stop iteration
         if (controller.signal.aborted) {
-          console.log(`Claude Code${useRetryModel ? ' (Retry)' : ''}: Abort signal detected, stopping iteration`);
+          console.log(`Agent${useRetryModel ? ' (Retry)' : ''}: Abort signal detected, stopping iteration`);
           break;
         }
         
@@ -112,7 +115,7 @@ export async function sendToClaudeCode(
       if (error.name === 'AbortError' || 
           controller.signal.aborted || 
           (error.message && error.message.includes('exited with code 143'))) {
-        console.log(`Claude Code${useRetryModel ? ' (Retry)' : ''}: Process terminated by abort signal`);
+        console.log(`Agent${useRetryModel ? ' (Retry)' : ''}: Process terminated by abort signal`);
         return {
           messages: [],
           response: "",
@@ -148,10 +151,10 @@ export async function sendToClaudeCode(
     };
   // deno-lint-ignore no-explicit-any
   } catch (error: any) {
-    // For exit code 1 errors, retry with Sonnet 4
+    // For exit code 1 errors, retry with fallback
     if (error.message && (error.message.includes('exit code 1') || error.message.includes('exited with code 1'))) {
-      console.log("Rate limit detected, retrying with Sonnet 4...");
-      modelUsed = "Claude Sonnet 4";
+      console.log("Rate limit detected, retrying with fallback model...");
+      modelUsed = "Fallback Model";
       
       try {
         const retryResult = await executeWithErrorHandling(true);
@@ -179,7 +182,7 @@ export async function sendToClaudeCode(
           return { response: "Request was cancelled", modelUsed };
         }
         
-        retryError.message += '\n\n⚠️ Both default model and Sonnet 4 encountered errors. Please wait a moment and try again.';
+        retryError.message += '\n\n⚠️ Both default model and fallback model encountered errors. Please wait a moment and try again.';
         throw retryError;
       }
     }

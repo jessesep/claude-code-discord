@@ -1,20 +1,20 @@
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { CLAUDE_MODELS, CLAUDE_TEMPLATES } from "./enhanced-client.ts";
+import { AGENT_MODELS, AGENT_TEMPLATES } from "./enhanced-client.ts";
 
-export const enhancedClaudeCommands = [
+export const enhancedAgentCommands = [
   new SlashCommandBuilder()
-    .setName('claude-enhanced')
-    .setDescription('Send message to Claude Code with advanced options')
+    .setName('agent-enhanced')
+    .setDescription('Send message to agent with advanced options')
     .addStringOption(option =>
       option.setName('prompt')
-        .setDescription('Prompt for Claude Code')
+        .setDescription('Prompt for agent')
         .setRequired(true))
     .addStringOption(option =>
       option.setName('model')
-        .setDescription('Claude model to use')
+        .setDescription('Agent model to use')
         .setRequired(false)
         .addChoices(
-          ...Object.entries(CLAUDE_MODELS).map(([value, model]) => ({
+          ...Object.entries(AGENT_MODELS).map(([value, model]) => ({
             name: model.name,
             value: value
           }))
@@ -24,7 +24,7 @@ export const enhancedClaudeCommands = [
         .setDescription('Use a predefined template')
         .setRequired(false)
         .addChoices(
-          ...Object.entries(CLAUDE_TEMPLATES).map(([key, value]) => ({
+          ...Object.entries(AGENT_TEMPLATES).map(([key, value]) => ({
             name: key.charAt(0).toUpperCase() + key.slice(1),
             value: key
           }))
@@ -47,12 +47,12 @@ export const enhancedClaudeCommands = [
         .setRequired(false)),
 
   new SlashCommandBuilder()
-    .setName('claude-models')
-    .setDescription('List available Claude models and their capabilities'),
+    .setName('agent-models')
+    .setDescription('List available agent models and their capabilities'),
 
   new SlashCommandBuilder()
-    .setName('claude-sessions')
-    .setDescription('Manage Claude Code sessions')
+    .setName('agent-sessions')
+    .setDescription('Manage agent sessions')
     .addStringOption(option =>
       option.setName('action')
         .setDescription('Action to perform')
@@ -68,12 +68,12 @@ export const enhancedClaudeCommands = [
         .setDescription('Session ID (required for info/delete actions)')
         .setRequired(false)),
 
-  // NOTE: claude-templates command removed as requested
+  // NOTE: templates command removed as requested
   // Template functionality is now handled through enhanced prompting
 
   new SlashCommandBuilder()
-    .setName('claude-context')
-    .setDescription('Show context information that would be sent to Claude')
+    .setName('agent-context')
+    .setDescription('Show context information that would be sent to agent')
     .addBooleanOption(option =>
       option.setName('include_system_info')
         .setDescription('Include system information')
@@ -88,21 +88,21 @@ export const enhancedClaudeCommands = [
         .setRequired(false))
 ];
 
-export interface EnhancedClaudeHandlerDeps {
+export interface EnhancedAgentHandlerDeps {
   workDir: string;
-  claudeController: AbortController | null;
-  setClaudeController: (controller: AbortController | null) => void;
-  setClaudeSessionId: (sessionId: string | undefined) => void;
-  sendClaudeMessages: (messages: any[]) => Promise<void>;
+  agentController: AbortController | null;
+  setAgentController: (controller: AbortController | null) => void;
+  setAgentSessionId: (sessionId: string | undefined) => void;
+  sendAgentMessages: (messages: any[]) => Promise<void>;
   sessionManager: any;
   crashHandler: any;
 }
 
-export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
-  const { workDir, sessionManager, crashHandler, sendClaudeMessages } = deps;
+export function createEnhancedAgentHandlers(deps: EnhancedAgentHandlerDeps) {
+  const { workDir, sessionManager, crashHandler, sendAgentMessages } = deps;
   
   return {
-    async onClaudeEnhanced(
+    async onAgentEnhanced(
       ctx: any,
       prompt: string,
       model?: string,
@@ -114,19 +114,19 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
     ) {
       try {
         // Cancel any existing session
-        if (deps.claudeController) {
-          deps.claudeController.abort();
+        if (deps.agentController) {
+          deps.agentController.abort();
         }
 
         const controller = new AbortController();
-        deps.setClaudeController(controller);
+        deps.setAgentController(controller);
 
         await ctx.deferReply();
 
         // Apply template if specified
         let enhancedPrompt = prompt;
-        if (template && CLAUDE_TEMPLATES[template as keyof typeof CLAUDE_TEMPLATES]) {
-          const templateText = CLAUDE_TEMPLATES[template as keyof typeof CLAUDE_TEMPLATES];
+        if (template && AGENT_TEMPLATES[template as keyof typeof AGENT_TEMPLATES]) {
+          const templateText = AGENT_TEMPLATES[template as keyof typeof AGENT_TEMPLATES];
           enhancedPrompt = `${templateText}\n\n${prompt}`;
         }
 
@@ -138,7 +138,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
         await ctx.editReply({
           embeds: [{
             color: 0xffff00,
-            title: '🤖 Enhanced Claude Code Running...',
+            title: '🤖 Enhanced Agent Running...',
             description: 'Processing with advanced options...',
             fields: [
               { name: 'Model', value: model || 'Default', inline: true },
@@ -152,9 +152,9 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
           }]
         });
 
-        const { enhancedClaudeQuery } = await import("./enhanced-client.ts");
+        const { enhancedAgentQuery } = await import("./enhanced-client.ts");
 
-        const result = await enhancedClaudeQuery(
+        const result = await enhancedAgentQuery(
           enhancedPrompt,
           {
             workDir,
@@ -168,22 +168,22 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
           undefined,
           async (jsonData) => {
             const { convertToClaudeMessages } = await import("./message-converter.ts");
-            const claudeMessages = convertToClaudeMessages(jsonData);
-            if (claudeMessages.length > 0) {
-              sendClaudeMessages(claudeMessages).catch(() => {});
+            const agentMessages = convertToClaudeMessages(jsonData);
+            if (agentMessages.length > 0) {
+              sendAgentMessages(agentMessages).catch(() => {});
             }
           },
           false
         );
 
-        deps.setClaudeSessionId(result.sessionId);
-        deps.setClaudeController(null);
+        deps.setAgentSessionId(result.sessionId);
+        deps.setAgentController(null);
 
         // Update session manager
         if (result.sessionId) {
           sessionManager.updateSession(result.sessionId, result.cost);
           
-          await sendClaudeMessages([{
+          await sendAgentMessages([{
             type: 'system',
             content: '',
             metadata: {
@@ -210,8 +210,8 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
       }
     },
 
-    async onClaudeModels(ctx: any) {
-      const modelsList = Object.entries(CLAUDE_MODELS).map(([key, model]) => {
+    async onAgentModels(ctx: any) {
+      const modelsList = Object.entries(AGENT_MODELS).map(([key, model]) => {
         const recommended = model.recommended ? ' ⭐' : '';
         return `**${model.name}${recommended}**\n${model.description}\nContext: ${model.contextWindow.toLocaleString()} tokens\nID: \`${key}\``;
       }).join('\n\n');
@@ -219,7 +219,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
       await ctx.reply({
         embeds: [{
           color: 0x0099ff,
-          title: '🤖 Available Claude Models',
+          title: '🤖 Available Models',
           description: modelsList,
           footer: { text: '⭐ = Recommended for general use' },
           timestamp: true
@@ -228,7 +228,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
       });
     },
 
-    async onClaudeSessions(ctx: any, action: string, sessionId?: string) {
+    async onAgentSessions(ctx: any, action: string, sessionId?: string) {
       try {
         switch (action) {
           case 'list':
@@ -237,7 +237,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
               await ctx.reply({
                 embeds: [{
                   color: 0xffaa00,
-                  title: '📋 Claude Sessions',
+                  title: '📋 Agent Sessions',
                   description: 'No active sessions found.',
                   timestamp: true
                 }],
@@ -255,7 +255,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
             await ctx.reply({
               embeds: [{
                 color: 0x00ff00,
-                title: '📋 Active Claude Sessions',
+                title: '📋 Active Agent Sessions',
                 description: sessionsList,
                 footer: { text: `Total: ${sessions.length} sessions` },
                 timestamp: true
@@ -348,7 +348,7 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
     // NOTE: onClaudeTemplates handler removed as the claude-templates command was removed
     // Template functionality is now handled through the enhanced prompting system
 
-    async onClaudeContext(
+    async onAgentContext(
       ctx: any,
       includeSystemInfo?: boolean,
       includeGitContext?: boolean,
@@ -409,14 +409,14 @@ export function createEnhancedClaudeHandlers(deps: EnhancedClaudeHandlerDeps) {
         await ctx.editReply({
           embeds: [{
             color: 0x0099ff,
-            title: '📋 Claude Context Preview',
+            title: '📋 Agent Context Preview',
             description: fullContext || 'No context selected. Enable options to see what would be included.',
-            footer: { text: 'This is what would be sent to Claude as additional context' },
+            footer: { text: 'This is what would be sent to the agent as additional context' },
             timestamp: true
           }]
         });
       } catch (error) {
-        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'claude-context', 'Context preview');
+        await crashHandler.reportCrash('main', error instanceof Error ? error : new Error(String(error)), 'agent-context', 'Context preview');
         throw error;
       }
     }

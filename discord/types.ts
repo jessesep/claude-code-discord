@@ -6,7 +6,7 @@ export interface EmbedData {
   description?: string;
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
   footer?: { text: string };
-  timestamp?: boolean;
+  timestamp?: boolean | string;
 }
 
 export interface ComponentData {
@@ -43,6 +43,8 @@ export interface InteractionContext {
   channelContext?: import("../util/channel-context.ts").ChannelProjectContext;
   // Optional client override (e.g. from provider mentions)
   clientOverride?: 'claude' | 'cursor' | 'antigravity' | 'ollama';
+  // Helper to send updates through the interaction or channel
+  sendAgentMessages?: (messages: any[]) => Promise<void>;
 }
 
 export interface BotConfig {
