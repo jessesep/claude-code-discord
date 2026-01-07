@@ -277,3 +277,19 @@ Result: ❌ FAILED
 Message: Timed out after 120s
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+[0m[33mWarning[0m "exports" field should be specified when specifying a "name".
+    at file:///Users/jessesep/repos/claude-code-discord/deno.json
+🧪 Starting E2E Tester Bot Suite...
+   Using dedicated testing channel (not main)
+
+✅ Test context created for #e2e-basic (e2e-basic)
+✅ Tester connected as user-tester-bot#5126
+📂 Testing in channel: #e2e-basic (e2e-basic)
+📤 Spawning cursor-coder: "Create a file named "e2e_test_1767808672617.txt" w..."
+🧹 Cleaning up test context (ran for 122007ms)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: ❌ FAILED
+Message: Timed out after 120s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

@@ -1885,3 +1885,71 @@ Using channel "main" (ID: 1458093359162986620)
 
 [Antigravity] Using API key fallback (OAuth preferred for security)
 [MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): 
+Received SIGTERM, initiating graceful shutdown...
+
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[0m[33mWarning[0m "exports" field should be specified when specifying a "name".
+    at file:///Users/jessesep/repos/claude-code-discord/deno.json
+[Providers] Initializing agent provider registry...
+[Registry] Registered provider: primary-cli (Primary CLI)
+[Registry] Registered provider: cursor (Cursor Agent)
+[Registry] Registered provider: antigravity (Google Antigravity (Gemini))
+[Registry] Registered provider: anthropic-api (Anthropic Messages API)
+[Registry] Registered provider: ollama (Ollama)
+[Registry] Registered provider: openai (OpenAI API)
+[Registry] Registered provider: groq (Groq)
+[Registry] Registered provider: vscode-continue-continue (VS Code: Continue.dev)
+[Registry] Registered provider: vscode-codeium-codeium (VS Code: Codeium)
+[Registry] Registered provider: vscode-aider-aider (VS Code: Aider)
+[Providers] Registered 10 providers
+[Providers] 4 providers are available:
+  ✓ Primary CLI (primary-cli) - 2.0.76 (Claude Code)
+  ✓ Cursor Agent (cursor) - 2.3.23
+655ee705c6c7b6da1da481d0fdf13191d5e3e980
+arm64
+  ✓ Google Antigravity (Gemini) (antigravity)
+  ✓ Ollama (ollama)
+[Providers] 6 providers are unavailable:
+  ✗ Anthropic Messages API - ANTHROPIC_API_KEY not set
+  ✗ OpenAI API - OpenAI API key not found. Set OPENAI_API_KEY environment variable.
+  ✗ Groq - Groq API key not found. Set GROQ_API_KEY environment variable.
+  ✗ VS Code: Continue.dev - Continue.dev not found or not configured
+  ✗ VS Code: Codeium - Codeium not found or not configured
+  ✗ VS Code: Aider - Aider not found or not configured
+[Providers] Initialization complete
+[ConversationSync] Initializing...
+[ConversationSync] Initialized. 1 valid, 0 invalid conversations.
+Signal handlers registered for Unix (SIGINT, SIGTERM)
+Settings loaded from ./data/settings.json
+Starting Web Server on port 8000...
+Listening on http://0.0.0.0:8000/ (http://localhost:8000/)
+[OSC] Native binding failed. Ensure --unstable-net flag is used: TypeError: Deno.listenDatagram is not a function
+    at OSCManager.start (file:///Users/jessesep/repos/claude-code-discord/osc/index.ts:207:37)
+    at createOneAgentBot (file:///Users/jessesep/repos/claude-code-discord/index.ts:401:16)
+    at eventLoopTick (ext:core/01_core.js:187:7)
+    at async file:///Users/jessesep/repos/claude-code-discord/index.ts:2128:5
+Bot logged in: Master-Remote#8819
+Category: claude-code-discord
+Branch: main
+Working directory: /Users/jessesep/repos/claude-code-discord
+Checking category "claude-code-discord"...
+Using channel "main" (ID: 1458093359162986620)
+[Startup] Sending initial status message...
+Bot has started. Press Ctrl+C to stop.
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[ModelCache] Initializing model cache...
+[ModelCache] Refreshing available models from API...
+[ModelCache] Found 33 available models
+[ModelCache] Latest Flash models: gemini-2.0-flash, gemini-2.0-flash-001, gemini-2.0-flash-exp, gemini-2.0-flash-lite, gemini-2.0-flash-lite-001
+[Startup] Latest Flash model: gemini-3-flash-preview
+⚠️  [TESTING MODE] ENABLED - All restrictions bypassed!
+⚠️  [TESTING MODE] Do NOT use in production!
+[Startup] ⚠️ TESTING MODE ENABLED
+[Startup] Config: autoApprove=true, sandbox=false, force=true
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[Commands] Skipping command registration (SKIP_COMMAND_REGISTRATION=true)
+[Startup] ✅ Startup complete in 1.8s
+[MessageHandler] Received message from user-tester-bot#5126 (1458440747295576206): 
+[MessageHandler] Received message from jessesep (367705631014256641): touch

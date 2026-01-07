@@ -48,6 +48,88 @@ export interface AgentSession {
 // Context note for all agents
 export const CONTEXT_NOTE = `\n\n> **Mandatory Context Read**: Every repository contains a root \`.agent-context.md\` defining "Golden Standards" and improvement tasks. Your VERY FIRST action MUST be to use the \`view_file\` tool to read this file. This ensures you are aligned with the project mission and standards. Additionally, all repos include a \`CLAUDE.md\` with \`agent-mem\` memory shortcuts—use them for historical context.`;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Agent Styling - Consistent colors and icons per agent type
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface AgentStyle {
+  emoji: string;
+  color: number; // Discord color (hex)
+  icon?: string; // Optional URL to icon
+}
+
+export const AGENT_STYLES: Record<string, AgentStyle> = {
+  // Manager agents - Purple/Magenta theme
+  'ag-manager': { emoji: '🎯', color: 0x9B59B6 },
+  
+  // Coder agents - Green theme
+  'ag-coder': { emoji: '💻', color: 0x2ECC71 },
+  'cursor-coder': { emoji: '⚡', color: 0x00D166 },
+  'cursor-fast': { emoji: '🚀', color: 0x57F287 },
+  
+  // Refactoring - Cyan theme
+  'cursor-refactor': { emoji: '🔄', color: 0x1ABC9C },
+  
+  // Architect agents - Blue theme
+  'ag-architect': { emoji: '🏗️', color: 0x3498DB },
+  'architect': { emoji: '📐', color: 0x5865F2 },
+  
+  // Security agents - Red theme
+  'ag-security': { emoji: '🛡️', color: 0xE74C3C },
+  
+  // Tester agents - Orange theme
+  'ag-tester': { emoji: '🧪', color: 0xE67E22 },
+  
+  // Reviewer agents - Gold theme
+  'code-reviewer': { emoji: '👁️', color: 0xF1C40F },
+  
+  // General assistant - Blurple (Discord color)
+  'general-assistant': { emoji: '🤖', color: 0x5865F2 },
+  
+  // Default fallback
+  'default': { emoji: '🤖', color: 0x99AAB5 },
+};
+
+/**
+ * Get styling for an agent by name/type
+ */
+export function getAgentStyle(agentName: string): AgentStyle {
+  // Try exact match first
+  if (AGENT_STYLES[agentName]) {
+    return AGENT_STYLES[agentName];
+  }
+  
+  // Try partial match (e.g., 'cursor-coder' matches 'coder')
+  for (const [key, style] of Object.entries(AGENT_STYLES)) {
+    if (agentName.includes(key) || key.includes(agentName)) {
+      return style;
+    }
+  }
+  
+  // Check by capability keywords
+  const nameLower = agentName.toLowerCase();
+  if (nameLower.includes('manager') || nameLower.includes('orchestrat')) {
+    return AGENT_STYLES['ag-manager'];
+  }
+  if (nameLower.includes('coder') || nameLower.includes('code')) {
+    return AGENT_STYLES['cursor-coder'];
+  }
+  if (nameLower.includes('architect') || nameLower.includes('design')) {
+    return AGENT_STYLES['ag-architect'];
+  }
+  if (nameLower.includes('test') || nameLower.includes('qa')) {
+    return AGENT_STYLES['ag-tester'];
+  }
+  if (nameLower.includes('security') || nameLower.includes('audit')) {
+    return AGENT_STYLES['ag-security'];
+  }
+  if (nameLower.includes('review')) {
+    return AGENT_STYLES['code-reviewer'];
+  }
+  
+  return AGENT_STYLES['default'];
+}
+
 // Predefined agent configurations
 export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-manager': {

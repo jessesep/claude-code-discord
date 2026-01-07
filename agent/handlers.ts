@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "npm:discord.js@14.14.1";
 import * as path from "https://deno.land/std/path/mod.ts";
-import { AgentConfig, AgentSession, PREDEFINED_AGENTS, ROLE_DEFINITIONS, CONTEXT_NOTE } from "./types.ts";
+import { AgentConfig, AgentSession, PREDEFINED_AGENTS, ROLE_DEFINITIONS, CONTEXT_NOTE, getAgentStyle } from "./types.ts";
 import { MANAGER_SYSTEM_PROMPT, parseManagerResponse, parseGitHubIssueRequest, ManagerAction } from "./manager.ts";
 import { AgentRegistry } from "./registry.ts";
 import { DISCORD_LIMITS, splitText } from "../discord/utils.ts";
@@ -85,9 +85,12 @@ function buildAgentInfoFields(
   agent: AgentConfig,
   clientType: string,
   sessionData?: { session: AgentSession } | null,
-  options: { showModel?: boolean; modelUsed?: string } = {}
+  options: { showModel?: boolean; modelUsed?: string; agentKey?: string } = {}
 ): Array<{ name: string; value: string; inline: boolean }> {
   const fields: Array<{ name: string; value: string; inline: boolean }> = [];
+  
+  // Get agent style for emoji
+  const style = getAgentStyle(options.agentKey || agent.name);
   
   // Row 1: Channel & Category
   const channelName = ctx.channel?.name || 'DM';
@@ -115,6 +118,27 @@ function buildAgentInfoFields(
   }
   
   return fields;
+}
+
+/**
+ * Get embed color and title for an agent
+ */
+function getAgentEmbed(agentName: string, agentDisplayName: string, status: 'processing' | 'completed' | 'error') {
+  const style = getAgentStyle(agentName);
+  
+  const statusConfig = {
+    processing: { suffix: 'Processing...', color: style.color },
+    completed: { suffix: 'Completed', color: 0x00ff00 },
+    error: { suffix: 'Error', color: 0xff0000 },
+  };
+  
+  const config = statusConfig[status];
+  const statusEmoji = status === 'processing' ? '🔄' : status === 'completed' ? '✅' : '❌';
+  
+  return {
+    color: config.color,
+    title: `${style.emoji} ${agentDisplayName} - ${statusEmoji} ${config.suffix}`,
+  };
 }
 
 /**
@@ -386,7 +410,9 @@ async function startAgentSession(ctx: any, agentName: string, roleId?: string, m
   const session = setAgentSession(userId, channelId!, agentName, roleId, projectPath);
   if (model) session.modelOverride = model;
 
-  const riskColor = agent.riskLevel === 'high' ? 0xff6600 : agent.riskLevel === 'medium' ? 0xffaa00 : 0x00ff00;
+  // Get agent styling
+  const style = getAgentStyle(agentName);
+  const riskEmoji = agent.riskLevel === 'high' ? '🔴' : agent.riskLevel === 'medium' ? '🟡' : '🟢';
   
   // Build location fields
   const channelName = ctx.channel?.name || 'DM';
@@ -394,11 +420,11 @@ async function startAgentSession(ctx: any, agentName: string, roleId?: string, m
   
   await ctx.editReply({
     embeds: [{
-      color: riskColor,
-      title: '🚀 Agent Session Started',
+      color: style.color,
+      title: `${style.emoji} Agent Session Started`,
       fields: [
         { name: '🤖 Agent', value: agent.name, inline: true },
-        { name: '⚠️ Risk Level', value: agent.riskLevel.toUpperCase(), inline: true },
+        { name: `${riskEmoji} Risk Level`, value: agent.riskLevel.toUpperCase(), inline: true },
         { name: '🧠 Model', value: model || agent.model, inline: true },
         { name: '📍 Channel', value: `#${channelName}`, inline: true },
         { name: '📂 Category', value: categoryName, inline: true },
@@ -620,17 +646,18 @@ export async function chatWithAgent(
   }
 
   // Build enhanced info fields for processing embed
-  const processingFields = buildAgentInfoFields(ctx, agent, clientType, sessionData);
+  const processingFields = buildAgentInfoFields(ctx, agent, clientType, sessionData, { agentKey: activeAgentName });
   processingFields.push({ 
     name: '📝 Task', 
     value: `\`${message.substring(0, 150)}${message.length > 150 ? '...' : ''}\``, 
     inline: false 
   });
 
+  const processingEmbed = getAgentEmbed(activeAgentName, agent.name, 'processing');
   await ctx.editReply({
     embeds: [{
-      color: 0xffff00,
-      title: `🤖 ${agent.name} Processing...`,
+      color: processingEmbed.color,
+      title: processingEmbed.title,
       fields: processingFields,
       timestamp: new Date().toISOString()
     }]
@@ -741,15 +768,17 @@ export async function chatWithAgent(
 
     const displayResponse = fullResponse.length > 3800 ? fullResponse.substring(0, 3800) + '...' : fullResponse;
     
-    // Build enhanced info fields for completion embed
+    // Build enhanced info fields for completion embed with agent styling
     const completedFields = buildAgentInfoFields(ctx, agent, clientType, sessionData, {
-      modelUsed: result?.modelUsed || agent.model
+      modelUsed: result?.modelUsed || agent.model,
+      agentKey: activeAgentName
     });
     
+    const completedEmbed = getAgentEmbed(activeAgentName, agent.name, 'completed');
     await ctx.editReply({
       embeds: [{
-        color: 0x00ff00,
-        title: `✅ ${agent.name} - Completed`,
+        color: completedEmbed.color,
+        title: completedEmbed.title,
         description: displayResponse,
         fields: completedFields,
         timestamp: new Date().toISOString()
@@ -759,22 +788,16 @@ export async function chatWithAgent(
   } catch (error) {
     console.error(`[Agent] Error:`, error);
     
-    // Build error fields with context
-    const channelName = ctx.channel?.name || 'DM';
-    const categoryName = ctx.channel?.parent?.name || 'No Category';
+    // Build error embed with agent styling
+    const errorEmbed = getAgentEmbed(activeAgentName, agent.name, 'error');
+    const errorFields = buildAgentInfoFields(ctx, agent, clientType, sessionData, { agentKey: activeAgentName });
     
     await ctx.editReply({ 
       embeds: [{ 
-        color: 0xff0000, 
-        title: `❌ Agent Error`, 
+        color: errorEmbed.color, 
+        title: errorEmbed.title, 
         description: String(error).substring(0, 2000),
-        fields: [
-          { name: '🤖 Agent', value: agent.name, inline: true },
-          { name: '🔌 Client', value: clientType.toUpperCase(), inline: true },
-          { name: '🧠 Model', value: agent.model, inline: true },
-          { name: '📍 Channel', value: `#${channelName}`, inline: true },
-          { name: '📂 Category', value: categoryName, inline: true },
-        ],
+        fields: errorFields,
         timestamp: new Date().toISOString() 
       }] 
     });
