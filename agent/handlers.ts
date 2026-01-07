@@ -77,6 +77,61 @@ async function sendAgentUpdate(
 }
 
 /**
+ * Build enhanced agent info fields for embeds
+ * Includes channel, category, session duration, and context window size
+ */
+function buildAgentInfoFields(
+  ctx: any,
+  agent: AgentConfig,
+  clientType: string,
+  sessionData?: { session: AgentSession } | null,
+  options: { showModel?: boolean; modelUsed?: string } = {}
+): Array<{ name: string; value: string; inline: boolean }> {
+  const fields: Array<{ name: string; value: string; inline: boolean }> = [];
+  
+  // Row 1: Channel & Category
+  const channelName = ctx.channel?.name || 'DM';
+  const categoryName = ctx.channel?.parent?.name || 'No Category';
+  fields.push({ name: '📍 Channel', value: `#${channelName}`, inline: true });
+  fields.push({ name: '📂 Category', value: categoryName, inline: true });
+  
+  // Row 2: Client & Model
+  fields.push({ name: '🔌 Client', value: clientType.toUpperCase(), inline: true });
+  if (options.showModel !== false) {
+    fields.push({ name: '🧠 Model', value: options.modelUsed || agent.model, inline: true });
+  }
+  
+  // Row 3: Session info (if available)
+  if (sessionData?.session) {
+    const session = sessionData.session;
+    const startTime = session.startTime instanceof Date ? session.startTime : new Date(session.startTime);
+    const durationMs = Date.now() - startTime.getTime();
+    const durationStr = formatDuration(durationMs);
+    fields.push({ name: '⏱️ Session', value: durationStr, inline: true });
+    
+    const contextSize = session.history?.length || 0;
+    const estimatedTokens = session.history?.reduce((sum, msg) => sum + Math.ceil(msg.content.length / 4), 0) || 0;
+    fields.push({ name: '💬 Context', value: `${contextSize} msgs (~${estimatedTokens} tokens)`, inline: true });
+  }
+  
+  return fields;
+}
+
+/**
+ * Format duration in human-readable format
+ */
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSecs = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainingSecs}s`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMins = minutes % 60;
+  return `${hours}h ${remainingMins}m`;
+}
+
+/**
  * Resolves context based on channel and category information
  */
 export async function resolveChannelContext(ctx: any, deps?: AgentHandlerDeps) {
@@ -333,18 +388,25 @@ async function startAgentSession(ctx: any, agentName: string, roleId?: string, m
 
   const riskColor = agent.riskLevel === 'high' ? 0xff6600 : agent.riskLevel === 'medium' ? 0xffaa00 : 0x00ff00;
   
+  // Build location fields
+  const channelName = ctx.channel?.name || 'DM';
+  const categoryName = ctx.channel?.parent?.name || 'No Category';
+  
   await ctx.editReply({
     embeds: [{
       color: riskColor,
       title: '🚀 Agent Session Started',
       fields: [
-        { name: 'Agent', value: agent.name, inline: true },
-        { name: 'Risk Level', value: agent.riskLevel.toUpperCase(), inline: true },
-        { name: 'Model', value: model || agent.model, inline: true },
-        { name: 'Description', value: agent.description, inline: false },
-        { name: 'Capabilities', value: agent.capabilities.join(', '), inline: false }
+        { name: '🤖 Agent', value: agent.name, inline: true },
+        { name: '⚠️ Risk Level', value: agent.riskLevel.toUpperCase(), inline: true },
+        { name: '🧠 Model', value: model || agent.model, inline: true },
+        { name: '📍 Channel', value: `#${channelName}`, inline: true },
+        { name: '📂 Category', value: categoryName, inline: true },
+        { name: '🔌 Client', value: (agent.client || 'claude').toUpperCase(), inline: true },
+        { name: '📋 Description', value: agent.description, inline: false },
+        { name: '🛠️ Capabilities', value: agent.capabilities.join(', '), inline: false }
       ],
-      footer: { text: 'You can now chat with this agent in this channel.' },
+      footer: { text: `Session ID: ${session.id}` },
       timestamp: new Date().toISOString()
     }]
   });
@@ -545,15 +607,19 @@ export async function chatWithAgent(
     enhancedPrompt += `\n\nRelevant Files: ${contextFiles}`;
   }
 
+  // Build enhanced info fields for processing embed
+  const processingFields = buildAgentInfoFields(ctx, agent, clientType, sessionData);
+  processingFields.push({ 
+    name: '📝 Task', 
+    value: `\`${message.substring(0, 150)}${message.length > 150 ? '...' : ''}\``, 
+    inline: false 
+  });
+
   await ctx.editReply({
     embeds: [{
       color: 0xffff00,
       title: `🤖 ${agent.name} Processing...`,
-      fields: [
-        { name: 'Agent', value: agent.name, inline: true },
-        { name: 'Model', value: agent.model, inline: true },
-        { name: 'Message Preview', value: `\`${message.substring(0, 200)}...\``, inline: false }
-      ],
+      fields: processingFields,
       timestamp: new Date().toISOString()
     }]
   });
@@ -662,22 +728,44 @@ export async function chatWithAgent(
     }
 
     const displayResponse = fullResponse.length > 3800 ? fullResponse.substring(0, 3800) + '...' : fullResponse;
+    
+    // Build enhanced info fields for completion embed
+    const completedFields = buildAgentInfoFields(ctx, agent, clientType, sessionData, {
+      modelUsed: result?.modelUsed || agent.model
+    });
+    
     await ctx.editReply({
       embeds: [{
         color: 0x00ff00,
         title: `✅ ${agent.name} - Completed`,
         description: displayResponse,
-        fields: [
-          { name: 'Client', value: clientType, inline: true },
-          { name: 'Model', value: result?.modelUsed || agent.model, inline: true }
-        ],
+        fields: completedFields,
         timestamp: new Date().toISOString()
       }]
     });
 
   } catch (error) {
     console.error(`[Agent] Error:`, error);
-    await ctx.editReply({ embeds: [{ color: 0xff0000, title: `❌ Agent Error`, description: String(error), timestamp: new Date().toISOString() }] });
+    
+    // Build error fields with context
+    const channelName = ctx.channel?.name || 'DM';
+    const categoryName = ctx.channel?.parent?.name || 'No Category';
+    
+    await ctx.editReply({ 
+      embeds: [{ 
+        color: 0xff0000, 
+        title: `❌ Agent Error`, 
+        description: String(error).substring(0, 2000),
+        fields: [
+          { name: '🤖 Agent', value: agent.name, inline: true },
+          { name: '🔌 Client', value: clientType.toUpperCase(), inline: true },
+          { name: '🧠 Model', value: agent.model, inline: true },
+          { name: '📍 Channel', value: `#${channelName}`, inline: true },
+          { name: '📂 Category', value: categoryName, inline: true },
+        ],
+        timestamp: new Date().toISOString() 
+      }] 
+    });
   }
 }
 
