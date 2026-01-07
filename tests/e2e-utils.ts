@@ -4,17 +4,29 @@
  * This module provides the foundation for end-to-end testing of the one agent discord system.
  * It serves as a REFERENCE IMPLEMENTATION for agent spawning patterns.
  * 
+ * ## AGENT ISOLATION PRINCIPLES
+ * 
+ * **Each spawned agent gets:**
+ * - A unique Agent Instance ID: `{agentType}-{channelId}-{timestamp}-{random}`
+ * - HARD channel binding (can ONLY respond in its bound channel)
+ * - Isolated context window (separate conversation history)
+ * - Category scope (if specified)
+ * 
+ * **This prevents crosstalk between tests running in parallel.**
+ * 
  * ## Usage Patterns
  * 
  * ### Basic Test Setup
  * ```typescript
  * const ctx = await createTestContext('e2e-basic');
  * const result = await spawnAgent(ctx, 'cursor-coder', 'Create a hello.txt file');
+ * console.log('Agent Instance ID:', result.instanceId);
  * ```
  * 
- * ### Custom Channel
+ * ### Custom Channel (Isolated)
  * ```typescript
  * const ctx = await createTestContext({ channelId: 'custom-id' });
+ * // Agents spawned here are bound to this specific channel
  * ```
  * 
  * ### Agent Spawning (Reference Pattern)
@@ -25,6 +37,7 @@
  *   model: 'gemini-3-flash',
  *   task: 'Your task here'
  * });
+ * // The bot will create an Agent Instance ID on receipt
  * ```
  */
 
@@ -290,6 +303,12 @@ export interface SpawnResult {
   messages: Message[];
   duration: number;
   error?: string;
+  /** 
+   * The Agent Instance ID for this spawn (if parsed from response)
+   * Format: {agentType}-{channelId_prefix}-{timestamp}-{random}
+   * Example: cursor-coder-14584878-1736300000000-ab12
+   */
+  instanceId?: string;
 }
 
 /**
@@ -332,10 +351,36 @@ export async function spawnAgent(
   // Wait for result
   const result = await waitForResult(ctx, timeout, isFinalResponse);
   
+  // Try to extract Agent Instance ID from bot messages
+  const instanceId = extractInstanceId(result.messages);
+  
   return {
     ...result,
     duration: Date.now() - startTime,
+    instanceId,
   };
+}
+
+/**
+ * Extract Agent Instance ID from bot response messages
+ * The bot embeds the instance ID in responses for tracking
+ */
+function extractInstanceId(messages: Message[]): string | undefined {
+  for (const msg of messages) {
+    // Check message content for instance ID pattern
+    const contentMatch = msg.content?.match(/instance[:\s]+([a-z-]+-\w+-\d+-\w+)/i);
+    if (contentMatch) return contentMatch[1];
+    
+    // Check embeds
+    for (const embed of msg.embeds || []) {
+      const footerMatch = embed.footer?.text?.match(/Instance:\s*([a-z-]+-\w+-\d+-\w+)/i);
+      if (footerMatch) return footerMatch[1];
+      
+      const fieldMatch = embed.fields?.find(f => f.name.toLowerCase().includes('instance'));
+      if (fieldMatch) return fieldMatch.value;
+    }
+  }
+  return undefined;
 }
 
 // =============================================================================
@@ -528,6 +573,73 @@ export async function withTestContext<T>(
   } finally {
     await cleanupTestContext(ctx);
   }
+}
+
+// =============================================================================
+// AGENT INSTANCE ID UTILITIES (Reference for Production)
+// =============================================================================
+
+/**
+ * Generate an Agent Instance ID
+ * 
+ * THIS IS THE CANONICAL FORMAT for agent identification across the system.
+ * Each spawned agent gets a unique ID that binds it to a channel.
+ * 
+ * Format: {agentType}-{channelIdPrefix}-{timestamp}-{random}
+ * Example: cursor-coder-14584878-1736300000000-ab12
+ * 
+ * @param agentType - The type of agent (e.g., 'cursor-coder')
+ * @param channelId - The Discord channel ID (will be truncated to 8 chars)
+ * @returns Unique agent instance ID
+ */
+export function generateAgentInstanceId(agentType: string, channelId: string): string {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 6);
+  return `${agentType}-${channelId.substring(0, 8)}-${timestamp}-${random}`;
+}
+
+/**
+ * Parse an Agent Instance ID back into components
+ */
+export function parseAgentInstanceId(instanceId: string): {
+  agentType: string;
+  channelPrefix: string;
+  timestamp: number;
+  random: string;
+} | null {
+  const parts = instanceId.split('-');
+  if (parts.length < 4) return null;
+  
+  // Agent type might have hyphens, so we take everything except last 3 parts
+  const agentType = parts.slice(0, -3).join('-');
+  const channelPrefix = parts[parts.length - 3];
+  const timestamp = parseInt(parts[parts.length - 2], 10);
+  const random = parts[parts.length - 1];
+  
+  if (isNaN(timestamp)) return null;
+  
+  return { agentType, channelPrefix, timestamp, random };
+}
+
+/**
+ * Validate that a message should be routed to a specific agent instance
+ * 
+ * NOTE: This is a REFERENCE function for understanding routing logic.
+ * In production, use the instance-registry's validateMessageRouting which
+ * does exact channel ID matching (not prefix matching).
+ * 
+ * @param instanceId - The agent instance ID
+ * @param channelId - The channel the message came from  
+ * @returns true if the message should be routed to this agent
+ */
+export function shouldRouteToInstance(instanceId: string, channelId: string): boolean {
+  const parsed = parseAgentInstanceId(instanceId);
+  if (!parsed) return false;
+  
+  // Check if channel prefix matches exactly (first 8 chars)
+  // NOTE: This is a loose check. For strict routing, always use the full channel ID
+  // stored in the instance registry (instance.boundChannelId === channelId)
+  return channelId.substring(0, 8) === parsed.channelPrefix;
 }
 
 // =============================================================================

@@ -1,17 +1,38 @@
-import { setupTester, waitForResult, hasError, ONE_BOT_ID } from './e2e-utils.ts';
+/**
+ * one agent discord - E2E Error Recovery Test
+ * 
+ * Tests error handling and recovery capabilities.
+ * Uses the #e2e-error-recovery testing channel.
+ */
+
+import { 
+  createTestContext, 
+  cleanupTestContext,
+  waitForResult,
+  hasError,
+  buildAgentPrompt,
+  ONE_BOT_ID,
+} from './e2e-utils.ts';
 
 async function runErrorRecoveryTest() {
-  console.log('🧪 Starting E2E Error Recovery Test Suite (Refactored)...');
+  console.log('🧪 Starting E2E Error Recovery Test Suite...');
+  console.log('   Using dedicated testing channel\n');
   
-  const ctx = await setupTester();
+  const ctx = await createTestContext('e2e-error-recovery');
   console.log(`✅ Tester connected as ${ctx.tester.user?.tag}`);
-  console.log(`📂 Testing in channel: #${ctx.channel.name}`);
+  console.log(`📂 Testing in channel: #${ctx.channel.name} (${ctx.channelType})`);
 
   try {
     // Step 1: Trigger an error
     const nonExistentFile = `non_existent_${Date.now()}.txt`;
     console.log(`📤 Step 1: Triggering error by reading ${nonExistentFile}...`);
-    await ctx.channel.send(`<@${ONE_BOT_ID}> using cursor-coder, Please read the file "${nonExistentFile}".`);
+    
+    const errorPrompt = buildAgentPrompt({
+      agent: 'cursor-coder',
+      task: `Read the file "${nonExistentFile}" and show me its contents.`,
+      useBudget: true
+    });
+    await ctx.channel.send(errorPrompt);
 
     console.log(`⏳ Waiting for error response...`);
     const errorResult = await waitForResult(ctx, 120000, hasError);
@@ -23,14 +44,19 @@ async function runErrorRecoveryTest() {
 
     // Step 2: Recovery
     console.log('📤 Step 2: Sending recovery command...');
-    await ctx.channel.send(`<@${ONE_BOT_ID}> using cursor-coder, That's fine. Now please just tell me "I AM ALIVE" so I know you recovered.`);
+    const recoveryPrompt = buildAgentPrompt({
+      agent: 'cursor-coder',
+      task: `That's fine. Now please just tell me "I AM ALIVE" so I know you recovered.`,
+      useBudget: true
+    });
+    await ctx.channel.send(recoveryPrompt);
 
     console.log(`⏳ Waiting for recovery confirmation...`);
     const recoveryResult = await waitForResult(ctx, 120000, (msgs) => 
       msgs.some(m => m.author.id === ONE_BOT_ID && 
         (m.content?.toUpperCase().includes('ALIVE') || 
          m.content?.toUpperCase().includes('RECOVERED') ||
-         m.embeds.some((e: any) => 
+         m.embeds.some((e) => 
            e.description?.toUpperCase().includes('ALIVE') || 
            e.description?.toUpperCase().includes('RECOVERED')
          ))
@@ -47,7 +73,7 @@ async function runErrorRecoveryTest() {
   } catch (err) {
     return { success: false, message: err.message };
   } finally {
-    ctx.tester.destroy();
+    await cleanupTestContext(ctx);
   }
 }
 
