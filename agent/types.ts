@@ -46,7 +46,7 @@ export interface AgentSession {
 }
 
 // Context note for all agents
-export const CONTEXT_NOTE = `\n\n> **CONTEXT AVAILABLE**: The root \`.agent-context.md\` and relevant compartment context files have been automatically loaded into your prompt. Use this information to understand the project structure and conventions.`;
+export const CONTEXT_NOTE = `\n\n> **Mandatory Context Read**: Every repository contains a root \`.agent-context.md\` defining "Golden Standards" and improvement tasks. Your VERY FIRST action MUST be to use the \`view_file\` tool to read this file. This ensures you are aligned with the project mission and standards. Additionally, all repos include a \`CLAUDE.md\` with \`claude-mem\` memory shortcuts—use them for historical context.`;
 
 // Predefined agent configurations
 export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
@@ -93,6 +93,17 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     temperature: 0.2,
     maxTokens: 10000,
     capabilities: ['security-analysis', 'vulnerability-assessment', 'threat-modeling'],
+    riskLevel: 'medium',
+    client: 'antigravity'
+  },
+  'ag-tester': {
+    name: 'Antigravity Tester',
+    description: 'Specialized in running and verifying E2E tests and quality assurance',
+    model: 'gemini-3-flash-preview',
+    systemPrompt: `You are a specialized Testing & QA agent.\n- Your primary goal is to execute test suites and verify system behavior.\n- Use the budget-friendly testing utilities (model="gemini-3-flash-preview") for all tasks.\n- Analyze test outputs and report failures with clear diagnostic information.\n- You can use shell tools to run the test runner: \`deno run --allow-all scripts/run-e2e-tests.ts\`.\n\n${CONTEXT_NOTE}`,
+    temperature: 0.2,
+    maxTokens: 15000,
+    capabilities: ['testing', 'qa', 'shell-execution', 'analysis'],
     riskLevel: 'medium',
     client: 'antigravity'
   },

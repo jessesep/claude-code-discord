@@ -62,7 +62,7 @@ export class SwarmManager {
         name: channelName,
         type: ChannelType.GuildText,
         parent: category.id,
-        topic: `Agent: ${agentTask.name} | Task: ${agentTask.task} | Repository: ${repoName} | Path: ${workDir} | Branch: ${branchName}`
+        topic: `[CONTEXT WINDOW] Agent: ${agentTask.name} | Project: ${config.projectName} | Task: ${agentTask.task.substring(0, 100)}... | Repository: ${repoName} | Path: ${workDir} | Branch: ${branchName}`
       });
 
       results.channels.push({

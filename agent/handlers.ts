@@ -31,7 +31,13 @@ export interface AgentHandlerDeps {
   modelOverride?: string;
 }
 
-const pendingSwarmTasks = new Map<string, { subAgentName: string, task: string, managerConfig: AgentConfig }>();
+const pendingSwarmTasks = new Map<string, { 
+  subAgentName: string, 
+  task: string, 
+  managerConfig: AgentConfig,
+  workDir: string,
+  channelId: string
+}>();
 
 /**
  * Helper to send agent updates to Discord with optional user mention
@@ -139,7 +145,8 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
           ...deps, 
           workDir: context.workDir,
           channelContext: context.channelContext,
-          modelOverride: model
+          modelOverride: model,
+          sendClaudeMessages: ctx.sendClaudeMessages || deps.sendClaudeMessages
         };
 
         switch (action) {
@@ -205,69 +212,88 @@ export function createAgentHandlers(deps: AgentHandlerDeps) {
     },
     async handleButton(ctx: any, customId: string) {
       const userId = ctx.user.id;
+      const channelId = ctx.channelId || ctx.channel?.id;
+      const key = `${userId}:${channelId}`;
 
-      if (customId.startsWith('agent_spawn_approve:')) {
-        const subAgentName = customId.split(':')[1];
-        const pending = pendingSwarmTasks.get(userId);
+      try {
+        if (customId.startsWith('agent_spawn_approve:')) {
+          const subAgentName = customId.split(':')[1];
+          const pending = pendingSwarmTasks.get(key);
 
-        if (!pending || pending.subAgentName !== subAgentName) {
-          await ctx.reply({ content: "No pending task found or session expired.", ephemeral: true });
-          return;
-        }
+          if (!pending || pending.subAgentName !== subAgentName) {
+            await ctx.reply({ content: "No pending task found or session expired. Note: Only the user who triggered the manager can approve.", ephemeral: true });
+            return;
+          }
 
-        pendingSwarmTasks.delete(userId);
-        await ctx.update({
-          embeds: [{
-            color: 0x00ff00,
-            title: `✅ Spawn Approved`,
-            description: `Starting **${subAgentName}** to work on task...`,
-            timestamp: new Date().toISOString()
-          }],
-          components: []
-        });
-
-        let subAgentOutput = "";
-        try {
-          const progressMsg = await ctx.followUp({
-            embeds: [{
-              color: 0xffaa00,
-              title: `⚙️ Subagent Working: ${subAgentName}`,
-              description: "The agent is executing the task autonomously...",
-              timestamp: new Date().toISOString()
-            }]
-          });
-
-          subAgentOutput = await runAgentTask(subAgentName, pending.task, undefined, true);
-
-          const summaryPrompt = `You are the Manager. You spawned '${subAgentName}' to do this task: "${pending.task}".\n\nOutput:\n${subAgentOutput.substring(0, 40000)}\n\nProvide CONCISE summary.`;
-          const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
-          const summaryResponse = await sendToAntigravityCLI(
-            summaryPrompt,
-            new AbortController(),
-            {
-              model: pending.managerConfig.model,
-              authorized: true 
-            }
-          );
-          const summaryText = summaryResponse.response;
-
-          await progressMsg.edit({
+          pendingSwarmTasks.delete(key);
+          
+          // Use update to acknowledge and change the original message
+          await ctx.update({
+            content: `<@${userId}> ✅ **Spawn Approved**`,
             embeds: [{
               color: 0x00ff00,
-              title: '✅ Task Completed',
-              description: summaryText.substring(0, DISCORD_LIMITS.EMBED_DESCRIPTION),
+              title: `✅ Spawn Approved`,
+              description: `Starting **${subAgentName}** to work on task...`,
               timestamp: new Date().toISOString()
-            }]
+            }],
+            components: []
           });
-        } catch (err) {
-          await ctx.followUp({ content: `❌ Error: ${err}`, ephemeral: true });
+
+          let subAgentOutput = "";
+          try {
+            const progressMsg = await ctx.followUp({
+              embeds: [{
+                color: 0xffaa00,
+                title: `⚙️ Subagent Working: ${subAgentName}`,
+                description: "The agent is executing the task autonomously...",
+                timestamp: new Date().toISOString()
+              }]
+            });
+
+            subAgentOutput = await runAgentTask(subAgentName, pending.task, undefined, true, pending.workDir);
+
+            const summaryPrompt = `You are the Manager. You spawned '${subAgentName}' to do this task: "${pending.task}".\n\nOutput:\n${subAgentOutput.substring(0, 40000)}\n\nProvide CONCISE summary.`;
+            const { sendToAntigravityCLI } = await import("../claude/antigravity-client.ts");
+            const summaryResponse = await sendToAntigravityCLI(
+              summaryPrompt,
+              new AbortController(),
+              {
+                model: pending.managerConfig.model,
+                authorized: true 
+              }
+            );
+            const summaryText = summaryResponse.response;
+
+            await progressMsg.edit({
+              embeds: [{
+                color: 0x00ff00,
+                title: '✅ Task Completed',
+                description: summaryText.substring(0, DISCORD_LIMITS.EMBED_DESCRIPTION),
+                timestamp: new Date().toISOString()
+              }]
+            });
+          } catch (err) {
+            console.error(`[AgentButton] Subagent error:`, err);
+            await ctx.followUp({ content: `❌ Error: ${err}`, ephemeral: true });
+          }
+        } else if (customId.startsWith('agent_spawn_decline:')) {
+          pendingSwarmTasks.delete(key);
+          await ctx.update({
+            content: `<@${userId}> ❌ **Spawn Declined**`,
+            embeds: [{ color: 0xff0000, title: '❌ Spawn Declined', timestamp: new Date().toISOString() }],
+            components: []
+          });
         }
-      } else if (customId.startsWith('agent_spawn_decline:')) {
-        pendingSwarmTasks.delete(userId);
-        await ctx.update({
-          embeds: [{ color: 0xff0000, title: '❌ Spawn Declined', timestamp: new Date().toISOString() }],
-          components: []
-        });
+      } catch (error) {
+        console.error(`[AgentButton] Interaction error:`, error);
+        // Try to report error if interaction is still valid
+        try {
+          if (!ctx.replied && !ctx.deferred) {
+            await ctx.reply({ content: `❌ Interaction error: ${error}`, ephemeral: true });
+          } else {
+            await ctx.followUp({ content: `❌ Interaction error: ${error}`, ephemeral: true });
+          }
+        } catch {}
       }
     }
   };
@@ -370,6 +396,32 @@ export async function chatWithAgent(
     await handleManagerInteraction(ctx, message, agent, effectiveDeps);
     return;
   }
+
+  // Create a sub-agent deps wrapper that uses followUp instead of editReply for updates
+  // to avoid overwriting the parent's message in the same interaction
+  const subAgentDeps = {
+    ...effectiveDeps,
+    sendClaudeMessages: async (messages: any[]) => {
+      const content = messages[0]?.content || '';
+      if (!content) return;
+      
+      const chunks = splitText(content, DISCORD_LIMITS.EMBED_DESCRIPTION, true);
+      for (const chunk of chunks) {
+        await ctx.followUp({
+          embeds: [{
+            color: 0x0099ff,
+            title: `🤖 ${agent.name} Update`,
+            description: chunk,
+            timestamp: new Date().toISOString()
+          }]
+        });
+      }
+    }
+  };
+
+  // Use the wrapper if this is NOT a top-level interaction (e.g. spawned by manager)
+  // We can detect this if deps was already passed in with a sendClaudeMessages
+  const finalDeps = deps?.sendClaudeMessages ? subAgentDeps : effectiveDeps;
 
   // Casual greeting detection
   const isCasualGreeting = (text: string): boolean => {
@@ -508,7 +560,12 @@ export async function chatWithAgent(
 
   const isRateLimitError = (error: any): boolean => {
     const msg = String(error).toLowerCase();
-    return msg.includes('rate limit') || msg.includes('quota') || msg.includes('429') || msg.includes('exit code 1');
+    return msg.includes('rate limit') || 
+           msg.includes('quota') || 
+           msg.includes('429') || 
+           msg.includes('exit code 1') || 
+           msg.includes('exited with code 1') ||
+           msg.includes('out of extra usage');
   };
 
   try {
@@ -528,7 +585,7 @@ export async function chatWithAgent(
           currentChunk += chunk;
           if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
             lastUpdate = Date.now();
-            await sendAgentUpdate(currentChunk, effectiveDeps);
+            await sendAgentUpdate(currentChunk, finalDeps);
             currentChunk = "";
           }
         });
@@ -541,7 +598,7 @@ export async function chatWithAgent(
             currentChunk += chunk;
             if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
               lastUpdate = Date.now();
-              await sendAgentUpdate(currentChunk, effectiveDeps);
+              await sendAgentUpdate(currentChunk, finalDeps);
               currentChunk = "";
             }
           });
@@ -556,7 +613,7 @@ export async function chatWithAgent(
         currentChunk += chunk;
         if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
           lastUpdate = Date.now();
-          await sendAgentUpdate(currentChunk, effectiveDeps);
+          await sendAgentUpdate(currentChunk, finalDeps);
           currentChunk = "";
         }
       });
@@ -567,7 +624,7 @@ export async function chatWithAgent(
         currentChunk += chunk;
         if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
           lastUpdate = Date.now();
-          await sendAgentUpdate(currentChunk, effectiveDeps);
+          await sendAgentUpdate(currentChunk, finalDeps);
           currentChunk = "";
         }
       });
@@ -581,14 +638,14 @@ export async function chatWithAgent(
         currentChunk += chunk;
         if (Date.now() - lastUpdate >= UPDATE_INTERVAL) {
           lastUpdate = Date.now();
-          await sendAgentUpdate(currentChunk, effectiveDeps);
+          await sendAgentUpdate(currentChunk, finalDeps);
           currentChunk = "";
         }
       }, controller.signal);
       result = { response: providerResult.response, modelUsed: providerResult.modelUsed };
     }
 
-    if (currentChunk) await sendAgentUpdate(currentChunk, effectiveDeps);
+    if (currentChunk) await sendAgentUpdate(currentChunk, finalDeps);
 
     const fullResponse = result?.response || '';
     if (sessionData?.session) sessionData.session.history.push({ role: 'model', content: fullResponse });
@@ -712,8 +769,122 @@ export async function handleManagerInteraction(
   if (action?.action === 'reply') {
     await ctx.editReply({ embeds: [{ color: 0x00cc99, title: '💬 Manager', description: action.message, timestamp: new Date().toISOString() }] });
   } else if (action?.action === 'spawn_agent') {
-    await ctx.editReply({ content: `Spawning ${action.agent_name}...` });
-    await chatWithAgent(ctx, action.task!, action.agent_name, undefined, false, deps);
+    const subAgent = AgentRegistry.getInstance().getAgent(action.agent_name!);
+    
+    if (subAgent && subAgent.riskLevel === 'high') {
+      // Store in pending tasks for approval
+      const userId = ctx.user.id;
+      const channelId = ctx.channelId || ctx.channel?.id;
+      const key = `${userId}:${channelId}`;
+      const workDir = deps?.workDir || Deno.cwd();
+      
+      pendingSwarmTasks.set(key, { 
+        subAgentName: action.agent_name!, 
+        task: action.task!, 
+        managerConfig: agentConfig,
+        workDir,
+        channelId: channelId!
+      });
+
+      const row = new ActionRowBuilder<any>()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`agent_spawn_approve:${action.agent_name}`)
+            .setLabel('Approve')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`agent_spawn_decline:${action.agent_name}`)
+            .setLabel('Decline')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+      await ctx.editReply({
+        content: `<@${userId}> ⚠️ **Approval Required**`,
+        embeds: [{
+          color: 0xffaa00,
+          title: '⚠️ Approval Required',
+          description: `The manager wants to spawn **${subAgent.name}** for a high-risk task.\n\n**Task:** ${action.task}`,
+          timestamp: new Date().toISOString()
+        }],
+        components: [row]
+      });
+    } else {
+      await ctx.editReply({ content: `Spawning ${action.agent_name}...` });
+      await chatWithAgent(ctx, action.task!, action.agent_name, undefined, false, deps);
+    }
+  } else if (action?.action === 'spawn_swarm') {
+    await ctx.editReply({ content: `🚀 Initializing Swarm: **${action.projectName}**...` });
+    
+    try {
+      const { SwarmManager } = await import("../util/swarm-manager.ts");
+      const swarmResult = await SwarmManager.spawnSwarm(ctx, {
+        projectName: action.projectName!,
+        agents: action.agents!
+      });
+
+      const channelList = swarmResult.channels.map(c => `<#${c.id}>`).join(', ');
+      await ctx.followUp({
+        embeds: [{
+          color: 0x00ff00,
+          title: '✅ Swarm Spawned',
+          description: `Created category and channels for **${action.projectName}**.\n\n**Channels:** ${channelList}`,
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+      // Optionally start agents in their respective channels
+      for (const channelInfo of swarmResult.channels) {
+        const agentTask = action.agents?.find(a => a.name === channelInfo.name);
+        if (agentTask) {
+          // 1. Create a mock context for the new channel
+          const { createInteractionContext } = await import("../discord/interaction-context.ts");
+          const guild = ctx.guild;
+          const channel = await guild.channels.fetch(channelInfo.id);
+          
+          if (!channel) continue;
+
+          const swarmCtx = await createInteractionContext({
+            user: ctx.user,
+            channel: channel,
+            guild: guild,
+            channelId: channel.id,
+          }, { 
+            projectPath: deps?.workDir || Deno.cwd(),
+            repoName: ctx.channelContext?.repoName || "swarm-project",
+            branchName: ctx.channelContext?.branchName || "main"
+          });
+
+          // 2. Set the active agent for THIS channel specifically
+          // This ensures that messages in this channel are routed to this agent
+          addActiveAgent(ctx.user.id, channel.id, agentTask.name);
+
+          // 3. Start agent session in the new channel
+          await startAgentSession(swarmCtx, agentTask.name);
+
+          // 4. Send "Context Window" initialization message
+          await channel.send({
+            embeds: [{
+              color: 0x5865F2,
+              title: `🪟 Context Window: ${agentTask.name}`,
+              description: `This channel is dedicated to a specific agent task within the **${action.projectName}** swarm.`,
+              fields: [
+                { name: '🤖 Agent', value: agentTask.name, inline: true },
+                { name: '📁 Project', value: action.projectName, inline: true },
+                { name: '📋 Task', value: agentTask.task, inline: false },
+                { name: '💻 Workspace', value: `\`${deps?.workDir || Deno.cwd()}\``, inline: false }
+              ],
+              timestamp: new Date().toISOString()
+            }]
+          });
+
+          // Send initial task to the agent in the new channel
+          await chatWithAgent(swarmCtx, agentTask.task, agentTask.name, undefined, false, deps);
+        }
+      }
+    } catch (error) {
+      console.error("[Swarm] Failed to spawn swarm:", error);
+      await ctx.followUp({ content: `❌ Failed to spawn swarm: ${error}`, ephemeral: true });
+    }
   }
 }
 
