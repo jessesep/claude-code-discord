@@ -22,6 +22,8 @@ This project uses persistent agent memory.
 | `agent/providers/` | Provider implementations |
 | `discord/` | Discord bot handlers |
 | `settings/` | Configuration management |
+| `osc/` | OSC bridge for TouchOSC integration |
+| `util/instance-lock.ts` | Prevents duplicate bot instances |
 
 ## 🏗️ Architecture
 
