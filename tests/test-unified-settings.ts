@@ -11,9 +11,9 @@ import {
   OPERATION_MODES,
   PROVIDER_RATE_LIMITS,
   unifiedSettingsCommands
-} from "./settings/unified-settings.ts";
+} from "../settings/unified-settings.ts";
 
-import type { UnifiedBotSettings } from "./settings/unified-settings.ts";
+import type { UnifiedBotSettings } from "../settings/unified-settings.ts";
 
 // Test 1: Verify default settings are properly structured
 function testDefaultSettings() {
