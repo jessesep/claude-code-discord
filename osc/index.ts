@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import OSCModule from "npm:osc-js";
+import { OSCDiscordChannel } from "./osc-discord-channel.ts";
 
 /**
  * Handle both default export and module export patterns for osc-js
@@ -27,6 +28,17 @@ export interface OSCDependencies {
 }
 
 /**
+ * OSC Message stats for monitoring
+ */
+export interface OSCStats {
+  messagesReceived: number;
+  messagesSent: number;
+  lastMessageTime: Date | null;
+  uptime: number;
+  isRunning: boolean;
+}
+
+/**
  * OSC Manager Class
  * Acts as a bridge between TouchOSC control surfaces and the One Agent bot system.
  * Uses Deno's native UDP (listenDatagram) for reliable binding.
@@ -40,6 +52,15 @@ export class OSCManager {
   private handlers: Map<string, (message: any) => void> = new Map();
   private wildcardHandlers: ((message: any) => void)[] = [];
   private isRunning: boolean = false;
+  private startTime: Date | null = null;
+  
+  // Stats
+  private messagesReceived = 0;
+  private messagesSent = 0;
+  private lastMessageTime: Date | null = null;
+  
+  // Discord integration
+  private discordChannel: OSCDiscordChannel | null = null;
 
   constructor(config: OSCConfig, deps: OSCDependencies = {}) {
     this.port = config.port;
@@ -48,6 +69,26 @@ export class OSCManager {
     this.deps = deps;
     
     this.setupListeners();
+  }
+
+  /**
+   * Set Discord channel for logging
+   */
+  setDiscordChannel(channel: OSCDiscordChannel): void {
+    this.discordChannel = channel;
+  }
+
+  /**
+   * Get current stats
+   */
+  getStats(): OSCStats {
+    return {
+      messagesReceived: this.messagesReceived,
+      messagesSent: this.messagesSent,
+      lastMessageTime: this.lastMessageTime,
+      uptime: this.startTime ? Date.now() - this.startTime.getTime() : 0,
+      isRunning: this.isRunning
+    };
   }
 
   /**
@@ -211,6 +252,7 @@ export class OSCManager {
       });
       
       this.isRunning = true;
+      this.startTime = new Date();
       console.log(`[OSC] Native bridge active on port ${this.port}`);
       console.log(`[OSC] Feedback targets: ${this.remoteHosts.join(', ')}:${this.remotePort}`);
 
@@ -225,10 +267,23 @@ export class OSCManager {
    * The infinite receive loop
    */
   private async receiveLoop() {
-    for await (const [data, _remoteAddr] of this.listener) {
+    for await (const [data, remoteAddr] of this.listener) {
       try {
         const message = new OSC.Message();
         message.unpack(new DataView(data.buffer), 0);
+        
+        // Update stats
+        this.messagesReceived++;
+        this.lastMessageTime = new Date();
+        
+        // Log to Discord if available
+        if (this.discordChannel?.ready()) {
+          this.discordChannel.logIncoming(
+            message.address, 
+            message.args || [],
+            remoteAddr?.hostname
+          );
+        }
         
         // Trigger specific handlers
         const handler = this.handlers.get(message.address);
@@ -253,6 +308,14 @@ export class OSCManager {
     try {
       const message = new OSC.Message(address, ...args);
       const binary = message.pack();
+      
+      // Update stats
+      this.messagesSent++;
+
+      // Log to Discord if available
+      if (this.discordChannel?.ready()) {
+        this.discordChannel.logOutgoing(address, args);
+      }
 
       for (const host of this.remoteHosts) {
         try {
@@ -267,6 +330,29 @@ export class OSCManager {
       }
     } catch (err) {
       console.error('[OSC] Failed to pack or send feedback:', err);
+    }
+  }
+
+  /**
+   * Send OSC message from Discord (for testing)
+   */
+  public async sendFromDiscord(address: string, args: any[] = []): Promise<void> {
+    // Simulate receiving this message and process it
+    const mockMessage = { address, args };
+    
+    console.log(`[OSC] Discord command: ${address}`, args);
+    
+    // Update stats as if received
+    this.messagesReceived++;
+    this.lastMessageTime = new Date();
+    
+    // Trigger handlers
+    const handler = this.handlers.get(address);
+    if (handler) handler(mockMessage);
+    
+    // Trigger wildcard handlers
+    for (const wh of this.wildcardHandlers) {
+      wh(mockMessage);
     }
   }
 

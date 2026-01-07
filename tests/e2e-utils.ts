@@ -415,16 +415,20 @@ export async function waitForResult(
       }
     };
 
-    const onUpdate = (_oldMsg: Message, newMsg: Message) => {
-      if (newMsg.channelId !== ctx.channel.id) return;
-      if (newMsg.author.id === ctx.tester.user?.id) return;
+    const onUpdate = (_oldMsg: Message | { partial: true }, newMsg: Message | { partial: true }) => {
+      // Skip partial messages
+      if ('partial' in newMsg && newMsg.partial) return;
+      const msg = newMsg as Message;
       
-      console.log(`🔄 Update from ${newMsg.author.tag}: ${newMsg.content || '(embed)'}`);
-      if (newMsg.embeds.length > 0) {
-        newMsg.embeds.forEach(e => console.log(`   Embed Title: ${e.title}, Desc: ${e.description?.substring(0, 50)}...`));
+      if (msg.channelId !== ctx.channel.id) return;
+      if (msg.author?.id === ctx.tester.user?.id) return;
+      
+      console.log(`🔄 Update from ${msg.author?.tag || 'unknown'}: ${msg.content || '(embed)'}`);
+      if (msg.embeds?.length > 0) {
+        msg.embeds.forEach(e => console.log(`   Embed Title: ${e.title}, Desc: ${e.description?.substring(0, 50)}...`));
       }
 
-      messagesMap.set(newMsg.id, newMsg);
+      messagesMap.set(msg.id, msg);
       const messages = Array.from(messagesMap.values());
       if (condition(messages)) {
         cleanup();

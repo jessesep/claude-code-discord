@@ -215,7 +215,7 @@ console.log("\n📋 Test 6: E2E Utils Instance ID Functions");
   const parsed = parseAgentInstanceId(testId);
   assert(parsed !== null, "ID is parseable");
   assertEqual(parsed?.agentType, "cursor-coder", "Parsed agent type is correct");
-  assert(parsed?.timestamp && parsed.timestamp > 0, "Parsed timestamp is valid");
+  assert(Boolean(parsed?.timestamp && parsed.timestamp > 0), "Parsed timestamp is valid");
   
   // Routing validation - use shouldRouteToInstance for same channel
   assert(shouldRouteToInstance(testId, CHANNEL_A), "Should route to correct channel");

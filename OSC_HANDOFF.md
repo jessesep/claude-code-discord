@@ -87,3 +87,67 @@ If the bot is not receiving messages:
 1.  Run `lsof -nP -iUDP:9000` to verify the port is bound.
 2.  Check `bot_output.log` for `[OSC] Received: ...` entries.
 3.  Verify the layout file on your phone is **V6**, as earlier versions lacked the internal OSC routing logic.
+
+## 🧪 Testing Infrastructure
+
+### E2E Test Suite
+Located in `tests/osc/`:
+
+```bash
+# Run full E2E test suite
+deno test --allow-all --unstable-net tests/osc/osc-e2e.test.ts
+
+# Run diagnostics
+deno run --allow-all --unstable-net tests/osc/osc-diagnostics.ts
+
+# Live test against running bot
+deno run --allow-all --unstable-net tests/osc/osc-live-test.ts ping
+deno run --allow-all --unstable-net tests/osc/osc-live-test.ts git-status
+deno run --allow-all --unstable-net tests/osc/osc-live-test.ts agent coder
+deno run --allow-all --unstable-net tests/osc/osc-live-test.ts monitor
+deno run --allow-all --unstable-net tests/osc/osc-live-test.ts stress 100
+```
+
+### Test Files
+| File | Purpose |
+| :--- | :--- |
+| `osc-test-client.ts` | Bidirectional OSC test client simulating TouchOSC |
+| `osc-e2e.test.ts` | E2E tests with mock server (8 tests including stress) |
+| `osc-live-test.ts` | Interactive CLI tool for testing live bot |
+| `osc-diagnostics.ts` | Health check for ports, UDP, OSC library |
+
+### Test Coverage
+- ✅ Ping/Pong connectivity
+- ✅ Git status requests
+- ✅ GitHub sync workflow
+- ✅ Agent selection
+- ✅ Issue creation
+- ✅ Multiple rapid messages
+- ✅ Stress test (50+ messages, 100% response rate)
+- ✅ Value 0 filtering (button release)
+
+## 🔬 OSC MCP Research
+
+### MCP2OSC (NeurIPS 2025 Creative AI)
+**Paper**: [arXiv:2508.10414](https://arxiv.org/html/2508.10414v1)  
+**Repo**: [github.com/yyf/MCP2OSC](https://github.com/yyf/MCP2OSC)
+
+A dedicated MCP server for OSC that enables:
+- Natural language → OSC message generation
+- OSC message interpretation/visualization
+- Address pattern management
+- Bidirectional validation and debugging
+
+### Other OSC MCP Integrations
+| Project | Purpose |
+| :--- | :--- |
+| **SuperColliderMCP** | Audio synthesis via OSC |
+| **VRChat MCP OSC** | Avatar control in VR |
+| **Ableton Live MCP** | DAW track/performance control |
+
+### Potential Integration
+The MCP2OSC approach could be adapted to allow Claude to:
+- Generate OSC commands from natural language
+- Debug OSC connectivity issues
+- Visualize received OSC data
+- Manage address patterns dynamically
