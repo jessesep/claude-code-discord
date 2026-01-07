@@ -265,7 +265,7 @@ This bot now uses a **Gemini 3 Flash** powered "Manager Agent" to:
 
 ### Key Features
 
-- **🧠 Main Agent**: Powered by Google's `gemini-3-flash`. Fast, smart, and context-aware.
+- **🧠 Main Agent**: Powered by Google's `gemini-3-flash-preview`. Fast, smart, and context-aware.
 - **🛠️ Subagents**: Specialized agents (e.g., `ag-coder`) that run headlessly to perform heavy lifting.
 - **💬 Interactive UI**: (Coming Soon) Buttons, Select Menus, and rich embeds.
 - **📂 Local Context**: Full access to your local filesystem.

@@ -43,6 +43,22 @@ export class ShellManager {
 
   // deno-lint-ignore no-explicit-any
   async execute(command: string, input?: string, discordContext?: any): Promise<ShellExecutionResult> {
+    // Validate command is not empty or whitespace-only
+    const trimmedCommand = command.trim();
+    if (!trimmedCommand) {
+      return {
+        processId: -1,
+        onOutput: () => {},
+        onComplete: (callback: (code: number, output: string) => void) => {
+          // Immediately call with error code
+          callback(1, 'Error: Empty command provided');
+        },
+        onError: (callback: (error: Error) => void) => {
+          callback(new Error('Empty command provided'));
+        },
+      };
+    }
+
     const processId = ++this.processIdCounter;
     let output = '';
     const outputCallbacks: ((data: string) => void)[] = [];

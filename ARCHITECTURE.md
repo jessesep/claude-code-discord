@@ -7,7 +7,7 @@ The core philosophy of this refactor is to move away from a monolithic "chat wit
 ### 1. The Main Agent (Manager)
 
 - **Role**: The frontend of the system. It owns the user relationship.
-- **Model**: `gemini-3-flash`. Selected for low latency and high instruction-following capability.
+- **Model**: `gemini-3-flash-preview`. Selected for low latency and high instruction-following capability.
 - **Responsibilities**:
   - **Triage**: Decide if a user request is a simple question or a complex task.
   - **Delegation**: If a task is complex, it outputs a structured JSON command `spawn_agent`.

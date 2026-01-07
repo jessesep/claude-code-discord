@@ -16,7 +16,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   "ag-tester": {
     name: "Antigravity Tester",
     description: "Runs and writes tests",
-    model: "gemini-3-flash", // or another supported model
+    model: "gemini-3-flash-preview", // or another supported model
     systemPrompt: `You are a testing expert...`,
   },
 };
