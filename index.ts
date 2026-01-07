@@ -35,6 +35,8 @@ import { handlePaginationInteraction, cleanupPaginationStates, formatShellOutput
 import { SettingsPersistence } from "./util/settings-persistence.ts";
 import { WebServer } from "./server/index.ts";
 import { OSCManager } from "./osc/index.ts";
+import { createOSCDiscordChannel, OSCDiscordChannel } from "./osc/osc-discord-channel.ts";
+import { handleOSCMessage } from "./osc/osc-commands.ts";
 import { repoCommands, createRepoHandlers } from "./repo/index.ts";
 import { githubCommands, createGitHubHandlers } from "./git/index.ts";
 import { simpleCommands } from "./agent/index.ts";
@@ -377,6 +379,9 @@ export async function createOneAgentBot(config: BotConfig) {
   });
 
   // Start OSC Server
+  let oscManager: OSCManager | null = null;
+  let oscDiscordChannel: OSCDiscordChannel | null = null;
+  
   try {
     const phoneIP = Deno.env.get("OSC_PHONE_IP");
     const remoteHosts = ["127.0.0.1"];
@@ -384,7 +389,7 @@ export async function createOneAgentBot(config: BotConfig) {
       remoteHosts.push(phoneIP);
     }
 
-    const oscManager = new OSCManager(
+    oscManager = new OSCManager(
       { 
         port: 9000, 
         remoteHosts: remoteHosts, 
@@ -399,6 +404,9 @@ export async function createOneAgentBot(config: BotConfig) {
       }
     );
     oscManager.start();
+    
+    // Create OSC Discord channel manager
+    oscDiscordChannel = createOSCDiscordChannel('🎛️ OSC Testing');
   } catch (error) {
     console.error("Failed to start OSC Server:", error);
   }
@@ -2031,6 +2039,30 @@ export async function createOneAgentBot(config: BotConfig) {
 
   // Create agent sender function
   agentSender = createAgentSender(discordSender);
+
+  // Initialize OSC Discord channels after bot is ready
+  if (oscDiscordChannel && oscManager) {
+    bot.client.once('ready', async () => {
+      const guild = bot.client.guilds.cache.first();
+      if (guild) {
+        try {
+          await oscDiscordChannel!.initialize(bot.client, guild.id);
+          oscManager!.setDiscordChannel(oscDiscordChannel!);
+          console.log('[OSC] Discord channels initialized');
+        } catch (error) {
+          console.error('[OSC] Failed to initialize Discord channels:', error);
+        }
+      }
+    });
+
+    // Add message handler for !osc commands
+    bot.client.on('messageCreate', async (message: any) => {
+      if (message.author.bot) return;
+      if (message.content.startsWith('!osc')) {
+        await handleOSCMessage(message, oscManager);
+      }
+    });
+  }
 
   // Signal handlers
   const handleSignal = async (signal: string) => {

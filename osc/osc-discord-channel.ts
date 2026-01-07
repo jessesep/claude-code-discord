@@ -1,5 +1,7 @@
 /// <reference lib="deno.unstable" />
 
+// deno-lint-ignore-file no-explicit-any
+
 /**
  * OSC Discord Channel Manager
  * 
@@ -145,7 +147,7 @@ export class OSCDiscordChannel {
       )
       .setTimestamp();
 
-    await this.oscChannel.send({ embeds: [embed] });
+    await this.oscChannel.send({ embeds: [embed as any] });
   }
 
   /**
@@ -228,7 +230,7 @@ export class OSCDiscordChannel {
     }
 
     try {
-      await this.oscChannel.send({ embeds: [embed] });
+      await this.oscChannel.send({ embeds: [embed as any] });
     } catch (error) {
       console.error('[OSC Discord] Failed to send control message:', error);
     }

@@ -18,9 +18,18 @@ Due to Deno's strict security and the nature of the `npm:osc-js` UDP plugin (whi
 -   **Binding**: Binds to `0.0.0.0:9000` to allow connections from local and Tailscale networks.
 
 ## 📂 File Structure
+### Core Files
 -   `osc/index.ts`: The core `OSCManager` implementation.
+-   `osc/osc-discord-channel.ts`: Discord channel manager for OSC testing.
+-   `osc/osc-commands.ts`: `!osc` Discord command handler.
 -   `index.ts`: Integration point where the manager is initialized and started.
 -   `one_agent_iphone.tosc`: (In `one-OSC` repo) The V5/V6 TouchOSC layout.
+
+### Test Files
+-   `tests/osc/osc-test-client.ts`: Bidirectional OSC test client.
+-   `tests/osc/osc-e2e.test.ts`: E2E test suite (8 tests).
+-   `tests/osc/osc-live-test.ts`: Interactive CLI test tool.
+-   `tests/osc/osc-diagnostics.ts`: Health check diagnostics.
 
 ## 🔌 Integration Point
 In the main `index.ts`, the bridge is initialized alongside the other managers:
@@ -52,6 +61,35 @@ try {
 } catch (error) {
   console.error("Failed to start OSC Server:", error);
 }
+```
+
+## 💬 Discord Integration
+
+When the bot starts, it creates a **🎛️ OSC Testing** category with two channels:
+
+### Channels
+| Channel | Purpose |
+| :--- | :--- |
+| `#osc-control` | Send OSC commands, see feedback |
+| `#osc-log` | Real-time log of all OSC traffic |
+
+### Discord Commands (`!osc`)
+| Command | Description |
+| :--- | :--- |
+| `!osc ping` | Test OSC connectivity |
+| `!osc status` | Show bridge status and stats |
+| `!osc send <addr> [args]` | Send custom OSC message |
+| `!osc git status` | Request git status via OSC |
+| `!osc git sync` | Trigger git pull/push |
+| `!osc agent <name>` | Select agent (coder, architect, etc.) |
+| `!osc help` | Show all commands |
+
+### Example Usage
+```
+!osc ping                    # Test connectivity
+!osc status                  # Show stats
+!osc send /git/status 1      # Custom OSC
+!osc agent coder             # Switch to coder agent
 ```
 
 ## 🎮 Protocol Mapping

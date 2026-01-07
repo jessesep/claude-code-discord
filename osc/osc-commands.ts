@@ -1,3 +1,5 @@
+// deno-lint-ignore-file no-explicit-any
+
 /**
  * OSC Discord Commands
  * 
@@ -25,7 +27,7 @@ export async function handleOSCMessage(
 
   if (!oscManager) {
     await message.reply({
-      embeds: [createEmbed('❌ OSC Not Available', 'OSC Manager is not initialized.', 0xff0000)]
+      embeds: [createEmbed('❌ OSC Not Available', 'OSC Manager is not initialized.', 0xff0000) as any]
     });
     return true;
   }
@@ -67,7 +69,7 @@ async function handlePing(message: Message, oscManager: OSCManager): Promise<voi
   const startTime = Date.now();
   
   await message.reply({
-    embeds: [createEmbed('🏓 Sending /ping...', 'Waiting for response...', 0xffff00)]
+    embeds: [createEmbed('🏓 Sending /ping...', 'Waiting for response...', 0xffff00) as any]
   });
 
   // Send ping via OSC
@@ -84,7 +86,7 @@ async function handlePing(message: Message, oscManager: OSCManager): Promise<voi
         { name: 'Latency', value: `${latency}ms`, inline: true },
         { name: 'Status', value: 'Active', inline: true }
       ]
-    )]
+    ) as any]
   });
 }
 
@@ -113,7 +115,7 @@ async function handleStatus(message: Message, oscManager: OSCManager): Promise<v
         { name: 'Listen Port', value: '9000', inline: true },
         { name: 'Feedback Port', value: '9001', inline: true }
       ]
-    )]
+    ) as any]
   });
 }
 
@@ -127,7 +129,7 @@ async function handleSend(message: Message, oscManager: OSCManager, args: string
         '❌ Missing Address',
         'Usage: `!osc send <address> [arg1] [arg2] ...`\nExample: `!osc send /ping`',
         0xff0000
-      )]
+      ) as any]
     });
     return;
   }
@@ -142,7 +144,7 @@ async function handleSend(message: Message, oscManager: OSCManager, args: string
       `📤 Sent: ${address}`,
       `Args: ${oscArgs.length > 0 ? oscArgs.map(a => `\`${a}\``).join(', ') : '`1`'}`,
       0x00ff88
-    )]
+    ) as any]
   });
 }
 
@@ -155,14 +157,14 @@ async function handleGitCommand(message: Message, oscManager: OSCManager, args: 
   switch (subcommand) {
     case 'status':
       await message.reply({
-        embeds: [createEmbed('📊 Requesting Git Status...', 'Sending /git/status', 0xffff00)]
+        embeds: [createEmbed('📊 Requesting Git Status...', 'Sending /git/status', 0xffff00) as any]
       });
       await oscManager.sendFromDiscord('/git/status', [1]);
       break;
 
     case 'sync':
       await message.reply({
-        embeds: [createEmbed('🔄 Starting GitHub Sync...', 'Sending /github/sync', 0xffff00)]
+        embeds: [createEmbed('🔄 Starting GitHub Sync...', 'Sending /github/sync', 0xffff00) as any]
       });
       await oscManager.sendFromDiscord('/github/sync', [1]);
       break;
@@ -173,7 +175,7 @@ async function handleGitCommand(message: Message, oscManager: OSCManager, args: 
           '❓ Unknown Git Command',
           'Available: `!osc git status`, `!osc git sync`',
           0xffaa00
-        )]
+        ) as any]
       });
   }
 }
@@ -190,7 +192,7 @@ async function handleAgentCommand(message: Message, oscManager: OSCManager, args
         '❓ Select an Agent',
         'Available agents:\n`coder` `architect` `manager` `tester` `security` `reviewer` `assistant`\n\nUsage: `!osc agent coder`',
         0xffaa00
-      )]
+      ) as any]
     });
     return;
   }
@@ -200,7 +202,7 @@ async function handleAgentCommand(message: Message, oscManager: OSCManager, args
       `🤖 Selecting Agent: ${agentName}`,
       `Sending /agent/select/${agentName}`,
       0xffff00
-    )]
+    ) as any]
   });
 
   await oscManager.sendFromDiscord(`/agent/select/${agentName}`, [1]);
@@ -223,7 +225,7 @@ async function handleHelp(message: Message): Promise<void> {
         { name: '!osc git sync', value: 'Trigger git pull/push via OSC', inline: false },
         { name: '!osc agent <name>', value: 'Select an agent\nExample: `!osc agent coder`', inline: false }
       ]
-    )]
+    ) as any]
   });
 }
 
