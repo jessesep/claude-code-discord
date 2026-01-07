@@ -16,7 +16,7 @@ const MemoryExplorer: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Memory Browser</h2>
-          <p className="text-sm text-zinc-500">Explorer persistent system knowledge from <code>claude-mem</code>.</p>
+          <p className="text-sm text-zinc-500">Explorer persistent system knowledge from <code>agent-mem</code>.</p>
         </div>
         <div className="relative w-full md:w-80">
           <input

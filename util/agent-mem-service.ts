@@ -1,23 +1,25 @@
 import { 
-  ClaudeMemMemory, 
-  ClaudeMemSearchResult, 
-  ClaudeMemSession, 
+  AgentMemMemory, 
+  AgentMemSearchResult, 
+  AgentMemSession, 
   ObservationData,
-  ClaudeMemService
-} from "./claude-mem-types.ts";
+  AgentMemService
+} from "./agent-mem-types.ts";
 
 /**
- * Implementation of the ClaudeMemService
+ * Implementation of the AgentMemService
+ * Provider-agnostic memory service for any AI agent.
  */
-export class ClaudeMemServiceImpl implements ClaudeMemService {
+export class AgentMemServiceImpl implements AgentMemService {
   private workerUrl: string;
 
   constructor() {
-    this.workerUrl = Deno.env.get("CLAUDE_MEM_WORKER_URL") || "http://localhost:37777";
+    // Environment variable kept for backward compatibility
+    this.workerUrl = Deno.env.get("AGENT_MEM_WORKER_URL") || Deno.env.get("CLAUDE_MEM_WORKER_URL") || "http://localhost:37777";
   }
 
   /**
-   * Start a new session in claude-mem
+   * Start a new session in agent-mem
    */
   async startSession(workspace: string, agentName: string, metadata?: Record<string, any>): Promise<string> {
     try {
@@ -31,16 +33,16 @@ export class ClaudeMemServiceImpl implements ClaudeMemService {
         throw new Error(`Failed to start session: ${response.statusText}`);
       }
 
-      const session: ClaudeMemSession = await response.json();
+      const session: AgentMemSession = await response.json();
       return session.id;
     } catch (error) {
-      console.warn("Claude-mem: Failed to start session:", error instanceof Error ? error.message : String(error));
+      console.warn("agent-mem: Failed to start session:", error instanceof Error ? error.message : String(error));
       return `local-${Date.now()}`; // Fallback local ID
     }
   }
 
   /**
-   * End a session in claude-mem
+   * End a session in agent-mem
    */
   async endSession(sessionId: string, summary?: string): Promise<void> {
     if (sessionId.startsWith('local-')) return;
@@ -53,10 +55,10 @@ export class ClaudeMemServiceImpl implements ClaudeMemService {
       });
 
       if (!response.ok) {
-        console.warn(`Claude-mem: Failed to end session ${sessionId}: ${response.statusText}`);
+        console.warn(`agent-mem: Failed to end session ${sessionId}: ${response.statusText}`);
       }
     } catch (error) {
-      console.warn(`Claude-mem: Error ending session ${sessionId}:`, error instanceof Error ? error.message : String(error));
+      console.warn(`agent-mem: Error ending session ${sessionId}:`, error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -74,10 +76,10 @@ export class ClaudeMemServiceImpl implements ClaudeMemService {
       });
 
       if (!response.ok) {
-        console.warn(`Claude-mem: Failed to save observation: ${response.statusText}`);
+        console.warn(`agent-mem: Failed to save observation: ${response.statusText}`);
       }
     } catch (error) {
-      console.warn("Claude-mem: Error saving observation:", error instanceof Error ? error.message : String(error));
+      console.warn("agent-mem: Error saving observation:", error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -115,7 +117,7 @@ export class ClaudeMemServiceImpl implements ClaudeMemService {
   /**
    * Query context from previous sessions
    */
-  async queryContext(query: string, workspace?: string, agentName?: string, limit: number = 5): Promise<ClaudeMemMemory[]> {
+  async queryContext(query: string, workspace?: string, agentName?: string, limit: number = 5): Promise<AgentMemMemory[]> {
     try {
       const searchPayload: any = { query, limit };
       if (workspace) searchPayload.workspace = workspace;
@@ -130,7 +132,7 @@ export class ClaudeMemServiceImpl implements ClaudeMemService {
 
       if (!response.ok) return [];
 
-      const result: ClaudeMemSearchResult = await response.json();
+      const result: AgentMemSearchResult = await response.json();
       return result.memories || [];
     } catch {
       return [];
@@ -172,4 +174,10 @@ export class ClaudeMemServiceImpl implements ClaudeMemService {
 }
 
 // Export singleton instance
-export const claudeMemService = new ClaudeMemServiceImpl();
+export const agentMemService = new AgentMemServiceImpl();
+
+// Backward-compatible alias (deprecated)
+/** @deprecated Use agentMemService instead */
+export const claudeMemService = agentMemService;
+/** @deprecated Use AgentMemServiceImpl instead */
+export { AgentMemServiceImpl as ClaudeMemServiceImpl };

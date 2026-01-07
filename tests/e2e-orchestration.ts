@@ -1,4 +1,4 @@
-import { setupTester, waitForResult, isFinalResponse, CLAUDE_BOT_ID } from './e2e-utils.ts';
+import { setupTester, waitForResult, isFinalResponse, ONE_BOT_ID } from './e2e-utils.ts';
 
 async function runOrchestrationTest() {
   console.log('🧪 Starting E2E Orchestration (Manager -> Coder) Test Suite...');
@@ -12,7 +12,7 @@ async function runOrchestrationTest() {
   const task = `Create a file named "${filename}" containing the word "ORCHESTRATED" and then verify it exists.`;
   
   // We explicitly mention 'ag-manager' to test delegation
-  const testPrompt = `<@${CLAUDE_BOT_ID}> using ag-manager, I have a task for you: ${task}`;
+  const testPrompt = `<@${ONE_BOT_ID}> using ag-manager, I have a task for you: ${task}`;
   
   try {
     console.log(`📤 Sending command to Manager: "${testPrompt}"`);

@@ -1,4 +1,4 @@
-import { setupTester, waitForResult, isFinalResponse, CLAUDE_BOT_ID } from './e2e-utils.ts';
+import { setupTester, waitForResult, isFinalResponse, ONE_BOT_ID } from './e2e-utils.ts';
 
 async function runGitTest() {
   console.log('🧪 Starting E2E Git Operation Test Suite...');
@@ -8,7 +8,7 @@ async function runGitTest() {
   console.log(`📂 Testing in channel: #${ctx.channel.name}`);
 
   const branchName = `test-e2e-branch-${Date.now()}`;
-  const testPrompt = `<@${CLAUDE_BOT_ID}> using cursor-coder, Please perform the following git operations:
+  const testPrompt = `<@${ONE_BOT_ID}> using cursor-coder, Please perform the following git operations:
 1. Create a new branch named "${branchName}"
 2. Switch to this new branch
 3. Switch back to the main branch

@@ -276,8 +276,8 @@ export async function sendToAntigravityCLI(
           // Save observation if memory session is active
           if (options.memorySessionId) {
             try {
-              const { claudeMemService } = await import("../util/claude-mem-service.ts");
-              await claudeMemService.savePromptResponse(options.memorySessionId, prompt, fullText);
+              const { agentMemService } = await import("../util/agent-mem-service.ts");
+              await agentMemService.savePromptResponse(options.memorySessionId, prompt, fullText);
             } catch (err) {
               console.warn("[Antigravity] Failed to save memory observation:", err);
             }
@@ -340,8 +340,8 @@ export async function sendToAntigravityCLI(
       // Save observation if memory session is active
       if (options.memorySessionId) {
         try {
-          const { claudeMemService } = await import("../util/claude-mem-service.ts");
-          await claudeMemService.savePromptResponse(options.memorySessionId, prompt, fullText);
+          const { agentMemService } = await import("../util/agent-mem-service.ts");
+          await agentMemService.savePromptResponse(options.memorySessionId, prompt, fullText);
         } catch (err) {
           console.warn("[Antigravity] Failed to save memory observation:", err);
         }

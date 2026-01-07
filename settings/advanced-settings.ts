@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { CLAUDE_MODELS } from "../provider-clients/enhanced-client.ts";
+import { AGENT_MODELS } from "../provider-clients/enhanced-client.ts";
 
 // Advanced bot settings configuration
 export interface AdvancedBotSettings {
@@ -7,7 +7,7 @@ export interface AdvancedBotSettings {
   mentionEnabled: boolean;
   mentionUserId: string | null;
   
-  // Claude Code settings
+  // One Agent settings
   defaultModel: string;
   defaultTemperature: number;
   defaultMaxTokens: number;
@@ -42,7 +42,7 @@ export const DEFAULT_SETTINGS: AdvancedBotSettings = {
   mentionEnabled: false,
   mentionUserId: null,
   
-  // Claude Code
+  // One Agent
   defaultModel: 'claude-sonnet-4',
   defaultTemperature: 0.7,
   defaultMaxTokens: 4096,
@@ -74,8 +74,8 @@ export const DEFAULT_SETTINGS: AdvancedBotSettings = {
 
 export const advancedSettingsCommands = [
   new SlashCommandBuilder()
-    .setName('claude-settings')
-    .setDescription('Manage Claude Code specific settings')
+    .setName('agent-settings')
+    .setDescription('Manage One Agent specific settings')
     .addStringOption(option =>
       option.setName('action')
         .setDescription('Setting action to perform')
@@ -118,16 +118,17 @@ export const advancedSettingsCommands = [
   // - session-settings, monitoring-settings, developer-settings, profile-settings
   // These commands were defined but had no handlers implemented
   // Their functionality is now available through the unified settings system
+  // 
 
   new SlashCommandBuilder()
     .setName('quick-model')
-    .setDescription('Quickly switch Claude model for next conversation')
+    .setDescription('Quickly switch model for next conversation')
     .addStringOption(option =>
       option.setName('model')
-        .setDescription('Claude model to use')
+        .setDescription('Agent model to use')
         .setRequired(true)
         .addChoices(
-          ...Object.entries(CLAUDE_MODELS).map(([key, model]) => ({
+          ...Object.entries(AGENT_MODELS).map(([key, model]) => ({
             name: `${model.name}${model.recommended ? ' ⭐' : ''}`,
             value: key
           }))

@@ -1,12 +1,29 @@
-# Cursor Integration - Discord Bot Usage Guide
+# Cursor Provider - Discord Usage Guide
 
-This guide explains how to use the Cursor-powered agents in the Discord bot.
+This guide explains how to use the Cursor provider within **one agent**.
+
+---
 
 ## Overview
 
-The Discord bot now supports **two AI clients**:
-- **Claude CLI** (`claude` command) - Conversational AI, code review, architecture advice
-- **Cursor CLI** (`cursor agent`) - Autonomous code editing, refactoring, debugging
+**one agent** routes requests to different AI providers. The Cursor provider specializes in:
+
+- **Autonomous code editing** — Cursor can read, write, and modify files
+- **Refactoring** — Complex code transformations
+- **Debugging** — Finding and fixing bugs with file context
+
+### When to Use Cursor
+
+| Task | Use Cursor? | Why |
+|------|-------------|-----|
+| File editing | ✅ Yes | Cursor can modify files directly |
+| Refactoring | ✅ Yes | Specialized in code transformations |
+| Debugging | ✅ Yes | Full file system access |
+| Code review | ⚠️ Optional | Claude may be better for analysis |
+| Architecture advice | ❌ No | Use Claude or Gemini instead |
+| Quick Q&A | ❌ No | Use Gemini for speed |
+
+---
 
 ## Prerequisites
 
@@ -30,129 +47,137 @@ cursor agent --print "hello"
 
 Follow the authentication prompts if not already signed in.
 
-## Available Cursor Agents
+---
 
-The bot includes 4 Cursor-powered agents:
+## Using Cursor via Discord
 
-### 1. `cursor-coder` - Autonomous Coder
-**Description:** General-purpose autonomous code editor
-**Model:** sonnet-4
-**Capabilities:** File editing, code generation, refactoring
-**Safety:** Requires approval for operations, sandbox enabled
-**Risk Level:** High
+### Method 1: Explicit Provider Mention
 
-**Example Usage:**
+Mention "cursor" in your message to route to the Cursor provider:
+
 ```
-/agent select cursor-coder
-/agent send Add error handling to the API endpoints in server.ts
+/agent action:chat message:use cursor to refactor the auth module
+/agent action:chat message:cursor: fix the memory leak in websocket handler
 ```
 
-### 2. `cursor-refactor` - Refactoring Specialist
-**Description:** Specialized in code refactoring
-**Model:** sonnet-4
-**Capabilities:** Refactoring, code improvement, file editing
-**Safety:** Requires approval, sandbox enabled
-**Risk Level:** High
+### Method 2: Select a Cursor-Powered Agent
 
-**Example Usage:**
+Some agents are pre-configured to use Cursor:
+
 ```
-/agent select cursor-refactor
-/agent send Refactor the authentication module to use dependency injection
+/agent action:start agent_name:cursor-coder
+/agent action:chat message:Add error handling to the API endpoints
 ```
 
-### 3. `cursor-debugger` - Debug Agent
-**Description:** Autonomous debugging with code editing
-**Model:** sonnet-4-thinking
-**Capabilities:** Debugging, testing, file editing
-**Safety:** Requires approval, sandbox enabled
-**Risk Level:** High
+### Method 3: Default Configuration
 
-**Example Usage:**
-```
-/agent select cursor-debugger
-/agent send Fix the memory leak in the WebSocket connection handler
-```
+If Cursor is set as your default provider for file-editing tasks in settings, it will be used automatically for code modification requests.
 
-### 4. `cursor-fast` - Fast Agent (⚠️ Use with Caution)
-**Description:** Quick code changes with auto-approval
-**Model:** sonnet-4
-**Capabilities:** Quick edits, file editing
-**Safety:** **AUTO-APPROVES ALL OPERATIONS**, sandbox disabled
-**Risk Level:** High
+---
 
-**Example Usage:**
-```
-/agent select cursor-fast
-/agent send Add a console.log to track user sessions
-```
+## Cursor Agents
 
-⚠️ **Warning:** `cursor-fast` auto-approves all file operations without confirmation. Only use in development environments or for trivial changes.
+**one agent** includes pre-configured Cursor-powered agents:
+
+### `cursor-coder` — Autonomous Coder
+
+- **Purpose**: General-purpose autonomous code editing
+- **Model**: sonnet-4
+- **Capabilities**: File editing, code generation, refactoring
+- **Safety**: Requires approval for operations, sandbox enabled
+- **Risk Level**: High
+
+### `cursor-refactor` — Refactoring Specialist
+
+- **Purpose**: Code refactoring and improvement
+- **Model**: sonnet-4
+- **Capabilities**: Refactoring, code improvement
+- **Safety**: Requires approval, sandbox enabled
+- **Risk Level**: High
+
+### `cursor-debugger` — Debug Agent
+
+- **Purpose**: Autonomous debugging with code editing
+- **Model**: sonnet-4-thinking
+- **Capabilities**: Debugging, testing, file editing
+- **Safety**: Requires approval, sandbox enabled
+- **Risk Level**: High
+
+### `cursor-fast` — Fast Agent ⚠️
+
+- **Purpose**: Quick code changes with auto-approval
+- **Model**: sonnet-4
+- **Capabilities**: Quick edits
+- **Safety**: **AUTO-APPROVES ALL OPERATIONS**
+- **Risk Level**: High
+
+⚠️ **Warning**: `cursor-fast` auto-approves all file operations. Only use in development environments or for trivial changes.
+
+---
 
 ## How It Works
 
-### Message Flow
+When you send a request that routes to Cursor:
 
-1. User selects Cursor agent via `/agent select cursor-coder`
-2. User sends task via `/agent send <task>`
+1. **one agent** receives your Discord message
+2. Router determines Cursor is the appropriate provider
 3. Bot spawns Cursor CLI process:
    ```bash
    cursor agent --print --output-format stream-json --stream-partial-output \
-     --model sonnet-4 --sandbox enabled "<task>"
+     --model sonnet-4 --sandbox enabled "<your task>"
    ```
-4. Cursor analyzes codebase and generates plan
+4. Cursor analyzes your codebase and generates a plan
 5. Cursor requests approval for file operations (unless `force: true`)
 6. Bot streams Cursor's output to Discord in real-time
-7. Completion message shows:
-   - Client type (🖱️ Cursor)
-   - Model used
-   - Duration
-   - Chat ID (for session resumption)
+7. Completion message shows results
 
 ### Streaming Updates
 
-Cursor responses are streamed to Discord every 2 seconds, providing real-time feedback on:
-- File analysis
+Cursor responses are streamed to Discord every ~2 seconds:
+- File analysis progress
 - Code generation
 - Refactoring steps
 - Error fixes
-- Test execution
+
+---
 
 ## Configuration
 
-### Agent Configuration Parameters
+### Agent Configuration
 
-Each Cursor agent supports these parameters (defined in `agent/index.ts`):
+Each Cursor agent supports these parameters:
 
 ```typescript
 {
-  client: 'cursor',           // Use Cursor CLI instead of Claude
-  model: 'sonnet-4',          // Cursor model (sonnet-4, gpt-5, sonnet-4-thinking)
-  workspace: '/path/to/repo', // Working directory (defaults to bot's cwd)
-  force: false,               // Auto-approve operations (true = dangerous!)
-  sandbox: 'enabled'          // Sandbox mode (enabled|disabled)
+  client: 'cursor',           // Use Cursor provider
+  model: 'sonnet-4',          // Cursor model
+  workspace: '/path/to/repo', // Working directory
+  force: false,               // Auto-approve (true = dangerous!)
+  sandbox: 'enabled'          // Sandbox mode
 }
 ```
 
 ### Creating Custom Cursor Agents
 
-Edit `agent/index.ts` and add to `PREDEFINED_AGENTS`:
+Add to `agent/types.ts` in `PREDEFINED_AGENTS`:
 
 ```typescript
 'my-cursor-agent': {
   name: 'My Custom Cursor Agent',
-  description: 'Does something specific',
+  description: 'Specialized for my workflow',
   model: 'sonnet-4',
   systemPrompt: 'You are a specialist in...',
   temperature: 0.3,
   maxTokens: 8000,
   capabilities: ['file-editing', 'testing'],
   riskLevel: 'high',
-  client: 'cursor',        // Use Cursor
-  force: false,            // Require approval
-  sandbox: 'enabled',      // Enable sandbox
-  workspace: '/path/proj'  // Optional: specific workspace
+  client: 'cursor',
+  force: false,
+  sandbox: 'enabled'
 }
 ```
+
+---
 
 ## Safety Features
 
@@ -170,156 +195,112 @@ When `force: false`:
   - Creating/modifying files
   - Executing shell commands
   - Reading sensitive files
-- User must confirm via Cursor CLI interface
 
-⚠️ **Note:** Currently, approval prompts happen in the CLI, not Discord. You need access to the bot's terminal to approve operations.
+**Note**: Approval prompts currently happen in the CLI. You need access to the bot's terminal to approve operations.
 
 ### Risk Levels
 
-- **Low:** Read-only operations, safe queries
-- **Medium:** Limited file modifications, controlled operations
-- **High:** Autonomous code editing, shell access, file creation/deletion
+| Level | Behavior |
+|-------|----------|
+| Low | Read-only operations |
+| Medium | Limited file modifications |
+| High | Full file editing, shell access |
 
-All Cursor agents are marked as **High Risk** because they can modify files.
+All Cursor agents are marked **High Risk** because they can modify files.
 
-## Comparison: Claude vs Cursor
+---
 
-| Feature | Claude CLI | Cursor CLI |
-|---------|-----------|------------|
-| **Best For** | Conversation, advice, review | Autonomous code editing |
-| **File Editing** | ❌ Cannot edit files | ✅ Full file editing |
-| **Code Execution** | ❌ Cannot run code | ✅ Can execute commands |
-| **Streaming** | ✅ Yes | ✅ Yes (stream-json) |
-| **Session Resume** | ❌ No | ✅ Yes (via chatId) |
-| **Safety** | Low risk | High risk |
-| **Speed** | Fast | Slower (spawns processes) |
-| **Use Case** | Architecture, review, Q&A | Refactoring, debugging, building |
+## Comparison: Cursor vs Other Providers
 
-## Session Management
+| Feature | Cursor | Claude CLI | Ollama | Gemini |
+|---------|--------|-----------|--------|--------|
+| **File Editing** | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Code Execution** | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Streaming** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Session Resume** | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Speed** | Slower | Fast | Fast | Very Fast |
+| **Cost** | Subscription | API | Free | API |
+| **Best For** | Coding | Analysis | Privacy | Speed |
 
-### Chat ID for Resumption
-
-Cursor returns a `chatId` after each task. This can be used to resume the conversation:
-
-```typescript
-// Future feature: Resume Cursor session
-/agent resume <chatId>
-```
-
-Currently, each task starts a fresh Cursor session.
+---
 
 ## Troubleshooting
 
 ### Cursor CLI Not Found
 
-**Error:** `cursor: command not found`
+```
+Error: cursor: command not found
+```
 
-**Solution:**
+**Solution**:
 ```bash
-# Reinstall Cursor CLI
 curl https://cursor.com/install -fsSL | bash
-
-# Verify installation
 which cursor
 cursor agent --version
 ```
 
 ### Authentication Failed
 
-**Error:** `Authentication required`
+```
+Error: Authentication required
+```
 
-**Solution:**
+**Solution**:
 ```bash
-# Authenticate interactively
 cursor agent --print "test"
-
 # Follow the prompts to sign in
 ```
 
 ### Permission Denied
 
-**Error:** `Permission denied: cannot write to file`
+```
+Error: Permission denied: cannot write to file
+```
 
-**Solution:**
+**Solution**:
 - Ensure the bot has write permissions in the workspace
 - Check that `workspace` parameter points to a valid directory
 - Consider using `sandbox: 'enabled'` for safer operations
 
 ### Slow Responses
 
-Cursor spawns a new process for each task, which can be slower than Claude CLI. Typical times:
-- **Startup:** 1-2 seconds
-- **First chunk:** 2-5 seconds
-- **Complete task:** 10-60 seconds (depends on complexity)
+Cursor spawns a new process for each task, which is slower than API-based providers:
 
-For faster responses, use Claude agents instead.
+| Phase | Typical Time |
+|-------|--------------|
+| Startup | 1-2 seconds |
+| First chunk | 2-5 seconds |
+| Complete task | 10-60 seconds |
 
-## Testing
+For faster responses, use Gemini or Ollama for non-file-editing tasks.
 
-### Manual Test
-
-Run the test suite:
-```bash
-cd /Users/jessesep/repos/claude-code-discord
-deno run --allow-run tests/cursor-client-manual-test.ts
-```
-
-### Discord Test
-
-1. Select a Cursor agent:
-   ```
-   /agent select cursor-coder
-   ```
-
-2. Send a simple task:
-   ```
-   /agent send List all TypeScript files in this project
-   ```
-
-3. Verify:
-   - ✅ Completion message shows "🖱️ Cursor"
-   - ✅ Response is streamed in real-time
-   - ✅ Chat ID is displayed
-   - ✅ Duration is reasonable (<30s for simple tasks)
+---
 
 ## Best Practices
 
 ### ✅ Do
 
-- Use Cursor for **autonomous code editing** (refactoring, bug fixes)
-- Use Claude for **conversation and advice** (architecture, review)
+- Use Cursor for **autonomous code editing**
 - Start with `sandbox: 'enabled'` for safety
 - Test with simple tasks first
 - Review Cursor's changes before committing
+- Use other providers for conversation/advice
 
 ### ❌ Don't
 
 - Use `cursor-fast` in production environments
 - Run Cursor on untrusted codebases without sandbox
-- Expect instant responses (Cursor needs time to analyze code)
-- Use Cursor for simple Q&A (Claude is faster and cheaper)
-
-## Future Enhancements
-
-Planned improvements:
-- [ ] Session resumption via `/agent resume <chatId>`
-- [ ] Approval workflow integration with Discord (buttons/modals)
-- [ ] Workspace selection via slash command
-- [ ] Cursor hooks integration for security gates
-- [ ] Real-time approval via Discord reactions
-- [ ] Process pooling for faster responses
-- [ ] MCP server for persistent storage
-
-## Resources
-
-- [Cursor CLI Documentation](https://cursor.com/docs/cli/overview)
-- [Cursor Agent Guide](https://cursor.com/docs/cli/using)
-- [Cursor Hooks System](https://cursor.com/docs/agent/hooks)
-- [CURSOR-INTEGRATION.md](./CURSOR-INTEGRATION.md) - Detailed technical docs
-- [CURSOR-QUICK-REFERENCE.md](./CURSOR-QUICK-REFERENCE.md) - Quick reference guide
+- Expect instant responses
+- Use Cursor for simple Q&A (use Gemini instead)
 
 ---
 
-**Last Updated:** January 6, 2026
-**Version:** 1.0
-**Status:** ✅ Production Ready
+## Related Documentation
+
+- [CURSOR_GUIDE.md](./CURSOR_GUIDE.md) - Technical CLI reference
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System design
+- [AGENT-ROLE-SYSTEM.md](./AGENT-ROLE-SYSTEM.md) - Role system guide
+
+---
+
+*Last Updated*: January 2026

@@ -1,4 +1,4 @@
-import { setupTester, waitForResult, hasError, CLAUDE_BOT_ID } from './e2e-utils.ts';
+import { setupTester, waitForResult, hasError, ONE_BOT_ID } from './e2e-utils.ts';
 
 async function runErrorRecoveryTest() {
   console.log('🧪 Starting E2E Error Recovery Test Suite (Refactored)...');
@@ -11,7 +11,7 @@ async function runErrorRecoveryTest() {
     // Step 1: Trigger an error
     const nonExistentFile = `non_existent_${Date.now()}.txt`;
     console.log(`📤 Step 1: Triggering error by reading ${nonExistentFile}...`);
-    await ctx.channel.send(`<@${CLAUDE_BOT_ID}> using cursor-coder, Please read the file "${nonExistentFile}".`);
+    await ctx.channel.send(`<@${ONE_BOT_ID}> using cursor-coder, Please read the file "${nonExistentFile}".`);
 
     console.log(`⏳ Waiting for error response...`);
     const errorResult = await waitForResult(ctx, 120000, hasError);
@@ -23,11 +23,11 @@ async function runErrorRecoveryTest() {
 
     // Step 2: Recovery
     console.log('📤 Step 2: Sending recovery command...');
-    await ctx.channel.send(`<@${CLAUDE_BOT_ID}> using cursor-coder, That's fine. Now please just tell me "I AM ALIVE" so I know you recovered.`);
+    await ctx.channel.send(`<@${ONE_BOT_ID}> using cursor-coder, That's fine. Now please just tell me "I AM ALIVE" so I know you recovered.`);
 
     console.log(`⏳ Waiting for recovery confirmation...`);
     const recoveryResult = await waitForResult(ctx, 120000, (msgs) => 
-      msgs.some(m => m.author.id === CLAUDE_BOT_ID && 
+      msgs.some(m => m.author.id === ONE_BOT_ID && 
         (m.content?.toUpperCase().includes('ALIVE') || 
          m.content?.toUpperCase().includes('RECOVERED') ||
          m.embeds.some((e: any) => 

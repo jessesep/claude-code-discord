@@ -15,11 +15,11 @@ export const ENHANCED_AGENTS: Record<string, EnhancedAgentConfig> = {
   // ========================================================================
   'ag-manager': {
     id: 'ag-manager',
-    name: 'Gemini Manager',
+    name: 'one manager',
     description: 'Main orchestrator agent that manages other agents and interacts with the user',
     providerId: 'antigravity',
     model: 'gemini-3-flash-preview',
-    systemPrompt: `You are the Manager Agent. Your role is to interact with users and orchestrate work.
+    systemPrompt: `You are the one manager. Your role is to interact with users and orchestrate work across the one architecture.
 
 **Core Responsibilities**:
 1. **Triage Requests**: Determine if a request is simple (you can answer directly) or complex (requires a specialist).

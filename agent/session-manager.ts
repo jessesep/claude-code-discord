@@ -1,5 +1,5 @@
 import { AgentSession, PREDEFINED_AGENTS } from "./types.ts";
-import { claudeMemService } from "../util/claude-mem-service.ts";
+import { agentMemService } from "../util/agent-mem-service.ts";
 
 // In-memory storage for agent sessions
 export let agentSessions: AgentSession[] = [];
@@ -113,17 +113,17 @@ export function setAgentSession(
   agentSessions.push(newSession);
   addActiveAgent(userId, channelId, agentName);
 
-  // Trigger claude-mem session start (async, don't block)
+  // Trigger agent-mem session start (async, don't block)
   (async () => {
     try {
-      const memSessionId = await claudeMemService.startSession(
+      const memSessionId = await agentMemService.startSession(
         projectPath || Deno.cwd(), 
         agentName,
         { userId, channelId, sessionId: newSession.id }
       );
       newSession.memorySessionId = memSessionId;
     } catch (err) {
-      console.warn("Failed to start claude-mem session:", err);
+      console.warn("Failed to start agent-mem session:", err);
     }
   })();
 
@@ -141,7 +141,7 @@ export function clearAgentSessions(userId: string, channelId: string, agentName?
     for (const session of sessions) {
       session.status = 'completed';
       if (session.memorySessionId) {
-        claudeMemService.endSession(session.memorySessionId);
+        agentMemService.endSession(session.memorySessionId);
       }
     }
     removeActiveAgent(userId, channelId, agentName);
@@ -154,7 +154,7 @@ export function clearAgentSessions(userId: string, channelId: string, agentName?
     for (const session of sessions) {
       session.status = 'completed';
       if (session.memorySessionId) {
-        claudeMemService.endSession(session.memorySessionId);
+        agentMemService.endSession(session.memorySessionId);
       }
     }
     removeActiveAgent(userId, channelId);

@@ -76,7 +76,7 @@ function parseArgs(args: string[]): { category?: string; userId?: string } {
 export { getGitInfo, executeGitCommand } from "./git/index.ts";
 export { sendToOneAgent } from "./provider-clients/index.ts";
 
-// Create One Agent Bot
+// Create one agent discord
 export async function createOneAgentBot(config: BotConfig) {
   const { discordToken, applicationId, workDir, repoName, branchName, categoryName, defaultMentionUserId } = config;
 

@@ -1,327 +1,298 @@
 <div align="center">
 
-# one agent bot
+# one agent discord
+
+**A dynamic router that connects Discord to any AI provider**
+
+*One interface. Any model. Every workflow.*
 
 <kbd>
 
-| Advantage                     | Details                                                                                  | Status |
-| ----------------------------- | ---------------------------------------------------------------------------------------- | :----: |
-| Use AI Anywhere      | Host locally (VM / Docker / cloud) and send commands via the Discord API                 |   ✅   |
-| Centralized collaboration     | Run commands and discuss results where your team already communicates                    |   ✅   |
-| Branch-aware organization     | Maps Git branches to channels/categories so feature work stays separated                 |   ✅   |
-| Immediate, shareable feedback | Execute `/git`, `/shell`, or `/agent` and get outputs directly in-channel               |   ✅   |
-| Reduced context switching     | Keep actions, logs, and discussion together — less switching between terminal and chat   |   ✅   |
-| Role-based access control     | Restrict destructive commands (`/shell`, `/git`, worktree ops) to specific Discord roles |   ✅   |
-| Non-developer friendly        | PMs, QA, and stakeholders can trigger checks and view results without repo access        |   ✅   |
-| Automatable touchpoint        | Integrate with CI/webhooks to triage issues and run fixes from chat                      |   ✅   |
-| Local hosting & security      | Keep keys and code on your infra while exposing a controlled interface through Discord   |   ✅   |
-| Audit trail & accountability  | Channel history provides an easy-to-search record of who ran what and when               |   ✅   |
+| Capability | Description | Status |
+| --- | --- | :---: |
+| **Universal Provider Routing** | Connect to Cursor, Claude, Ollama, Gemini, OpenAI, or any provider through a single interface | ✅ |
+| **Use AI Anywhere** | Host locally (VM / Docker / cloud) and send commands via Discord | ✅ |
+| **Dynamic Model Selection** | Switch providers and models on-the-fly per request | ✅ |
+| **Role-Based Agents** | Specialized roles (Builder, Tester, Architect, Reviewer) work with any provider | ✅ |
+| **Multi-Agent Orchestration** | Manager agent coordinates specialized workers concurrently | ✅ |
+| **Branch-Aware Organization** | Maps Git branches to Discord channels/categories | ✅ |
+| **Immediate, Shareable Feedback** | Execute `/agent`, `/git`, or `/shell` and get outputs directly in-channel | ✅ |
+| **Role-Based Access Control** | Restrict commands to specific Discord roles | ✅ |
+| **Local Hosting & Security** | Keep keys and code on your infrastructure | ✅ |
+| **Audit Trail** | Channel history records who ran what and when | ✅ |
 
 </kbd>
 
 </div>
 
-<br>
+---
 
-**Start Here If You Have These:**
-<kbd>DISCORD_TOKEN</kbd>
-<kbd>APPLICATION_ID</kbd>
+## The One Agent Philosophy
 
-- **[Quick Start](#pre)**
-- **[Command List 48 Commands](#Command-list)**
+**one agent discord** is not another AI chatbot—it's a *routing layer* that decouples your workflow from any single AI provider.
 
-**Tutorial If you dont know or have them follow these first then come back:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Discord Interface                         │
+│                    (one unified experience)                      │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      one agent (Router)                          │
+│                                                                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+│  │  Cursor  │  │  Claude  │  │  Ollama  │  │  Gemini  │  ...   │
+│  │ Provider │  │ Provider │  │ Provider │  │ Provider │        │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-- **[How To Setup Discord Bot?](#setup)**
+**Why this matters:**
+- **No vendor lock-in**: Switch providers without changing your workflow
+- **Cost optimization**: Route simple queries to free local models, complex tasks to premium APIs
+- **Resilience**: If one provider is down, route to another
+- **Best tool for the job**: Use Cursor for file editing, Claude for reasoning, Ollama for privacy
 
 ---
 
-### Preview:
+## Quick Start
 
-<img width="350" height="350" alt="image" src="https://github.com/user-attachments/assets/e8091420-d271-48a4-8e55-279f2093d3ae" />
+**Prerequisites:**
+- [Deno](https://deno.com/) runtime
+- Discord bot token and application ID
+- At least one AI provider configured
 
-<h2 id="pre">Quick Start</h2>
+### 1. Install Deno
 
-- **Install Deno Can Be Done Via [Denos Website](https://deno.com/) Or Commands Under:**
-
-```C
-# Linux/MacOS
+```bash
+# Linux/macOS
 curl -fsSL https://deno.land/install.sh | sh
 
-# Windows|Powershell
+# Windows (PowerShell)
 irm https://deno.land/install.ps1 | iex
 ```
 
-**Clone the project:**
+### 2. Clone & Configure
 
-```
+```bash
 git clone https://github.com/zebbern/claude-code-discord.git
 cd claude-code-discord
 ```
 
-**Required environment variables**
+Set your Discord credentials:
 
-```
-# Linux
+```bash
+# Linux/macOS
 export DISCORD_TOKEN="your-discord-bot-token"
 export APPLICATION_ID="your-discord-app-id"
 
-# Windows Terminal
-set DISCORD_TOKEN=your-discord-bot-token
-set APPLICATION_ID=your-discord-app-id
-
-# Windows Powershell
+# Windows PowerShell
 $env:DISCORD_TOKEN = "your-discord-bot-token"
 $env:APPLICATION_ID = "your-discord-app-id"
 ```
 
-**Using direnv (Recommended)**
-If you use [direnv](https://direnv.net/), you can copy the example file:
-
+**Using direnv (recommended):**
 ```bash
 cp .envrc.example .envrc
-# Then edit .envrc with your tokens
+# Edit .envrc with your tokens
 direnv allow
 ```
 
-**Now Run the discord Bot**
+### 3. Configure a Provider
 
-> If you get `not a git directory` just run
-> <kbd>git init</kbd> or <kbd>git add .</kbd>
+Choose at least one provider:
+
+| Provider | Setup | Best For |
+|----------|-------|----------|
+| **Ollama** | `ollama serve` (local, free) | Privacy, offline, experimentation |
+| **Cursor** | `cursor agent --version` | File editing, autonomous coding |
+| **Claude CLI** | `claude login` | Reasoning, code review |
+| **Gemini/Antigravity** | `GOOGLE_API_KEY` or `ANTHROPIC_API_KEY` | Fast responses, orchestration |
+
+### 4. Run
 
 ```bash
-# Option 1: Just run the bot
+# Basic start
 deno run --allow-all index.ts
 
-# Option 2: Run the bot with extra terminal output (For Dev)
-deno run --allow-all index.ts --watch
-
-# Option 3: Run the bot and get pings when agent is done
-./index.ts --category myproject --user-id Your_Discord_User_ID_Here
-
-# Can also be ran like this:
-deno run --allow-all index.ts --category yourproject --user-id Your_Discord_User_ID_Here
+# With notifications when agent completes
+deno run --allow-all index.ts --category myproject --user-id YOUR_DISCORD_USER_ID
 ```
 
-**You can run without `--user-id Your_Discord_User_ID_Here` if you dont want to be notified when agent finishes**
-<img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/2fea008b-76b7-48d8-9a87-8214cc7a24ad" />
+---
 
-<h1 id="setup">Setup Discord Bot</h1>
+## Discord Bot Setup
 
-<h2 id="1">1. Create a Discord Application</h2>
+If you don't have a Discord bot yet:
 
-> [!Note]
->
-> - Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-> - Click <kbd>New Application</kbd>
-> - Give your application a name (e.g., <kbd>one agent</kbd>)
-> - Click <kbd>Create</kbd> > <img width="500" height="500" alt="app-create" src="https://github.com/user-attachments/assets/ee8bdf4e-9bbf-4d01-8046-a182ca6d5da9" />
+1. **Create Application**: Go to [Discord Developer Portal](https://discord.com/developers/applications) → New Application
+2. **Copy Application ID**: General Information → Application ID
+3. **Create Bot**: Bot section → Add Bot → Copy Token
+4. **Invite Bot**: OAuth2 → URL Generator
+   - Scopes: `bot`, `applications.commands`
+   - Permissions: Send Messages, Use Slash Commands, Read Message History, Embed Links
 
-<h2 id="2">2. Copy Application ID (Needed For Config)</h2>
+---
 
-> [!Note]
->
-> - Go to the <kbd>General Information</kbd> → Copy <kbd>Application ID</kbd> section
->   <img width="800" height="500" alt="APPLICATION_ID" src="https://github.com/user-attachments/assets/3ad02111-0a9f-4f0f-8a77-d61841f6dd27" />
+## Command Overview
 
-<h2 id="3">3. Create a Bot User</h2>
+**48 commands** organized by function:
 
-> [!Note]
->
-> - In your application, go to the <kbd>Bot</kbd> section in the left sidebar
-> - Click <kbd>Add Bot</kbd>
-> - Under <kbd>Token</kbd> click <kbd>Copy</kbd> to copy your bot token (keep this secure!)
-> - Click <kbd>Save Changes</kbd> > <img width="800" height="500" alt="image" src="https://github.com/user-attachments/assets/0621b5ed-c4b4-44e3-a3f6-fe678f6893c3" />
+### Core Agent Commands
+| Command | Description |
+|---------|-------------|
+| `/agent` | Chat with AI agent (routes to configured provider) |
+| `/continue` | Continue previous conversation |
+| `/cancel-agent` | Cancel running agent |
+| `/agents-status` | View all active agents |
 
-<h2 id="4">4. Invite the Bot to Your Server</h2>
+### Provider & Model Selection
+| Command | Description |
+|---------|-------------|
+| `/agent-models` | List available models per provider |
+| `/settings` | Configure providers, models, and defaults |
+| `/quick-model` | Quick switch between models |
 
-> [!Note]
->
-> - Go to the <kbd>OAuth2</kbd> → <kbd>URL Generator</kbd> section
-> - Under <kbd>Scopes</kbd> select:
->
-> ```
-> + | bot
-> + | applications.commands
-> ```
->
-> - Under <kbd>Bot Permissions</kbd> select:
->
-> ```
-> + | Send Messages
-> + | Use Slash Commands
-> + | Read Message History
-> + | Embed Links
-> ```
->
-> Copy the generated URL and open it in your browser
-> Select your Discord server and authorize the bot
-> <img width="800" height="500" alt="oauth2" src="https://github.com/user-attachments/assets/3e1fe004-1ae5-4078-b1a4-882a11bc68cd" /> > <img width="800" height="500" alt="botallowcommands" src="https://github.com/user-attachments/assets/9cd92467-2f3d-4c03-abb0-9f10ec979a1b" /> > <img width="800" height="500" alt="image" src="https://github.com/user-attachments/assets/697f6f52-fe37-4885-b492-5d660f23596d" />
+### Development Tools
+| Command | Description |
+|---------|-------------|
+| `/agent-explain` | Explain code or concepts |
+| `/agent-debug` | Debug issues |
+| `/agent-review` | Code review |
+| `/agent-refactor` | Refactor code |
+| `/agent-generate` | Generate code |
 
-## Command List
+### Git Operations
+| Command | Description |
+|---------|-------------|
+| `/git` | Run git commands |
+| `/worktree` | Manage git worktrees |
+| `/worktree-list` | List active worktrees |
 
-> (48 Commands)
+### Shell & System
+| Command | Description |
+|---------|-------------|
+| `/shell` | Execute shell commands |
+| `/system-info` | System information |
+| `/processes` | List processes |
 
-### Core Agent (3)
+See [docs/DISCORD_COMMANDS.md](docs/DISCORD_COMMANDS.md) for the complete command reference.
 
-- `/agent`, `/continue`, `/cancel-agent`
+---
 
-### Enhanced Agent (4)
+## Architecture
 
-- `/agent-enhanced`, `/agent-models`, `/agent-sessions`, `/agent-context`
+**one agent discord** uses a hierarchical architecture:
 
-### Development Tools (7)
+```
+User Request
+     │
+     ▼
+┌─────────────────┐
+│  Manager Agent  │  ← Orchestrator (routes requests, spawns workers)
+│  (Gemini Flash) │
+└────────┬────────┘
+         │
+    ┌────┴────┬────────────┬────────────┐
+    ▼         ▼            ▼            ▼
+┌───────┐ ┌───────┐  ┌──────────┐  ┌─────────┐
+│ Coder │ │Tester │  │ Architect│  │Reviewer │  ← Specialized Roles
+└───┬───┘ └───┬───┘  └────┬─────┘  └────┬────┘
+    │         │           │             │
+    └─────────┴─────┬─────┴─────────────┘
+                    ▼
+           ┌────────────────┐
+           │   Providers    │  ← Any AI backend
+           │ Cursor│Claude  │
+           │ Ollama│Gemini  │
+           └────────────────┘
+```
 
-- `/agent-explain`, `/agent-debug`, `/agent-optimize`, `/agent-review`
-- `/agent-generate`, `/agent-refactor`, `/agent-learn`
+**Key concepts:**
+- **Manager**: Triages requests, decomposes tasks, delegates to specialists
+- **Roles**: Behavioral presets that work across any provider
+- **Providers**: Pluggable AI backends (add your own!)
+- **Sessions**: Track conversation history per user/channel
 
-### New Features (3)
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design.
 
-- `/todos` - Task management with API rate limits
-- `/mcp` - Model Context Protocol servers
-- `/agent` - Specialized AI agents
+---
 
-### Settings (4)
+## Provider Configuration
 
-- `/settings` - Unified settings (NEW)
-- `/agent-settings`, `/output-settings`, `/quick-model`
+### Ollama (Local, Free)
+```bash
+# Install and start
+ollama serve
 
-### Git Operations (6)
+# Pull a model
+ollama pull llama3.2
+```
 
-- `/git`, `/worktree`, `/worktree-list`, `/worktree-remove`
-- `/worktree-bots`, `/worktree-kill`
+### Cursor (File Editing)
+```bash
+# Install CLI
+curl https://cursor.com/install -fsSL | bash
 
-### Shell Management (4)
+# Verify
+cursor agent --version
+```
 
-- `/shell`, `/shell-input`, `/shell-list`, `/shell-kill`
+### Claude CLI
+```bash
+# Authenticate
+claude login
+```
 
-### System Monitoring (10)
+### Gemini / Anthropic API
+```bash
+export GOOGLE_API_KEY="your-key"
+# or
+export ANTHROPIC_API_KEY="your-key"
+```
 
-- `/system-info`, `/processes`, `/system-resources`, `/network-info`
-- `/disk-usage`, `/env-vars`, `/system-logs`, `/port-scan`
-- `/service-status`, `/uptime`
-
-### Utilities (7)
-
-- `/status`, `/pwd`, `/shutdown`, `/help`
-- `/agents-status` - View all active agents running concurrently
-- `/category-info` - Show category and repository information
-- `/repo-info` - Display repository details
-
-### Agent System
-
-- `/agent` with specialized AI agents:
-  - **ag-manager**: Main orchestrator agent
-  - **ag-coder**: Autonomous coding agent
-  - **ag-architect**: System design and planning
-  - **ag-security**: Security analyst
-  - **cursor-coder**: Autonomous coder
-  - **cursor-refactor**: Refactoring specialist
-  - **cursor-fast**: Quick edits agent
-  - **code-reviewer**: Quality and security review
-  - **architect**: Architecture review
-  - **general-assistant**: Helpful AI assistant
-
-#### Thinking Mode Options ✨
-
-- `none` - Standard responses
-- `think` - Step-by-step reasoning mode
-- `think-hard` - Deep analysis and reasoning
-- `ultrathink` - Maximum depth thinking for complex problems
-
-#### Operation Mode Options ✨
-
-- `normal` - Standard operation with user confirmation
-- `plan` - Planning mode without execution
-- `auto-accept` - Automatically apply suggested changes
-- `danger` - Unrestricted mode (high risk)
-
-#### one agent bot
-
-A powerful Discord-based AI coding assistant that acts as a "Main Agent" (Manager) to orchestrate specialized subagents for complex coding tasks.
-
-### ✨ New Features
-
-**Multi-Agent Support:**
-
-- Multiple agents can now run simultaneously in the same channel
-- Each agent works on different tasks concurrently
-- Use `/agents-status` to see all active agents
-- Manager agent can spawn multiple subagents without stopping existing ones
-
-**Category Names with Repository Info:**
-
-- Category names now include repository information for easy identification
-- Format: `CategoryName (RepositoryName)` or just `RepositoryName` if no category specified
-- Makes it easy to see which repository each Discord category belongs to
-- Use `/category-info` to see category and repository details
-
-## 🌟 New Architecture (Manager-Subagent)
-
-This bot now uses a "Manager Agent" to:
-
-1.  **Interact with the User**: Provides instant, helpful responses and remembers conversation context.
-2.  **Orchestrate Work**: Intelligently delegates complex tasks (like coding or architecture design) to specialized subagents.
-3.  **Provide Summaries**: Consolidates subagent outputs into concise, human-readable status updates.
-
-### Key Features
-
-- **🧠 Main Agent**: Powered by high-performance models. Fast, smart, and context-aware.
-- **🛠️ Subagents**: Specialized agents (e.g., `ag-coder`) that run headlessly to perform heavy lifting.
-- **💬 Interactive UI**: Buttons, Select Menus, and rich embeds.
-- **📂 Local Context**: Full access to your local filesystem.
-
-## Getting Started
-
-1.  **Clone the Repo**
-2.  **Configure**: Copy `.env.example` to `.env` and add your tokens:
-    - `DISCORD_TOKEN`
-    - `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY`
-3.  **Run**:
-    ```bash
-    ./start-bot.sh
-    ```
+---
 
 ## Project Structure
 
-- `agent/`: Core agent logic.
-  - `manager.ts`: Brain of the Main Agent.
-  - `index.ts`: Agent orchestration and session management.
-- `claude/`: API client implementations.
-- `discord/`: Discord bot interaction handlers.
+```
+claude-code-discord/
+├── agent/           # Agent system (manager, providers, orchestration)
+│   ├── manager.ts   # Manager agent orchestration
+│   ├── providers/   # Provider implementations (Cursor, Ollama, etc.)
+│   └── types.ts     # Agent configurations and roles
+├── discord/         # Discord bot handlers
+├── docs/            # Documentation
+├── settings/        # Configuration management
+└── util/            # Shared utilities
+```
+
+---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to add new agents.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-#### `/todos` Command ✨
+**Key areas:**
+- Adding new providers
+- Improving role definitions
+- Enhancing Discord UX
+- Documentation improvements
 
-- **Action types**: list, add, complete, generate, prioritize, rate-status
-- **Priority levels**: low, medium, high, critical
-- **Rate limit awareness** - Supports API tiers including `exceeds_200k_tokens`
-- **Token estimation** - Calculates estimated token usage
-- **Auto-generation** - Generate todos from code files
+---
 
-#### `/mcp` Command ✨
+## Related Documentation
 
-- **MCP server management** - Model Context Protocol integration
-- **Server types**: local, http, websocket, ssh
-- **Actions**: list, add, remove, test, status
-- **Connection testing** - Verify MCP server connectivity
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and component details
+- [docs/AGENT-ROLE-SYSTEM.md](docs/AGENT-ROLE-SYSTEM.md) - Role system guide
+- [docs/DISCORD_COMMANDS.md](docs/DISCORD_COMMANDS.md) - Complete command reference
+- [docs/CURSOR_GUIDE.md](docs/CURSOR_GUIDE.md) - Cursor integration details
 
-#### `/agent` Command ✨
+---
 
-- **Specialized AI agents** for different development tasks:
-  - Manager - Main orchestrator
-  - Coder - Autonomous coding
-  - Architect - System design
-  - Security - Vulnerability assessment
-  - Cursor Autonomous Coder - File editing
-  - Cursor Refactoring Specialist - Code improvement
-  - Cursor Fast Agent - Quick targeted changes
-  - Code Reviewer - Quality analysis and security
-  - Software Architect - System design review
-  - General Assistant - Multi-purpose development help
-- **Risk levels** - Low/Medium/High risk classification
-- **Session management** - Persistent agent conversations
-- **Context awareness** - Include system info and files
+<div align="center">
+
+**one agent discord** — *Route to any AI. Work from anywhere.*
+
+</div>

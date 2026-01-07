@@ -1,10 +1,11 @@
 /**
- * Claude-Mem Types
+ * Agent-Mem Types
  * 
- * Shared interfaces for the claude-mem service and context utilities.
+ * Shared interfaces for the agent-mem service and context utilities.
+ * Provider-agnostic memory architecture for any AI agent.
  */
 
-export interface ClaudeMemMemory {
+export interface AgentMemMemory {
   id: string;
   summary: string;
   content: string;
@@ -14,13 +15,13 @@ export interface ClaudeMemMemory {
   metadata?: Record<string, any>;
 }
 
-export interface ClaudeMemSearchResult {
-  memories: ClaudeMemMemory[];
+export interface AgentMemSearchResult {
+  memories: AgentMemMemory[];
   query: string;
   total: number;
 }
 
-export interface ClaudeMemSession {
+export interface AgentMemSession {
   id: string;
   workspace: string;
   agent: string;
@@ -38,7 +39,7 @@ export interface ObservationData {
   metadata?: Record<string, any>;
 }
 
-export interface ClaudeMemService {
+export interface AgentMemService {
   // Session Management
   startSession(workspace: string, agentName: string, metadata?: Record<string, any>): Promise<string>;
   endSession(sessionId: string, summary?: string): Promise<void>;
@@ -49,9 +50,19 @@ export interface ClaudeMemService {
   saveToolUsage(sessionId: string, tool: string, input: any, output: any): Promise<void>;
   
   // Context
-  queryContext(query: string, workspace?: string, agentName?: string, limit?: number): Promise<ClaudeMemMemory[]>;
+  queryContext(query: string, workspace?: string, agentName?: string, limit?: number): Promise<AgentMemMemory[]>;
   injectContext(prompt: string, workspace: string, agentName?: string): Promise<string>;
   
   // Health
   isAvailable(): Promise<boolean>;
 }
+
+// Backward-compatible aliases (deprecated)
+/** @deprecated Use AgentMemMemory instead */
+export type ClaudeMemMemory = AgentMemMemory;
+/** @deprecated Use AgentMemSearchResult instead */
+export type ClaudeMemSearchResult = AgentMemSearchResult;
+/** @deprecated Use AgentMemSession instead */
+export type ClaudeMemSession = AgentMemSession;
+/** @deprecated Use AgentMemService instead */
+export type ClaudeMemService = AgentMemService;

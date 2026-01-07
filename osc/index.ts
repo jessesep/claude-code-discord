@@ -28,7 +28,7 @@ export interface OSCDependencies {
 
 /**
  * OSC Manager Class
- * Acts as a bridge between TouchOSC control surfaces and the One Agent bot system.
+ * Acts as a bridge between TouchOSC control surfaces and one agent discord.
  */
 export class OSCManager {
   private osc: any;

@@ -1,4 +1,4 @@
-import { setupTester, waitForResult, isFinalResponse, CLAUDE_BOT_ID } from './e2e-utils.ts';
+import { setupTester, waitForResult, isFinalResponse, ONE_BOT_ID } from './e2e-utils.ts';
 
 async function runShellTest() {
   console.log('🧪 Starting E2E Shell Command Test Suite...');
@@ -8,7 +8,7 @@ async function runShellTest() {
   console.log(`📂 Testing in channel: #${ctx.channel.name}`);
 
   const testString = `hello_shell_${Date.now()}`;
-  const testPrompt = `<@${CLAUDE_BOT_ID}> using cursor-coder, Run a shell command to echo "${testString}" and tell me what the output was.`;
+  const testPrompt = `<@${ONE_BOT_ID}> using cursor-coder, Run a shell command to echo "${testString}" and tell me what the output was.`;
   
   try {
     console.log(`📤 Sending command: "${testPrompt}"`);

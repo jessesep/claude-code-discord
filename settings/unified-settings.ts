@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "npm:discord.js@14.14.1";
-import { CLAUDE_MODELS } from "../provider-clients/enhanced-client.ts";
+import { AGENT_MODELS } from "../provider-clients/enhanced-client.ts";
 
 // Unified settings interface combining all bot settings
 export interface UnifiedBotSettings {
@@ -7,7 +7,7 @@ export interface UnifiedBotSettings {
   mentionEnabled: boolean;
   mentionUserId: string | null;
 
-  // Claude Code settings (formerly /claude-settings)
+  // One Agent settings (formerly /agent-settings)
   defaultModel: string;
   defaultTemperature: number;
   defaultMaxTokens: number;
@@ -65,7 +65,7 @@ export const UNIFIED_DEFAULT_SETTINGS: UnifiedBotSettings = {
   mentionEnabled: false,
   mentionUserId: null,
 
-  // Claude settings
+  // One Agent settings
   defaultModel: 'claude-sonnet-4',
   defaultTemperature: 0.7,
   defaultMaxTokens: 4096,
@@ -112,17 +112,17 @@ export const UNIFIED_DEFAULT_SETTINGS: UnifiedBotSettings = {
 export const THINKING_MODES = {
   'none': {
     name: 'Standard Mode',
-    description: 'Regular Claude responses without thinking mode',
+    description: 'Regular responses without thinking mode',
     parameter: null
   },
   'think': {
     name: 'Thinking Mode',
-    description: 'Claude thinks through problems step by step',
+    description: 'Agent thinks through problems step by step',
     parameter: 'thinking_mode=true'
   },
   'think-hard': {
     name: 'Deep Thinking',
-    description: 'Claude engages in deeper analysis and reasoning',
+    description: 'Agent engages in deeper analysis and reasoning',
     parameter: 'thinking_mode=deep'
   },
   'ultrathink': {
@@ -165,7 +165,7 @@ export interface RateLimitTier {
   tokensPerDay: number;
 }
 
-export const ANTHROPIC_RATE_LIMITS: Record<string, RateLimitTier> = {
+export const PROVIDER_RATE_LIMITS: Record<string, RateLimitTier> = {
   'free': {
     name: 'Free Tier',
     description: 'Basic usage limits for free users',
@@ -214,7 +214,7 @@ export const unifiedSettingsCommand = new SlashCommandBuilder()
       .addChoices(
         { name: 'Show All Settings', value: 'show' },
         { name: 'Bot Settings', value: 'bot' },
-        { name: 'Claude Settings', value: 'claude' },
+        { name: 'One Agent Settings', value: 'agent' },
         { name: 'Mode Settings', value: 'modes' },
         { name: 'Output Settings', value: 'output' },
         { name: 'Proxy Settings', value: 'proxy' },
@@ -262,10 +262,10 @@ export const todosCommand = new SlashCommandBuilder()
       ))
   .addStringOption(option =>
     option.setName('rate_tier')
-      .setDescription('Your Anthropic API rate limit tier')
+      .setDescription('Your API provider rate limit tier')
       .setRequired(false)
       .addChoices(
-        ...Object.entries(ANTHROPIC_RATE_LIMITS).map(([key, tier]) => ({
+        ...Object.entries(PROVIDER_RATE_LIMITS).map(([key, tier]) => ({
           name: tier.name,
           value: key
         }))

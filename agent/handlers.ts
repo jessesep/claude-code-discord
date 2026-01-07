@@ -529,10 +529,10 @@ export async function chatWithAgent(
   } catch {}
   enhancedPrompt += contextContent;
 
-  // Claude-mem context
+  // Agent-mem context
   try {
-    const { injectClaudeMemContext } = await import("../util/claude-mem-context.ts");
-    enhancedPrompt = await injectClaudeMemContext(enhancedPrompt, workDir, activeAgentName, message);
+    const { injectAgentMemContext } = await import("../util/agent-mem-context.ts");
+    enhancedPrompt = await injectAgentMemContext(enhancedPrompt, workDir, activeAgentName, message);
   } catch {}
 
   // System info
@@ -905,7 +905,7 @@ export async function handleSimpleCommand(ctx: any, commandName: string, deps: A
       { label: '🚀 Antigravity', value: 'antigravity', description: 'Google Gemini via gcloud OAuth' },
       { label: '🖥️ Cursor', value: 'cursor', description: 'Cursor AI agent' },
       { label: '🦙 Ollama', value: 'ollama', description: 'Local Ollama models' },
-      { label: '💻 Primary CLI', value: 'primary-cli', description: 'Primary CLI Client' },
+      { label: '💻 Claude CLI', value: 'claude-cli', description: 'Anthropic Claude via CLI' },
       { label: '⚡ OpenAI', value: 'openai', description: 'GPT-4o, o1, o3 models' },
       { label: '🔥 Groq', value: 'groq', description: 'Ultra-fast inference' },
     ];

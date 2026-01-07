@@ -1,6 +1,8 @@
-# Cursor IDE Integration - Quick Reference
+# Cursor Provider - Technical Reference
 
-**For detailed information, see: [CURSOR-INTEGRATION.md](./CURSOR-INTEGRATION.md)**
+**Cursor is one of the AI providers available in the one agent ecosystem.**
+
+This document provides technical details for integrating Cursor CLI as a provider. For usage within Discord, see [CURSOR-DISCORD-USAGE.md](./CURSOR-DISCORD-USAGE.md).
 
 ---
 
@@ -947,7 +949,9 @@ agent.on("error", (err) => console.error("Error:", err));
 
 ---
 
-## 8. Integration with Claude Code Discord Bot
+## 8. Integration with one agent
+
+**one agent** routes requests to different providers. When a task requires file editing, it routes to Cursor.
 
 ### Scenario: Discord Commands for Cursor
 

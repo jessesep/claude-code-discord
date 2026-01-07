@@ -1,4 +1,4 @@
-import { setupTester, waitForResult, isFinalResponse, CLAUDE_BOT_ID } from './e2e-utils.ts';
+import { setupTester, waitForResult, isFinalResponse, ONE_BOT_ID } from './e2e-utils.ts';
 
 async function runComplexRefactorTest() {
   console.log('🧪 Starting E2E Complex Refactor Test Suite...');
@@ -10,7 +10,7 @@ async function runComplexRefactorTest() {
   const targetFile = "tests/refactor-target.ts";
   const utilFile = "util/e2e-demo-util.ts";
   
-  const testPrompt = `<@${CLAUDE_BOT_ID}> using cursor-coder, I want to perform a multi-step refactor:
+  const testPrompt = `<@${ONE_BOT_ID}> using cursor-coder, I want to perform a multi-step refactor:
 1. Create a new file "${utilFile}" that exports a function \`logAndReturn<T>(val: T, msg: string): T\` that logs the message and returns the value.
 2. Refactor "${targetFile}" to use this new utility function instead of manual console.log calls inside \`calculateSum\`.
 3. Ensure "${targetFile}" imports the utility correctly.

@@ -41,17 +41,17 @@ export interface AgentSession {
   // Selected model for the session (overrides agent default)
   modelOverride?: string;
 
-  // Claude-mem session ID for persistent memory
+  // Agent-mem session ID for persistent memory
   memorySessionId?: string;
 }
 
 // Context note for all agents
-export const CONTEXT_NOTE = `\n\n> **Mandatory Context Read**: Every repository contains a root \`.agent-context.md\` defining "Golden Standards" and improvement tasks. Your VERY FIRST action MUST be to use the \`view_file\` tool to read this file. This ensures you are aligned with the project mission and standards. Additionally, all repos include a \`CLAUDE.md\` with \`claude-mem\` memory shortcuts—use them for historical context.`;
+export const CONTEXT_NOTE = `\n\n> **Mandatory Context Read**: Every repository contains a root \`.agent-context.md\` defining "Golden Standards" and improvement tasks. Your VERY FIRST action MUST be to use the \`view_file\` tool to read this file. This ensures you are aligned with the project mission and standards. Additionally, all repos include a \`CLAUDE.md\` with \`agent-mem\` memory shortcuts—use them for historical context.`;
 
 // Predefined agent configurations
 export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
   'ag-manager': {
-    name: 'Gemini Manager',
+    name: 'one manager',
     description: 'Main orchestrator agent that manages other agents and interacts with the user',
     model: 'gemini-3-flash-preview',
     systemPrompt: MANAGER_SYSTEM_PROMPT,
@@ -63,10 +63,10 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     isManager: true
   },
   'ag-coder': {
-    name: 'Antigravity Coder',
-    description: 'Google Antigravity agent for autonomous coding tasks',
+    name: 'one coder',
+    description: 'Autonomous coding agent for various tasks',
     model: 'gemini-3-flash-preview',
-    systemPrompt: `You are an autonomous coding agent powered by Google Antigravity.\n- Plan, execute, and verify complex coding tasks\n- Use available tools effectively\n- Write high-quality code\n\n${CONTEXT_NOTE}`,
+    systemPrompt: `You are an autonomous coding agent.\n- Plan, execute, and verify complex coding tasks\n- Use available tools effectively\n- Write high-quality code\n\n${CONTEXT_NOTE}`,
     temperature: 0.3,
     maxTokens: 30000,
     capabilities: ['file-editing', 'planning', 'autonomous', 'browser-interaction'],
@@ -75,10 +75,10 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     sandbox: 'enabled'
   },
   'ag-architect': {
-    name: 'Antigravity Architect',
+    name: 'one architect',
     description: 'High-level system design and planning agent',
     model: 'gemini-3-flash-preview',
-    systemPrompt: `You are a software architect agent.\n- Analyze requirements\n- Design systems and architecture\n- Create implementation plans\n- Use Antigravity tools effectively\n\n${CONTEXT_NOTE}`,
+    systemPrompt: `You are a software architect agent.\n- Analyze requirements\n- Design systems and architecture\n- Create implementation plans\n- Use planning tools effectively\n\n${CONTEXT_NOTE}`,
     temperature: 0.4,
     maxTokens: 30000,
     capabilities: ['system-design', 'planning', 'architecture'],
@@ -86,7 +86,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     client: 'antigravity'
   },
   'ag-security': {
-    name: 'Antigravity Security',
+    name: 'one security',
     description: 'Security analyst for finding vulnerabilities and secure coding',
     model: 'gemini-3-flash-preview',
     systemPrompt: `You are a security analyst agent.\n- Identify security vulnerabilities\n- Suggest secure coding practices\n- Perform threat modeling\n\n${CONTEXT_NOTE}`,
@@ -97,7 +97,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     client: 'antigravity'
   },
   'ag-tester': {
-    name: 'Antigravity Tester',
+    name: 'one tester',
     description: 'Specialized in running and verifying E2E tests and quality assurance',
     model: 'gemini-3-flash-preview',
     systemPrompt: `You are a specialized Testing & QA agent.\n- Your primary goal is to execute test suites and verify system behavior.\n- Use the budget-friendly testing utilities (model="gemini-3-flash-preview") for all tasks.\n- Analyze test outputs and report failures with clear diagnostic information.\n- You can use shell tools to run the test runner: \`deno run --allow-all scripts/run-e2e-tests.ts\`.\n\n${CONTEXT_NOTE}`,
@@ -108,10 +108,10 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     client: 'antigravity'
   },
   'cursor-coder': {
-    name: 'Cursor Autonomous Coder',
-    description: 'Cursor AI agent that can autonomously write and edit code',
+    name: 'one coder (autonomous)',
+    description: 'Autonomous agent that can write and edit code independently',
     model: 'sonnet-4.5',
-    systemPrompt: `You are an autonomous coding agent powered by Cursor.\n- Read, write, and modify code files\n- Write clean, maintainable code\n- Follow best practices\n- Test your changes\n\n${CONTEXT_NOTE}`,
+    systemPrompt: `You are an autonomous coding agent.\n- Read, write, and modify code files\n- Write clean, maintainable code\n- Follow best practices\n- Test your changes\n\n${CONTEXT_NOTE}`,
     temperature: 0.3,
     maxTokens: 8000,
     capabilities: ['file-editing', 'code-generation', 'refactoring', 'autonomous'],
@@ -120,8 +120,8 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     sandbox: 'enabled'
   },
   'cursor-refactor': {
-    name: 'Cursor Refactoring Specialist',
-    description: 'Specialized in autonomous code refactoring using Cursor',
+    name: 'one refactorer',
+    description: 'Specialized in autonomous code refactoring',
     model: 'sonnet-4.5',
     systemPrompt: `You are a refactoring specialist.\n- Improve code structure and readability\n- Maintain functionality while refactoring\n- Write tests to verify behavior\n\n${CONTEXT_NOTE}`,
     temperature: 0.2,
@@ -132,7 +132,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     sandbox: 'enabled'
   },
   'cursor-fast': {
-    name: 'Cursor Fast Agent',
+    name: 'one fast-coder',
     description: 'Quick code changes with auto-approval (use with caution)',
     model: 'sonnet-4.5',
     systemPrompt: `You are a fast coding agent. Make quick, targeted changes efficiently.\n\n${CONTEXT_NOTE}`,
@@ -145,7 +145,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     sandbox: 'disabled'
   },
   'code-reviewer': {
-    name: 'Code Reviewer',
+    name: 'one reviewer',
     description: 'Specialized in code review and quality analysis',
     model: 'sonnet',
     systemPrompt: `You are an expert code reviewer. Focus on:\n- Code quality and maintainability\n- Security vulnerabilities\n- Performance issues\n- Best practices and design patterns\n\nProvide detailed, actionable feedback with specific suggestions.\n\n${CONTEXT_NOTE}`,
@@ -156,7 +156,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     client: 'claude'
   },
   'architect': {
-    name: 'Software Architect',
+    name: 'one architect (senior)',
     description: 'Senior software architect for system design decisions',
     model: 'sonnet',
     systemPrompt: `You are a senior software architect. Help with:\n- System design and architecture patterns\n- Technology selection and trade-offs\n- Scalability and maintainability\n\n${CONTEXT_NOTE}`,
@@ -167,7 +167,7 @@ export const PREDEFINED_AGENTS: Record<string, AgentConfig> = {
     client: 'claude'
   },
   'general-assistant': {
-    name: 'General Assistant',
+    name: 'one assistant',
     description: 'General purpose AI assistant for various tasks',
     model: 'gemini-3-flash-preview',
     systemPrompt: `You are a helpful AI assistant. Answer user questions and help with various tasks.\n\n${CONTEXT_NOTE}`,

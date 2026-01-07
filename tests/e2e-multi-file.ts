@@ -1,4 +1,4 @@
-import { setupTester, waitForResult, isFinalResponse, CLAUDE_BOT_ID } from './e2e-utils.ts';
+import { setupTester, waitForResult, isFinalResponse, ONE_BOT_ID } from './e2e-utils.ts';
 
 async function runMultiFileTest() {
   console.log('🧪 Starting E2E Multi-File Test Suite (Refactored)...');
@@ -13,7 +13,7 @@ async function runMultiFileTest() {
   const file2 = `multi_test_2_${timestamp}.txt`;
   const content2 = "CONTENT TWO";
   
-  const testPrompt = `<@${CLAUDE_BOT_ID}> using cursor-coder, Create two files: "${file1}" with content "${content1}" and "${file2}" with content "${content2}". Then list the files in the current directory.`;
+  const testPrompt = `<@${ONE_BOT_ID}> using cursor-coder, Create two files: "${file1}" with content "${content1}" and "${file2}" with content "${content2}". Then list the files in the current directory.`;
   
   try {
     console.log(`📤 Sending command: "${testPrompt.substring(0, 100)}..."`);

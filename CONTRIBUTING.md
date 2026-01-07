@@ -1,4 +1,4 @@
-# Contributing to one agent bot
+# Contributing to one agent discord
 
 We welcome contributions! This guide specifically covers how to add **new agents** to the system.
 

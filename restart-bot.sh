@@ -1,5 +1,6 @@
 #!/bin/bash
-# Reboot script for one agent Discord Bot, Server, and Testing Bot
+# one agent discord - Restart Script
+# Restarts the bot, server, and testing bot processes
 
 # Get project directory
 PROJECT_DIR="/Users/jessesep/repos/claude-code-discord"

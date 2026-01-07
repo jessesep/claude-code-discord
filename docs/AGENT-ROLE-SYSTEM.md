@@ -2,9 +2,9 @@
 
 <div align="center">
 
-**A flexible, repository-based role system for AI agents**
+**A flexible, provider-independent role system for AI agents**
 
-*Provider-independent • Repository-specific • Fully customizable*
+*Route to any provider • Customize per repository • Consistent experience*
 
 </div>
 
@@ -13,11 +13,11 @@
 ## 📚 Table of Contents
 
 - [Overview](#overview)
+- [The One Agent Philosophy](#the-one-agent-philosophy)
 - [Architecture](#architecture)
-- [Workflow](#workflow)
 - [Role System](#role-system)
 - [Provider Integration](#provider-integration)
-- [Technical Details](#technical-details)
+- [Workflow](#workflow)
 - [Customization Guide](#customization-guide)
 - [Troubleshooting](#troubleshooting)
 
@@ -25,22 +25,20 @@
 
 ## 🎯 Overview
 
-The Agent Role System provides a flexible way to interact with AI agents using different providers (Cursor, Claude, Ollama, etc.) while maintaining consistent, repository-specific role definitions.
+The Agent Role System provides a flexible way to interact with AI agents using different providers (Cursor, Claude, Ollama, Gemini, etc.) while maintaining consistent, repository-specific role definitions.
 
 ### Key Concepts
 
 ```mermaid
 graph TB
-    A[🧑 User] -->|1. Selects| B[🔧 Provider]
-    A -->|2. Selects| C[👔 Role]
-    A -->|3. Selects| D[🎯 Model]
-    B -.->|Powers| E[🤖 Agent]
-    C -.->|Guides| E
-    D -.->|Runs on| E
-    E -->|4. Chats with| A
+    A[🧑 User] -->|1. Request| B[🔀 one agent Router]
+    B -->|2. Select| C[👔 Role]
+    B -->|3. Route to| D[🔌 Provider]
+    C -.->|Guides| E[🤖 Agent]
+    D -.->|Powers| E
+    E -->|4. Response| A
     
     F[📁 .roles/builder.md] -.->|Loaded into| C
-    F -.->|Context for| E
     
     style A fill:#e1f5ff
     style B fill:#fff3e0
@@ -55,10 +53,45 @@ graph TB
 | Principle | Description |
 |-----------|-------------|
 | **Provider Independence** | Roles work with any AI provider |
+| **Dynamic Routing** | Route requests to the best provider for the task |
 | **Repository Context** | Role documents live in your repo |
 | **Single Responsibility** | Each role has one clear focus |
-| **Customizable** | Easy to modify for your team |
-| **Consistent** | Same experience across providers |
+| **Consistent Experience** | Same roles, any backend |
+
+---
+
+## 🧭 The One Agent Philosophy
+
+**one agent** is not a specific AI model—it's a routing layer that connects your Discord interface to any AI provider. The role system is the behavioral layer on top of this:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     User Request                              │
+│              "Refactor the auth module"                       │
+└─────────────────────────┬────────────────────────────────────┘
+                          │
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    one agent Router                           │
+│                                                               │
+│  1. Parse intent → "refactoring task"                        │
+│  2. Select role → Builder 🔨                                  │
+│  3. Route to provider → Cursor (file editing)                │
+└─────────────────────────┬────────────────────────────────────┘
+                          │
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│              Builder Role + Cursor Provider                   │
+│                                                               │
+│  Role: "Focus on clean implementation..."                    │
+│  Provider: Cursor CLI with file editing                      │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Why this matters:**
+- Switch providers without learning new commands
+- Same role definitions work across all providers
+- Optimize cost by routing to the right provider
 
 ---
 
@@ -69,44 +102,31 @@ graph TB
 ```mermaid
 graph LR
     subgraph "Discord Interface"
-        A[/run-adv Command]
+        A[/agent Command]
     end
     
-    subgraph "Selection Flow"
-        B[Provider Menu]
-        C[Role Menu]
-        D[Model Menu]
+    subgraph "one agent Core"
+        B[Router]
+        C[Role System]
+        D[Session Manager]
     end
     
-    subgraph "Agent System"
-        E[Agent Config]
-        F[Role Document]
-        G[System Prompt]
-    end
-    
-    subgraph "AI Providers"
-        H[Cursor]
-        I[Claude CLI]
-        J[Ollama]
-        K[Antigravity]
-        L[Gemini API]
+    subgraph "Providers"
+        E[Cursor]
+        F[Claude]
+        G[Ollama]
+        H[Gemini]
     end
     
     A --> B
     B --> C
     C --> D
-    D --> E
-    F -.->|Loaded into| G
-    E --> G
-    G --> H & I & J & K & L
+    D --> E & F & G & H
     
     style A fill:#4fc3f7
     style B fill:#ffb74d
     style C fill:#ba68c8
     style D fill:#81c784
-    style E fill:#e57373
-    style F fill:#fff176
-    style G fill:#64b5f6
 ```
 
 ### Data Flow
@@ -115,29 +135,127 @@ graph LR
 sequenceDiagram
     participant User
     participant Discord
+    participant Router as one agent Router
     participant RoleSystem
-    participant FileSystem
     participant Provider
     
-    User->>Discord: /run-adv
-    Discord->>User: Show Provider Menu
-    User->>Discord: Select Provider (e.g., Ollama)
-    Discord->>User: Show Role Menu
-    User->>Discord: Select Role (e.g., Builder)
-    Discord->>RoleSystem: Get Role Definition
-    RoleSystem->>FileSystem: Load .roles/builder.md
-    FileSystem-->>RoleSystem: Role Document Content
-    Discord->>User: Show Model Menu
-    User->>Discord: Select Model (e.g., llama3.2)
-    Discord->>RoleSystem: Create Agent Session
-    RoleSystem->>Provider: Initialize with Role Context
-    Provider-->>User: Agent Ready!
-    User->>Provider: "Help me build a feature"
-    Provider-->>User: Response with Builder mindset
-    
-    Note over RoleSystem,FileSystem: Role document provides<br/>specialized context
-    Note over Provider: Provider-agnostic:<br/>Works with any AI
+    User->>Discord: /agent action:chat message:"Fix bug"
+    Discord->>Router: Route request
+    Router->>RoleSystem: Get role (Builder/Tester/etc.)
+    RoleSystem-->>Router: Role context
+    Router->>Provider: Select provider (Cursor/Ollama/etc.)
+    Provider-->>User: Execute and stream response
 ```
+
+---
+
+## 👔 Role System
+
+### Available Roles
+
+| Role | Emoji | Focus | Best For |
+|------|-------|-------|----------|
+| **Builder** | 🔨 | Implementation | Writing code, adding features |
+| **Tester** | 🧪 | Validation | Writing tests, QA |
+| **Investigator** | 🔍 | Analysis | Debugging, security audits |
+| **Architect** | 🏗️ | Design | System planning, refactoring |
+| **Reviewer** | 👁️ | Feedback | Code review, best practices |
+
+### Role Definition Structure
+
+Each role is defined in code and optionally extended with a markdown document:
+
+```typescript
+interface RoleDefinition {
+  name: string;              // Display name (e.g., "Builder")
+  description: string;       // Short description
+  emoji: string;             // Visual identifier (e.g., "🔨")
+  documentPath: string;      // Path to role doc (.roles/builder.md)
+  systemPromptAddition: string; // Fallback prompt if file missing
+}
+```
+
+### Role Documents
+
+Store role definitions in your repository's `.roles/` directory:
+
+```markdown
+<!-- .roles/builder.md -->
+# Builder Role
+
+## Purpose
+Implement features and write clean, maintainable code.
+
+## Responsibilities
+- Write production-quality code
+- Follow project conventions
+- Add appropriate tests
+- Document changes
+
+## Best Practices
+- Keep functions small and focused
+- Use meaningful variable names
+- Handle edge cases
+```
+
+The system automatically loads these documents to provide context to the AI.
+
+### Role Comparison
+
+| Feature | Builder 🔨 | Tester 🧪 | Investigator 🔍 | Architect 🏗️ | Reviewer 👁️ |
+|---------|-----------|-----------|-----------------|--------------|-------------|
+| **Primary Focus** | Implementation | Quality | Analysis | Design | Feedback |
+| **Key Activities** | Write code | Write tests | Debug/audit | Plan systems | Review PRs |
+| **Output** | Features | Test suites | Reports | Designs | Comments |
+| **Mindset** | "How to build" | "Does it work?" | "Why broke?" | "Best structure?" | "How improve?" |
+| **Risk Level** | Medium | Low | Low | Low | Low |
+
+---
+
+## 🔌 Provider Integration
+
+### Provider Independence
+
+Roles work with **any** provider. The role defines *what* to do; the provider determines *how* it's executed:
+
+```mermaid
+graph TB
+    subgraph "Role Layer (What)"
+        R1[Builder 🔨]
+        R2[Tester 🧪]
+        R3[Architect 🏗️]
+    end
+    
+    subgraph "Provider Layer (How)"
+        P1[Cursor - File editing]
+        P2[Claude - Reasoning]
+        P3[Ollama - Local/Private]
+        P4[Gemini - Fast]
+    end
+    
+    R1 -.-> P1 & P2 & P3 & P4
+    R2 -.-> P1 & P2 & P3 & P4
+    R3 -.-> P1 & P2 & P3 & P4
+```
+
+### Provider Comparison
+
+| Provider | Type | Strengths | Best For |
+|----------|------|-----------|----------|
+| **Cursor** | CLI | File editing, autonomous | Builder, Refactoring |
+| **Claude** | CLI/API | Reasoning, analysis | Architect, Reviewer |
+| **Ollama** | Local | Privacy, offline, free | Sensitive data |
+| **Gemini** | API | Fast, low latency | Quick queries, Manager |
+
+### Recommended Pairings
+
+| Role | Recommended Provider | Reason |
+|------|---------------------|--------|
+| Builder 🔨 | Cursor, Antigravity | File editing capabilities |
+| Tester 🧪 | Any | Testing works everywhere |
+| Investigator 🔍 | Ollama, Claude | Deep analysis |
+| Architect 🏗️ | Antigravity, Claude | Broad context window |
+| Reviewer 👁️ | Claude, Gemini | High-quality feedback |
 
 ---
 
@@ -147,22 +265,12 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CommandIssued: User types /run-adv
+    [*] --> RequestReceived: User sends /agent
     
-    CommandIssued --> ProviderSelection: Show provider menu
+    RequestReceived --> ParseIntent: Router parses request
     
-    ProviderSelection --> RoleSelection: Provider chosen
-    note right of ProviderSelection
-        Choose from:
-        - Cursor 💻
-        - Claude CLI 🤖
-        - Ollama 🦙
-        - Antigravity ⚡
-        - Gemini API 🚀
-    end note
-    
-    RoleSelection --> LoadRoleDoc: Role chosen
-    note right of RoleSelection
+    ParseIntent --> SelectRole: Determine role
+    note right of SelectRole
         Choose from:
         - Builder 🔨
         - Tester 🧪
@@ -171,362 +279,50 @@ stateDiagram-v2
         - Reviewer 👁️
     end note
     
-    LoadRoleDoc --> ModelSelection: Role doc loaded
-    note right of LoadRoleDoc
+    SelectRole --> LoadRole: Load role context
+    note right of LoadRole
         Loads from:
         .roles/{role}.md
         Falls back to built-in
     end note
     
-    ModelSelection --> SessionCreated: Model chosen/auto-selected
-    note right of ModelSelection
-        Provider-specific models
-        OR auto-select best
+    LoadRole --> RouteProvider: Select provider
+    note right of RouteProvider
+        Auto-select or user-specified:
+        - Cursor
+        - Claude
+        - Ollama
+        - Gemini
     end note
     
-    SessionCreated --> Active: Agent initialized
-    note right of SessionCreated
-        - Provider configured
-        - Role injected
-        - Model set
-        - Session active
-    end note
-    
-    Active --> Chatting: Ready for messages
-    Active --> [*]: /kill command
-    
-    Chatting --> Chatting: User messages
-    Chatting --> [*]: Session ended
+    RouteProvider --> Execute: Agent processes
+    Execute --> StreamResponse: Stream to Discord
+    StreamResponse --> [*]: Complete
 ```
 
 ### Decision Tree
 
 ```mermaid
 graph TD
-    Start([User wants AI help]) --> Command{Use /run-adv}
+    Start([User Request]) --> Task{What type of task?}
     
-    Command -->|Step 1| Provider{What provider?}
-    Provider -->|Local/Fast| Ollama[🦙 Ollama<br/>Free, runs locally]
-    Provider -->|IDE Integration| Cursor[💻 Cursor<br/>Built into editor]
-    Provider -->|Anthropic| Claude[🤖 Claude CLI<br/>Official API]
-    Provider -->|Google AI| Gemini[🚀 Gemini/Antigravity<br/>Powerful, fast]
+    Task -->|Build features| Builder[🔨 Builder]
+    Task -->|Write tests| Tester[🧪 Tester]
+    Task -->|Debug issues| Investigator[🔍 Investigator]
+    Task -->|Design systems| Architect[🏗️ Architect]
+    Task -->|Review code| Reviewer[👁️ Reviewer]
     
-    Ollama & Cursor & Claude & Gemini --> Role{What's your task?}
+    Builder & Tester & Investigator & Architect & Reviewer --> Provider{Which provider?}
     
-    Role -->|Build features| Builder[🔨 Builder<br/>Implementation focused]
-    Role -->|Test code| Tester[🧪 Tester<br/>Quality assurance]
-    Role -->|Debug/Secure| Investigator[🔍 Investigator<br/>Analysis focused]
-    Role -->|Design systems| Architect[🏗️ Architect<br/>High-level planning]
-    Role -->|Review code| Reviewer[👁️ Reviewer<br/>Feedback focused]
+    Provider -->|File editing needed| Cursor[Cursor]
+    Provider -->|Reasoning needed| Claude[Claude]
+    Provider -->|Privacy needed| Ollama[Ollama]
+    Provider -->|Speed needed| Gemini[Gemini]
     
-    Builder & Tester & Investigator & Architect & Reviewer --> Model{Choose model}
-    
-    Model -->|Specific| SelectModel[Pick from list]
-    Model -->|Let system decide| AutoSelect[✨ Auto-select]
-    
-    SelectModel & AutoSelect --> Ready([🤖 Agent Ready!])
+    Cursor & Claude & Ollama & Gemini --> Execute([Execute Task])
     
     style Start fill:#e3f2fd
-    style Ready fill:#c8e6c9
-    style Command fill:#fff3e0
-    style Provider fill:#fce4ec
-    style Role fill:#f3e5f5
-    style Model fill:#e1f5fe
-```
-
----
-
-## 👔 Role System
-
-### Role Architecture
-
-```mermaid
-graph TB
-    subgraph "Role Definition (Code)"
-        A[Role ID<br/>e.g., 'builder']
-        B[Name & Emoji<br/>🔨 Builder]
-        C[Description<br/>Short summary]
-        D[Document Path<br/>.roles/builder.md]
-        E[System Prompt Addition<br/>Fallback text]
-    end
-    
-    subgraph "Role Document (File)"
-        F[Purpose Section<br/>What this role does]
-        G[Responsibilities<br/>Key duties]
-        H[Best Practices<br/>Guidelines]
-        I[Checklists<br/>Verification steps]
-        J[Templates<br/>Useful formats]
-    end
-    
-    subgraph "Runtime"
-        K[Agent Session]
-        L[Combined System Prompt]
-    end
-    
-    A & B & C & D & E -.-> K
-    D -->|Load from disk| F & G & H & I & J
-    F & G & H & I & J -->|Inject into| L
-    E -.->|Fallback if file<br/>doesn't exist| L
-    K --> L
-    
-    style A fill:#ffebee
-    style B fill:#e3f2fd
-    style C fill:#f3e5f5
-    style D fill:#fff9c4
-    style E fill:#e0f2f1
-    style F fill:#fce4ec
-    style K fill:#c5e1a5
-    style L fill:#b2dfdb
-```
-
-### Role Lifecycle
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant User
-    participant Menu as Role Menu
-    participant Code as Agent Code
-    participant FS as File System
-    participant Agent as AI Agent
-    
-    User->>Menu: Select "Builder" role
-    Menu->>Code: role = 'builder'
-    Code->>Code: Lookup ROLE_DEFINITIONS['builder']
-    Note over Code: Gets documentPath:<br/>.roles/builder.md
-    
-    Code->>FS: readTextFile('.roles/builder.md')
-    
-    alt File exists
-        FS-->>Code: Full role document
-        Code->>Code: Inject document into system prompt
-    else File missing
-        FS-->>Code: File not found
-        Code->>Code: Use systemPromptAddition fallback
-    end
-    
-    Code->>Agent: Initialize with enriched prompt
-    Note over Agent: Agent has Builder context<br/>and understands its role
-    
-    Agent-->>User: Ready with Builder mindset! 🔨
-```
-
-### Role Comparison Matrix
-
-| Feature | Builder 🔨 | Tester 🧪 | Investigator 🔍 | Architect 🏗️ | Reviewer 👁️ |
-|---------|-----------|-----------|-----------------|--------------|-------------|
-| **Primary Focus** | Implementation | Quality | Analysis | Design | Feedback |
-| **Key Activities** | Write code | Write tests | Debug/audit | Plan systems | Review PRs |
-| **Output** | Features | Test suites | Reports | Designs | Comments |
-| **Mindset** | "How to build" | "Does it work?" | "Why broke?" | "Best structure?" | "How improve?" |
-| **Risk Level** | Medium | Low | Low | Low | Low |
-| **Best With** | Cursor, Antigravity | All providers | Ollama, Claude | Antigravity | All providers |
-
----
-
-## 🔌 Provider Integration
-
-### Provider Comparison
-
-```mermaid
-quadrantChart
-    title AI Provider Comparison
-    x-axis Low Cost --> High Cost
-    y-axis Low Capability --> High Capability
-    quadrant-1 Premium Options
-    quadrant-2 Best Value
-    quadrant-3 Budget Options
-    quadrant-4 High-End Options
-    
-    Ollama: [0.2, 0.6]
-    Cursor: [0.6, 0.8]
-    Claude CLI: [0.7, 0.9]
-    Antigravity: [0.5, 0.85]
-    Gemini API: [0.4, 0.75]
-```
-
-### Provider-Client Mapping
-
-```mermaid
-graph LR
-    subgraph "User Selection"
-        A[Provider Choice]
-    end
-    
-    subgraph "Mapping Layer"
-        B{Provider to Client}
-    end
-    
-    subgraph "Client Types"
-        C1[ollama]
-        C2[cursor]
-        C3[claude]
-        C4[antigravity]
-    end
-    
-    subgraph "Implementation"
-        D1[OllamaProvider]
-        D2[CursorProvider]
-        D3[ClaudeCliProvider]
-        D4[AntigravityProvider]
-    end
-    
-    A -->|"'ollama'"| B
-    A -->|"'cursor'"| B
-    A -->|"'claude-cli'"| B
-    A -->|"'antigravity'"| B
-    A -->|"'gemini-api'"| B
-    
-    B -->|Maps to| C1 & C2 & C3 & C4
-    
-    C1 --> D1
-    C2 --> D2
-    C3 --> D3
-    C4 --> D4
-    
-    style A fill:#e1f5fe
-    style B fill:#fff3e0
-    style C1 fill:#c5e1a5
-    style C2 fill:#c5e1a5
-    style C3 fill:#c5e1a5
-    style C4 fill:#c5e1a5
-```
-
-### Provider Selection Logic
-
-```mermaid
-flowchart TD
-    Start([Provider Selected]) --> Map{Map to Client Type}
-    
-    Map -->|ollama| CheckOllama{Ollama Running?}
-    Map -->|cursor| CheckCursor{Cursor Installed?}
-    Map -->|claude-cli| CheckClaude{Claude Authenticated?}
-    Map -->|antigravity<br/>gemini-api| CheckGemini{API Key Set?}
-    
-    CheckOllama -->|Yes| LoadOllama[Load OllamaProvider]
-    CheckOllama -->|No| ErrorOllama[❌ Start Ollama server]
-    
-    CheckCursor -->|Yes| LoadCursor[Load CursorProvider]
-    CheckCursor -->|No| ErrorCursor[❌ Install Cursor CLI]
-    
-    CheckClaude -->|Yes| LoadClaude[Load ClaudeProvider]
-    CheckClaude -->|No| ErrorClaude[❌ Run 'claude login']
-    
-    CheckGemini -->|Yes| LoadGemini[Load AntigravityProvider]
-    CheckGemini -->|No| ErrorGemini[❌ Set API key]
-    
-    LoadOllama & LoadCursor & LoadClaude & LoadGemini --> Ready([✅ Provider Ready])
-    
-    ErrorOllama & ErrorCursor & ErrorClaude & ErrorGemini --> Failed([❌ Setup Required])
-    
-    style Start fill:#e3f2fd
-    style Ready fill:#c8e6c9
-    style Failed fill:#ffcdd2
-```
-
----
-
-## 🔧 Technical Details
-
-### Agent Configuration Structure
-
-```typescript
-interface AgentConfig {
-  name: string;              // Display name
-  description: string;       // Short description
-  model: string;            // AI model identifier
-  systemPrompt: string;     // Base instructions
-  temperature: number;      // Creativity level (0-1)
-  maxTokens: number;       // Response length limit
-  capabilities: string[];   // What it can do
-  riskLevel: 'low' | 'medium' | 'high';
-  client?: 'claude' | 'cursor' | 'antigravity' | 'ollama';
-  workspace?: string;       // Working directory
-  force?: boolean;         // Auto-approve ops
-  sandbox?: 'enabled' | 'disabled';
-  isManager?: boolean;     // Can spawn other agents
-}
-```
-
-### Role Definition Structure
-
-```typescript
-interface RoleDefinition {
-  name: string;              // Display name (e.g., "Builder")
-  description: string;       // Short description
-  emoji: string;            // Visual identifier (e.g., "🔨")
-  documentPath: string;     // Path to role doc
-  systemPromptAddition: string; // Fallback prompt
-}
-```
-
-### Code Flow Diagram
-
-```mermaid
-flowchart TD
-    Start([User Selects Role]) --> GetDef[Get Role Definition<br/>from ROLE_DEFINITIONS]
-    
-    GetDef --> TryLoad{Try Load Document}
-    
-    TryLoad -->|Success| FileRead[Read .roles/builder.md]
-    TryLoad -->|Fail| Fallback[Use systemPromptAddition]
-    
-    FileRead --> Format[Format as context block]
-    Fallback --> Format
-    
-    Format --> Inject[Inject into Agent System Prompt]
-    
-    Inject --> CreateAgent[Create Agent Session]
-    
-    CreateAgent --> SetClient[Set Provider Client Type]
-    
-    SetClient --> SetModel[Set Model]
-    
-    SetModel --> Ready([Agent Ready with Role Context])
-    
-    Ready --> Chat{User Sends Message}
-    
-    Chat --> Process[Process with Role Context]
-    
-    Process --> Response[AI Response]
-    
-    Response --> Chat
-    
-    style Start fill:#e3f2fd
-    style Ready fill:#c8e6c9
-    style Process fill:#fff9c4
-```
-
-### Session Management
-
-```mermaid
-graph TB
-    subgraph "Session Storage"
-        A[agentSessions Array]
-    end
-    
-    subgraph "Session Object"
-        B[id: string]
-        C[agentName: string]
-        D[userId: string]
-        E[channelId: string]
-        F[status: active]
-        G[history: Message array]
-        H[client: 'ollama']
-        I[model: 'llama3.2']
-    end
-    
-    subgraph "Active Tracking"
-        J[currentUserAgent Map]
-        K[userId:channelId => agentName]
-    end
-    
-    A --> B & C & D & E & F & G & H & I
-    J --> K
-    K -.-> C
-    
-    style A fill:#fff3e0
-    style J fill:#e1f5fe
+    style Execute fill:#c8e6c9
 ```
 
 ---
@@ -535,26 +331,7 @@ graph TB
 
 ### Adding a Custom Role
 
-```mermaid
-graph LR
-    A[1. Create Role File] --> B[2. Define in Code]
-    B --> C[3. Update Menu]
-    C --> D[4. Test]
-    
-    A -.->|.roles/devops.md| A1[Write role document]
-    B -.->|agent/index.ts| B1[Add to ROLE_DEFINITIONS]
-    C -.->|discord/bot.ts| C1[Add menu option]
-    D -.->|/run-adv| D1[Try it out]
-    
-    style A fill:#e1f5fe
-    style B fill:#f3e5f5
-    style C fill:#fff3e0
-    style D fill:#c8e6c9
-```
-
-### Step-by-Step: Adding "DevOps" Role
-
-#### Step 1: Create Role Document
+1. **Create Role Document**:
 
 ```markdown
 <!-- .roles/devops.md -->
@@ -567,13 +344,12 @@ Deploy, monitor, and maintain production systems.
 - Manage deployments
 - Monitor system health
 - Handle incidents
-...
+- Optimize infrastructure
 ```
 
-#### Step 2: Add to Code
+2. **Add to Role Definitions** (`agent/types.ts`):
 
 ```typescript
-// agent/index.ts - Add to ROLE_DEFINITIONS
 'devops': {
   name: 'DevOps',
   description: 'Deploy, monitor, and maintain systems',
@@ -581,48 +357,29 @@ Deploy, monitor, and maintain production systems.
   documentPath: '.roles/devops.md',
   systemPromptAddition: `
     **Role: DevOps**
-    Focus on deployment, monitoring, and operations...
+    Focus on deployment, monitoring, and operations.
+    Prioritize reliability and observability.
   `
 }
 ```
 
-#### Step 3: Update Menu
+3. **Update Menus** (if using selection UI):
 
 ```typescript
-// discord/bot.ts - Add to role menu
-.addOptions([
-  // ... existing roles ...
-  { 
-    label: '🚀 DevOps', 
-    description: 'Deploy, monitor, and maintain systems', 
-    value: 'devops' 
-  }
-])
+{ 
+  label: '🚀 DevOps', 
+  description: 'Deploy and maintain systems', 
+  value: 'devops' 
+}
 ```
 
 ### Customizing Existing Roles
 
-```mermaid
-flowchart LR
-    A[Identify Role<br/>to Customize] --> B{What to Change?}
-    
-    B -->|Content| C[Edit .roles/{role}.md]
-    B -->|Behavior| D[Edit systemPromptAddition]
-    B -->|Appearance| E[Edit emoji/description]
-    
-    C --> F[Add team-specific<br/>guidelines]
-    C --> G[Add project<br/>examples]
-    C --> H[Link to<br/>internal docs]
-    
-    D --> I[Adjust AI<br/>instructions]
-    
-    E --> J[Update<br/>visual identity]
-    
-    F & G & H & I & J --> K([✅ Custom Role Ready])
-    
-    style A fill:#e3f2fd
-    style K fill:#c8e6c9
-```
+To customize a role for your team:
+
+1. Create/edit `.roles/{role}.md` in your repository
+2. Add team-specific guidelines, examples, and conventions
+3. The system automatically loads your custom version
 
 ---
 
@@ -630,331 +387,61 @@ flowchart LR
 
 ### Common Issues
 
-```mermaid
-graph TD
-    Issue{What's Wrong?}
-    
-    Issue -->|Ollama Error| O1{Is Ollama running?}
-    Issue -->|Cursor Error| C1{Is Cursor installed?}
-    Issue -->|Role Not Loading| R1{Does file exist?}
-    Issue -->|Wrong Context| M1{Model appropriate?}
-    
-    O1 -->|No| O2[Run: ollama serve]
-    O1 -->|Yes| O3[Check: ollama list]
-    
-    C1 -->|No| C2[Install Cursor CLI]
-    C1 -->|Yes| C3[Check: cursor --version]
-    
-    R1 -->|No| R2[Create .roles/{role}.md]
-    R1 -->|Yes| R3[Check file permissions]
-    
-    M1 -->|Small model| M2[Try larger model<br/>or different provider]
-    M1 -->|Wrong provider| M3[Switch to better provider]
-    
-    O2 & C2 & R2 & M2 --> Try[Try Again]
-    O3 & C3 & R3 & M3 --> Debug[Check logs]
-    
-    style Issue fill:#fff3e0
-    style Try fill:#c8e6c9
-    style Debug fill:#e1f5fe
-```
-
-### Error Messages
-
-| Error | Cause | Solution |
+| Issue | Cause | Solution |
 |-------|-------|----------|
 | `Ollama server is not running` | Ollama not started | Run `ollama serve` |
 | `No Ollama models available` | No models pulled | Run `ollama pull llama3.2` |
-| `Cursor CLI encountered an error` | Cursor auth issue | Check Cursor login |
-| `Could not read .roles/builder.md` | File missing | Role file doesn't exist (will use fallback) |
-| `Provider not found` | Invalid provider | Select from available providers |
+| `Cursor CLI error` | Auth issue | Check `cursor agent --version` |
+| `Role not loading` | File missing | Check `.roles/` directory |
+| `Provider not found` | Not configured | Add to settings |
 
 ### Debug Checklist
 
-```mermaid
-graph TD
-    Start([Issue Occurred]) --> Check1{Provider Available?}
-    
-    Check1 -->|No| Fix1[Setup provider]
-    Check1 -->|Yes| Check2{Model Available?}
-    
-    Check2 -->|No| Fix2[Pull/select model]
-    Check2 -->|Yes| Check3{Role File Exists?}
-    
-    Check3 -->|No| Fix3[Use fallback or create file]
-    Check3 -->|Yes| Check4{Session Active?}
-    
-    Check4 -->|No| Fix4[Start new session]
-    Check4 -->|Yes| Check5{Correct Channel?}
-    
-    Check5 -->|No| Fix5[Check channel ID]
-    Check5 -->|Yes| CheckLogs[Check Console Logs]
-    
-    Fix1 & Fix2 & Fix3 & Fix4 & Fix5 --> Retry[Retry Operation]
-    CheckLogs --> Report[Report Issue]
-    
-    style Start fill:#fff3e0
-    style Retry fill:#c8e6c9
-    style Report fill:#ffcdd2
-```
+1. ✅ Provider running and accessible?
+2. ✅ Model available for the provider?
+3. ✅ Role file exists (or fallback available)?
+4. ✅ Session active in correct channel?
+5. ✅ Discord bot has required permissions?
 
 ---
 
-## 📊 Performance Considerations
+## 📊 Quick Reference
 
-### Provider Performance Matrix
-
-```mermaid
-graph TB
-    subgraph "Speed vs Quality"
-        Fast[⚡ Fast Response]
-        Quality[🎯 High Quality]
-        
-        Fast -.-> Ollama[Ollama<br/>Local, fast]
-        Fast -.-> Gemini[Gemini Flash<br/>Cloud, fast]
-        
-        Quality -.-> Claude[Claude Sonnet<br/>High quality]
-        Quality -.-> Cursor[Cursor<br/>IDE integration]
-    end
-    
-    subgraph "Cost vs Access"
-        Free[💰 Free/Low Cost]
-        Premium[💎 Premium]
-        
-        Free -.-> Ollama
-        Free -.-> Gemini
-        
-        Premium -.-> Claude
-        Premium -.-> Cursor
-    end
-    
-    style Fast fill:#c8e6c9
-    style Quality fill:#b2dfdb
-    style Free fill:#fff9c4
-    style Premium fill:#ffccbc
-```
-
-### Role-Provider Recommendations
-
-| Role | Best Provider | Why |
-|------|--------------|-----|
-| Builder 🔨 | Cursor, Antigravity | File editing capabilities |
-| Tester 🧪 | Any | Testing works everywhere |
-| Investigator 🔍 | Ollama, Claude | Deep analysis needs power |
-| Architect 🏗️ | Antigravity | Planning needs broad context |
-| Reviewer 👁️ | Claude, Gemini | High-quality feedback |
-
----
-
-## 🎓 Best Practices
-
-### Do's and Don'ts
-
-```mermaid
-mindmap
-  root((Best Practices))
-    Do
-      Choose right role
-      Customize for team
-      Use role documents
-      Test providers
-      Document changes
-    Don't
-      Mix roles randomly
-      Ignore role context
-      Skip customization
-      Use wrong provider
-      Hardcode values
-```
-
-### Role Selection Guide
-
-```mermaid
-graph TD
-    Start{What's your goal?}
-    
-    Start -->|Write new code| Builder[👉 Builder Role]
-    Start -->|Fix bugs| Debug{Find or fix?}
-    Start -->|Improve code| Improve{What aspect?}
-    Start -->|Plan feature| Plan{Design or implement?}
-    Start -->|Other| Other{What else?}
-    
-    Debug -->|Find root cause| Investigator[👉 Investigator Role]
-    Debug -->|Write fix| Builder
-    
-    Improve -->|Better design| Architect[👉 Architect Role]
-    Improve -->|Better quality| Reviewer[👉 Reviewer Role]
-    Improve -->|More tests| Tester[👉 Tester Role]
-    
-    Plan -->|High-level design| Architect
-    Plan -->|Implementation| Builder
-    
-    Other -->|Code review| Reviewer
-    Other -->|Testing| Tester
-    Other -->|Investigation| Investigator
-    
-    style Builder fill:#c8e6c9
-    style Investigator fill:#b2dfdb
-    style Architect fill:#c5e1a5
-    style Reviewer fill:#dce775
-    style Tester fill:#fff59d
-```
-
----
-
-## 🚀 Quick Start Examples
-
-### Example 1: Building a Feature
-
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Bot as Discord Bot
-    participant Agent as AI Agent (Builder)
-    
-    Dev->>Bot: /run-adv
-    Bot->>Dev: Show provider menu
-    Dev->>Bot: Select "Cursor"
-    Bot->>Dev: Show role menu
-    Dev->>Bot: Select "Builder 🔨"
-    Bot->>Dev: Show model menu
-    Dev->>Bot: Click "Auto-select"
-    
-    Bot->>Agent: Initialize Builder with Cursor
-    Note over Agent: Loaded .roles/builder.md<br/>Focus: Implementation
-    
-    Agent->>Dev: Ready! What feature?
-    Dev->>Agent: "Add user authentication"
-    
-    Agent->>Agent: Think as Builder:<br/>- Plan implementation<br/>- Write clean code<br/>- Add tests
-    
-    Agent->>Dev: Here's the implementation plan...<br/>[Detailed code and steps]
-```
-
-### Example 2: Debugging an Issue
-
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Bot as Discord Bot
-    participant Agent as AI Agent (Investigator)
-    
-    Dev->>Bot: /run-adv
-    Note over Dev,Bot: Selects Ollama + Investigator
-    
-    Bot->>Agent: Initialize Investigator
-    Note over Agent: Loaded .roles/investigator.md<br/>Focus: Analysis & Security
-    
-    Dev->>Agent: "App crashes on login"
-    
-    Agent->>Agent: Think as Investigator:<br/>- Gather information<br/>- Form hypotheses<br/>- Test systematically
-    
-    Agent->>Dev: Questions:<br/>1. What's the error message?<br/>2. When did it start?<br/>3. Can you share logs?
-    
-    Dev->>Agent: [Provides details]
-    
-    Agent->>Dev: Root cause: Null check missing<br/>Here's the fix...
-```
-
-### Example 3: Code Review
-
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Bot as Discord Bot
-    participant Agent as AI Agent (Reviewer)
-    
-    Dev->>Bot: /run-adv
-    Note over Dev,Bot: Selects Gemini + Reviewer
-    
-    Bot->>Agent: Initialize Reviewer
-    Note over Agent: Loaded .roles/reviewer.md<br/>Focus: Constructive Feedback
-    
-    Dev->>Agent: Review this PR:<br/>[Code snippet]
-    
-    Agent->>Agent: Think as Reviewer:<br/>- Check quality<br/>- Find issues<br/>- Give feedback
-    
-    Agent->>Dev: Review feedback:<br/><br/>✅ Good: Clear naming<br/>🟡 Suggestion: Extract to function<br/>🔴 Issue: Security concern
-```
-
----
-
-## 📈 Metrics & Monitoring
-
-### Session Metrics
-
-```mermaid
-pie title Agent Usage by Role (Example)
-    "Builder" : 45
-    "Investigator" : 25
-    "Reviewer" : 15
-    "Tester" : 10
-    "Architect" : 5
-```
-
-### Provider Distribution
-
-```mermaid
-pie title Provider Usage (Example)
-    "Cursor" : 35
-    "Ollama" : 30
-    "Antigravity" : 20
-    "Claude CLI" : 10
-    "Gemini API" : 5
-```
-
----
-
-## 🔮 Future Enhancements
-
-```mermaid
-timeline
-    title Roadmap
-    
-    section Phase 1 (Current)
-        Provider Integration : Cursor : Claude : Ollama : Antigravity : Gemini
-        Role System : 5 Roles : File-based : Customizable
-    
-    section Phase 2 (Planned)
-        Multi-Agent : Agent collaboration : Parallel tasks
-        Advanced Roles : Custom templates : Role inheritance
-    
-    section Phase 3 (Future)
-        Auto-Tuning : Model selection : Performance optimization
-        Analytics : Usage tracking : Quality metrics
-```
-
----
-
-## 📝 Summary
-
-### Key Takeaways
-
-1. **Flexible**: Works with any AI provider
-2. **Customizable**: Repository-specific role documents
-3. **Simple**: Three-step selection process
-4. **Powerful**: Rich role context for better results
-5. **Extensible**: Easy to add new roles and providers
-
-### Quick Reference Card
+### Commands
 
 | Command | Purpose |
 |---------|---------|
-| `/run-adv` | Start advanced agent with full customization |
-| `/kill` | Stop current agent session |
-| `/sync` | Open conversation in IDE |
+| `/agent action:chat` | Chat with agent using role |
+| `/agent action:list` | List available roles |
+| `/agent action:start` | Start session with role |
+| `/agent action:end` | End current session |
 
-| Folder | Purpose |
-|--------|---------|
-| `.roles/` | Role document definitions |
-| `agent/` | Agent system code |
-| `discord/` | Discord bot integration |
+### File Locations
+
+| Path | Purpose |
+|------|---------|
+| `.roles/*.md` | Role document definitions |
+| `agent/types.ts` | Role configurations |
+| `agent/providers/` | Provider implementations |
+| `data/settings.json` | Provider settings |
+
+---
+
+## 🚀 Best Practices
+
+1. **Choose the Right Role**: Match the role to the task type
+2. **Customize for Your Team**: Add project-specific role documents
+3. **Use Provider Routing**: Mention providers for specific capabilities
+4. **Start Sessions**: Use `/agent action:start` for ongoing work
+5. **Monitor Active Agents**: Use `/agents-status` to track work
 
 ---
 
 <div align="center">
 
-**Made with ❤️ for better AI collaboration**
+**Part of the one agent ecosystem**
+
+*Route to any AI. Work from anywhere.*
 
 [Report Issue](../../issues) • [Request Feature](../../issues) • [View Source](../../)
 

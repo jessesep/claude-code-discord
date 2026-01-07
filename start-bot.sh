@@ -1,6 +1,5 @@
 #!/bin/bash
-
-# Discord Bot Startup Script (Foreground)
+# one agent discord - Bot Startup Script (Foreground)
 # This script sets up the environment and starts the bot in the current terminal
 
 # Get the directory where the script is located

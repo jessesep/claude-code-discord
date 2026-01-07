@@ -1,4 +1,6 @@
 {
+  "name": "one-agent-discord",
+  "description": "one agent discord - AI coding assistant orchestrating specialized subagents via Discord",
   "compilerOptions": {
     "lib": ["deno.window"],
     "strict": true
