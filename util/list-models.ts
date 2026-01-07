@@ -1,6 +1,9 @@
 /**
  * List Available Gemini Models
  * Fetches available models from Google's Generative AI API
+ * 
+ * GOLDEN RULE: Always use the latest models. Never downgrade.
+ * This module fetches available models periodically to ensure we're using valid model names.
  */
 
 import { GoogleGenerativeAI } from "npm:@google/generative-ai@^0.21.0";
@@ -14,6 +17,14 @@ export interface AvailableModel {
 }
 
 const API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Model Cache - Refreshes periodically
+// ═══════════════════════════════════════════════════════════════════════════
+
+let cachedModels: AvailableModel[] = [];
+let lastFetchTime = 0;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour cache
 
 /**
  * Fetch available models from Google Generative AI API
