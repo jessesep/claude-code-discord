@@ -85,24 +85,25 @@ function buildAgentInfoFields(
   agent: AgentConfig,
   clientType: string,
   sessionData?: { session: AgentSession } | null,
-  options: { showModel?: boolean; modelUsed?: string; agentKey?: string } = {}
+  options: { showModel?: boolean; modelUsed?: string; agentKey?: string; responseDuration?: number } = {}
 ): Array<{ name: string; value: string; inline: boolean }> {
   const fields: Array<{ name: string; value: string; inline: boolean }> = [];
   
-  // Get agent style for emoji
-  const style = getAgentStyle(options.agentKey || agent.name);
-  
-  // Row 1: Channel & Category
-  const channelName = ctx.channel?.name || 'DM';
-  const categoryName = ctx.channel?.parent?.name || 'No Category';
-  fields.push({ name: '📍 Channel', value: `#${channelName}`, inline: true });
-  fields.push({ name: '📂 Category', value: categoryName, inline: true });
-  
-  // Row 2: Client & Model
+  // Row 1: Client, Model, Duration (3 cols)
   fields.push({ name: '🔌 Client', value: clientType.toUpperCase(), inline: true });
   if (options.showModel !== false) {
     fields.push({ name: '🧠 Model', value: options.modelUsed || agent.model, inline: true });
   }
+  if (options.responseDuration) {
+    const speedLabel = options.responseDuration < 3000 ? '⚡' : options.responseDuration < 10000 ? '🚀' : '⏳';
+    fields.push({ name: `${speedLabel} Speed`, value: `${(options.responseDuration / 1000).toFixed(1)}s`, inline: true });
+  }
+  
+  // Row 2: Channel & Category (2 cols)
+  const channelName = ctx.channel?.name || 'DM';
+  const categoryName = ctx.channel?.parent?.name || 'No Category';
+  fields.push({ name: '📍 Channel', value: `#${channelName}`, inline: true });
+  fields.push({ name: '📂 Category', value: categoryName, inline: true });
   
   // Row 3: Session info (if available)
   if (sessionData?.session) {
@@ -153,6 +154,60 @@ function formatDuration(ms: number): string {
   const hours = Math.floor(minutes / 60);
   const remainingMins = minutes % 60;
   return `${hours}h ${remainingMins}m`;
+}
+
+/**
+ * Format agent response for Discord display
+ * - Truncates to Discord embed limit
+ * - Preserves code blocks
+ * - Formats markdown properly
+ */
+function formatAgentResponse(response: string): string {
+  if (!response) return '*No response*';
+  
+  const MAX_LENGTH = 3800; // Discord embed description limit is 4096, leave room
+  
+  // Clean up any excessive whitespace
+  let formatted = response.replace(/\n{4,}/g, '\n\n\n').trim();
+  
+  // If response is short, return as-is
+  if (formatted.length <= MAX_LENGTH) {
+    return formatted;
+  }
+  
+  // Try to truncate at a natural break point
+  let truncated = formatted.substring(0, MAX_LENGTH);
+  
+  // Check if we're in the middle of a code block
+  const codeBlockOpens = (truncated.match(/```/g) || []).length;
+  if (codeBlockOpens % 2 !== 0) {
+    // We're in an unclosed code block, find a good break point
+    const lastCodeBlockStart = truncated.lastIndexOf('```');
+    if (lastCodeBlockStart > MAX_LENGTH * 0.5) {
+      // Truncate before the code block if it's in the second half
+      truncated = truncated.substring(0, lastCodeBlockStart).trim();
+    } else {
+      // Close the code block
+      truncated += '\n```';
+    }
+  }
+  
+  // Find a good truncation point (end of sentence, paragraph, or line)
+  const breakPoints = [
+    truncated.lastIndexOf('\n\n'),
+    truncated.lastIndexOf('.\n'),
+    truncated.lastIndexOf('. '),
+    truncated.lastIndexOf('\n'),
+  ];
+  
+  for (const bp of breakPoints) {
+    if (bp > MAX_LENGTH * 0.7) {
+      truncated = truncated.substring(0, bp + 1);
+      break;
+    }
+  }
+  
+  return truncated.trim() + '\n\n*...response truncated*';
 }
 
 /**
@@ -680,6 +735,7 @@ export async function chatWithAgent(
     const UPDATE_INTERVAL = 2000;
     let result;
     let fallbackUsed = false;
+    const requestStartTime = Date.now(); // Track response speed
 
     // Primary Client Logic
     if (clientType === 'claude') {
@@ -766,12 +822,14 @@ export async function chatWithAgent(
       }
     }
 
-    const displayResponse = fullResponse.length > 3800 ? fullResponse.substring(0, 3800) + '...' : fullResponse;
+    const responseDuration = Date.now() - requestStartTime;
+    const displayResponse = formatAgentResponse(fullResponse);
     
     // Build enhanced info fields for completion embed with agent styling
     const completedFields = buildAgentInfoFields(ctx, agent, clientType, sessionData, {
       modelUsed: result?.modelUsed || agent.model,
-      agentKey: activeAgentName
+      agentKey: activeAgentName,
+      responseDuration
     });
     
     const completedEmbed = getAgentEmbed(activeAgentName, agent.name, 'completed');
@@ -781,6 +839,7 @@ export async function chatWithAgent(
         title: completedEmbed.title,
         description: displayResponse,
         fields: completedFields,
+        footer: { text: `Response time: ${(responseDuration / 1000).toFixed(1)}s` },
         timestamp: new Date().toISOString()
       }]
     });

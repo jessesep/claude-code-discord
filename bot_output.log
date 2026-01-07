@@ -497,12 +497,14 @@ E2E TEST PASSED
 }
 
 [Antigravity] Using API key fallback (OAuth preferred for security)
+[MessageHandler] Received message from jessesep (367705631014256641): Hey bud
+Received SIGTERM, initiating graceful shutdown...
 
-🧪 [TESTING] Channel restrictions bypassed for message in #e2e-orchestration
-[MessageHandler] Detected model override in prompt: gemini-3-flash-preview
-[MessageHandler] Processing prompt: "using ag-manager, with , I have a task for you: Cr..."
-[MessageHandler] Detected agent mention: ag-manager
-[MessageHandler] Detected provider mention: gemini (client: antigravity)
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+)
 [MessageHandler] Final target agent: ag-manager
 [MessageHandler] Deferring reply...
 [MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
@@ -551,3 +553,10 @@ E2E TEST PASSED
 }
 
 [Antigravity] Using API key fallback (OAuth preferred for security)
+[MessageHandler] Received message from jessesep (367705631014256641): Hey bud
+Received SIGTERM, initiating graceful shutdown...
+
+SIGTERM signal received. Stopping bot...
+Killing 0 worktree bot processes...
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
+[MessageHandler] Received message from Master-Remote#8819 (1457705423137275914): 
