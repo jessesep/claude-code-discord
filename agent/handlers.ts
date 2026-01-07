@@ -871,7 +871,11 @@ export async function handleManagerInteraction(
   } else if (action?.action === 'spawn_agent') {
     const subAgent = AgentRegistry.getInstance().getAgent(action.agent_name!);
     
-    if (subAgent && subAgent.riskLevel === 'high') {
+    // Check if testing mode should auto-approve
+    const { shouldAutoApprove, testingLog } = await import("../util/testing-mode.ts");
+    const autoApprove = shouldAutoApprove(subAgent?.riskLevel);
+    
+    if (subAgent && subAgent.riskLevel === 'high' && !autoApprove) {
       // Store in pending tasks for approval
       const userId = ctx.user.id;
       const channelId = ctx.channelId || ctx.channel?.id;
@@ -908,6 +912,18 @@ export async function handleManagerInteraction(
         }],
         components: [row]
       });
+    } else if (autoApprove && subAgent?.riskLevel === 'high') {
+      // Testing mode: auto-approve high-risk agents
+      testingLog(`Auto-spawning high-risk agent: ${action.agent_name}`);
+      await ctx.editReply({ 
+        embeds: [{
+          color: 0x00ff00,
+          title: '🧪 Auto-Approved (Testing Mode)',
+          description: `Spawning **${action.agent_name}**...`,
+          timestamp: new Date().toISOString()
+        }]
+      });
+      await chatWithAgent(ctx, action.task!, action.agent_name, undefined, false, deps);
     } else {
       await ctx.editReply({ content: `Spawning ${action.agent_name}...` });
       await chatWithAgent(ctx, action.task!, action.agent_name, undefined, false, deps);

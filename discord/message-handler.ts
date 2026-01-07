@@ -74,18 +74,28 @@ export function handleMessageCreate(
     const activeSession = getActiveSession(message.author.id, message.channelId);
     const isMention = message.mentions.has(client.user!.id);
 
-    // Channel restriction
-    if (!enableChannelRouting) {
-      // Allow if it's the bot's channel OR there's an active session OR it's a mention
-      if (!activeSession && !isMention && (!myChannel || message.channelId !== myChannel.id)) return;
-    } else {
-      // If routing enabled, allow if we have channel context OR it's the bot's channel OR active session/mention
-      if (!channelContext && !activeSession && !isMention && (!myChannel || message.channelId !== myChannel.id)) {
-        return;
-      }
-    }
+    // Check for testing mode bypass
+    const { shouldBypassChannelRestrictions, testingLog } = await import("../util/testing-mode.ts");
+    const bypassRestrictions = shouldBypassChannelRestrictions();
 
-    if (!activeSession && !isMention) return;
+    // Channel restriction (bypassed in testing mode)
+    if (!bypassRestrictions) {
+      if (!enableChannelRouting) {
+        // Allow if it's the bot's channel OR there's an active session OR it's a mention
+        if (!activeSession && !isMention && (!myChannel || message.channelId !== myChannel.id)) return;
+      } else {
+        // If routing enabled, allow if we have channel context OR it's the bot's channel OR active session/mention
+        if (!channelContext && !activeSession && !isMention && (!myChannel || message.channelId !== myChannel.id)) {
+          return;
+        }
+      }
+
+      if (!activeSession && !isMention) return;
+    } else {
+      // Testing mode: only require mention (bypass all other restrictions)
+      if (!isMention) return;
+      testingLog(`Channel restrictions bypassed for message in #${message.channel?.name}`);
+    }
 
     try {
       // Extract prompt (remove the mention)

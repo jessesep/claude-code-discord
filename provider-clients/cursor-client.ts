@@ -39,6 +39,15 @@ export async function sendToCursorCLI(
   onChunk?: (text: string) => void
 ): Promise<CursorResponse> {
   try {
+    // Apply testing mode overrides
+    const { getEffectiveSandbox, getEffectiveForce, isTestingMode } = await import("../util/testing-mode.ts");
+    const effectiveOptions = { ...options };
+    
+    if (isTestingMode()) {
+      effectiveOptions.sandbox = getEffectiveSandbox(options.sandbox);
+      effectiveOptions.force = getEffectiveForce(options.force);
+    }
+    
     // Build Cursor CLI command arguments
     const args: string[] = [
       "agent",
@@ -46,7 +55,7 @@ export async function sendToCursorCLI(
     ];
 
     // Add output format
-    if (options.streamJson) {
+    if (effectiveOptions.streamJson) {
       args.push("--output-format", "stream-json");
       args.push("--stream-partial-output");
     } else {
@@ -54,24 +63,24 @@ export async function sendToCursorCLI(
     }
 
     // Add optional flags
-    if (options.model) {
-      args.push("--model", options.model);
+    if (effectiveOptions.model) {
+      args.push("--model", effectiveOptions.model);
     }
 
-    if (options.workspace) {
-      args.push("--workspace", options.workspace);
+    if (effectiveOptions.workspace) {
+      args.push("--workspace", effectiveOptions.workspace);
     }
 
-    if (options.force) {
+    if (effectiveOptions.force) {
       args.push("--force");
     }
 
-    if (options.sandbox) {
-      args.push("--sandbox", options.sandbox);
+    if (effectiveOptions.sandbox) {
+      args.push("--sandbox", effectiveOptions.sandbox);
     }
 
-    if (options.resume) {
-      args.push("--resume", options.resume);
+    if (effectiveOptions.resume) {
+      args.push("--resume", effectiveOptions.resume);
     }
 
     // Add prompt as last argument

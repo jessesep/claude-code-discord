@@ -134,6 +134,35 @@ export async function handleStartup(
       } catch (err) {
         console.warn('[Startup] Could not initialize model cache:', err);
       }
+      
+      // Check for testing mode
+      try {
+        const { isTestingMode, getTestingConfig } = await import("../util/testing-mode.ts");
+        if (isTestingMode()) {
+          const config = getTestingConfig();
+          console.log(`[Startup] ⚠️ TESTING MODE ENABLED`);
+          console.log(`[Startup] Config: autoApprove=${config.autoApproveHighRisk}, sandbox=${!config.disableSandbox}, force=${config.forceMode}`);
+          
+          // Send warning to channel
+          try {
+            await myChannel!.send({
+              embeds: [{
+                color: 0xffaa00,
+                title: '⚠️ Testing Mode Active',
+                description: 'All restrictions and approvals are bypassed.\n\n**DO NOT USE IN PRODUCTION**',
+                fields: [
+                  { name: 'Auto-Approve', value: config.autoApproveHighRisk ? '✅ Yes' : '❌ No', inline: true },
+                  { name: 'Sandbox', value: config.disableSandbox ? '❌ Disabled' : '✅ Enabled', inline: true },
+                  { name: 'Force Mode', value: config.forceMode ? '✅ Yes' : '❌ No', inline: true },
+                ],
+                timestamp: new Date().toISOString()
+              }]
+            });
+          } catch { /* ignore */ }
+        }
+      } catch (err) {
+        console.warn('[Startup] Could not check testing mode:', err);
+      }
 
       // Register Guild Commands
       const skipRegistration = Deno.env.get("SKIP_COMMAND_REGISTRATION") === "true";
